@@ -62,13 +62,83 @@ The new architecture separates those responsibilities into standalone C++ areas 
 - layout generation is separated from render composition
 - simulation-style temperature coloring is derived in an overlay layer instead of being stored as geometry ownership
 
+## Incremental Editing Pass
+
+This pass moves the CAD subsystem closer to a true editable battery document instead of a pure regenerate-only preview flow.
+
+### Direct document editing support
+
+- `CadDocument` now supports direct mutation APIs such as:
+  - move entity
+  - set entity position
+  - remove entity
+  - select / clear selection
+  - set cell position and geometry
+  - set busbar, cooling plate, module boundary, and enclosure geometry
+  - rename entity labels
+- `CadEngine` now exposes those mutations as engine-facing APIs and refreshes the derived visualization/render state after edits.
+
+### Better entity lookup
+
+- `CadDocument` now maintains a lightweight `EntityId -> EntityLocator` index.
+- New APIs now support:
+  - `hasEntity`
+  - `entityKind`
+  - `findCell`
+  - `findBusbar`
+  - `findCoolingPlate`
+  - `findModuleBoundary`
+  - `findEnclosure`
+  - entity snapshot/restore for future undo and serialization work
+
+### Property-editing foundation
+
+- Explicit property-facing accessors now exist for:
+  - cells
+  - busbars
+  - cooling plates
+  - module boundaries
+  - enclosures
+- The engine can now expose selected-entity summaries and typed property snapshots without requiring the host UI to traverse raw containers directly.
+
+### Identity-preserving regeneration
+
+- Layout regeneration now preserves IDs for logically compatible generated entities where practical.
+- Reused logical keys include:
+  - cells by `series_index + parallel_index`
+  - busbars by role
+  - cooling plates by plate index
+  - module boundaries by module index
+  - enclosures by enclosure index
+- Selection now persists across compatible regeneration if the selected entity still exists logically.
+
+### Undo/redo scaffold
+
+- A lightweight command layer now exists under `cad/commands/`:
+  - `ICommand`
+  - `CommandStack`
+  - `MoveEntityCommand`
+  - `RemoveEntityCommand`
+  - `UpdateCellGeometryCommand`
+- Full editor integration is still future work, but the engine now has a clean command-execution seam.
+
+### Broader picking
+
+- Render packets now include broader pickable shapes instead of only cell circles.
+- Coarse rectangle-based picking is now prepared for:
+  - busbars
+  - cooling plates
+  - module boundaries
+  - enclosures
+- This remains a screen-space approximation and is intentionally structured so future ray/AABB or GPU picking can replace it cleanly.
+
 ## Remaining future work
 
-- TODO: add undo/redo command stack
 - TODO: add JSON save/load for CAD documents
-- TODO: add move/rotate/edit operations on entities instead of regenerate-only layout updates
+- TODO: add full UI integration for the command stack
+- TODO: add richer property editing and document tools on top of the new mutation APIs
 - TODO: add snapping, grid constraints, and object snap
 - TODO: add richer picking such as ray/volume picking
 - TODO: add OpenGL render backend implementing `IRenderBackend`
-- TODO: add simulation overlay channels beyond temperature
-- TODO: preserve entity identity across layout regeneration when topology changes are incremental
+- TODO: bind simulation overlays more directly by entity identity
+- TODO: add constraints/dimensions if a future pass needs engineering-style editing workflows

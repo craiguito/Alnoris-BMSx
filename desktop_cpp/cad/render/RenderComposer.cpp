@@ -100,6 +100,63 @@ ProjectionResult projectPoint(const Mat4& mvp, const Vec3& p, int width, int hei
     };
 }
 
+void appendBoxPickable(
+    std::vector<ScreenPickable>& pickables,
+    core::EntityId entity_id,
+    const Mat4& mvp,
+    const Vec3& center,
+    const Vec3& size,
+    int width,
+    int height
+)
+{
+    const Vec3 half{size.x * 0.5f, size.y * 0.5f, size.z * 0.5f};
+    const Vec3 corners[] = {
+        {center.x - half.x, center.y - half.y, center.z - half.z},
+        {center.x - half.x, center.y - half.y, center.z + half.z},
+        {center.x - half.x, center.y + half.y, center.z - half.z},
+        {center.x - half.x, center.y + half.y, center.z + half.z},
+        {center.x + half.x, center.y - half.y, center.z - half.z},
+        {center.x + half.x, center.y - half.y, center.z + half.z},
+        {center.x + half.x, center.y + half.y, center.z - half.z},
+        {center.x + half.x, center.y + half.y, center.z + half.z}
+    };
+
+    float min_x = static_cast<float>(width);
+    float min_y = static_cast<float>(height);
+    float max_x = 0.0f;
+    float max_y = 0.0f;
+    float depth_accumulator = 0.0f;
+    int valid_count = 0;
+
+    for (const Vec3& corner : corners) {
+        const ProjectionResult projected = projectPoint(mvp, corner, width, height);
+        if (!projected.valid) {
+            continue;
+        }
+        min_x = std::min(min_x, projected.x);
+        min_y = std::min(min_y, projected.y);
+        max_x = std::max(max_x, projected.x);
+        max_y = std::max(max_y, projected.y);
+        depth_accumulator += projected.depth;
+        ++valid_count;
+    }
+
+    if (valid_count < 2) {
+        return;
+    }
+
+    pickables.push_back({
+        entity_id,
+        ScreenPickable::Shape::Rectangle,
+        (min_x + max_x) * 0.5f,
+        (min_y + max_y) * 0.5f,
+        std::max(5.0f, (max_x - min_x) * 0.5f),
+        std::max(5.0f, (max_y - min_y) * 0.5f),
+        depth_accumulator / static_cast<float>(valid_count)
+    });
+}
+
 void appendWireBox(std::vector<RenderVertex>& lines, const Vec3& center, const Vec3& size, const Vec3& color)
 {
     const Vec3 half{size.x * 0.5f, size.y * 0.5f, size.z * 0.5f};
@@ -156,15 +213,19 @@ RenderPacket RenderComposer::compose(
 
     for (const battery::CoolingPlateEntity& plate : document.coolingPlates()) {
         appendBox(packet.triangles, plate.center, plate.size, {0.08f, 0.16f, 0.24f});
+        appendBoxPickable(packet.pickables, plate.id, mvp, plate.center, plate.size, viewport_width, viewport_height);
     }
     for (const battery::BusbarEntity& busbar : document.busbars()) {
         appendBox(packet.triangles, busbar.center, busbar.size, {0.86f, 0.68f, 0.30f});
+        appendBoxPickable(packet.pickables, busbar.id, mvp, busbar.center, busbar.size, viewport_width, viewport_height);
     }
     for (const battery::ModuleBoundaryEntity& boundary : document.moduleBoundaries()) {
         appendWireBox(packet.lines, boundary.center, boundary.size, {0.25f, 0.45f, 0.86f});
+        appendBoxPickable(packet.pickables, boundary.id, mvp, boundary.center, boundary.size, viewport_width, viewport_height);
     }
     for (const battery::PackEnclosureEntity& enclosure : document.packEnclosures()) {
         appendWireBox(packet.lines, enclosure.center, enclosure.size, {0.42f, 0.48f, 0.54f});
+        appendBoxPickable(packet.pickables, enclosure.id, mvp, enclosure.center, enclosure.size, viewport_width, viewport_height);
     }
 
     for (const battery::CellEntity& cell : document.cells()) {
@@ -201,8 +262,10 @@ RenderPacket RenderComposer::compose(
         if (center.valid && edge.valid) {
             packet.pickables.push_back({
                 cell.id,
+                ScreenPickable::Shape::Circle,
                 center.x,
                 center.y,
+                std::max(6.0f, std::abs(edge.x - center.x)),
                 std::max(6.0f, std::abs(edge.x - center.x)),
                 center.depth
             });

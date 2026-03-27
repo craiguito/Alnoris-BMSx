@@ -21,6 +21,11 @@ qt_add_executable(alnoris_desktop WIN32
     cad/battery/PackLayoutGenerator.h
     cad/camera/Camera.cpp
     cad/camera/Camera.h
+    cad/commands/BatteryCommands.cpp
+    cad/commands/BatteryCommands.h
+    cad/commands/CommandStack.cpp
+    cad/commands/CommandStack.h
+    cad/commands/ICommand.h
     cad/core/CadDocument.cpp
     cad/core/CadDocument.h
     cad/core/EntityId.h
@@ -62,6 +67,33 @@ add_custom_command(TARGET alnoris_desktop POST_BUILD
         $<TARGET_FILE_DIR:alnoris_desktop>
     COMMAND_EXPAND_LISTS
 )
+
+if (WIN32)
+    get_target_property(QT_CORE_DLL Qt6::Core IMPORTED_LOCATION_DEBUG)
+    if (NOT QT_CORE_DLL)
+        get_target_property(QT_CORE_DLL Qt6::Core IMPORTED_LOCATION_RELEASE)
+    endif()
+
+    if (QT_CORE_DLL)
+        get_filename_component(QT_BIN_DIR "${QT_CORE_DLL}" DIRECTORY)
+        get_filename_component(QT_PREFIX_DIR "${QT_BIN_DIR}" DIRECTORY)
+        set(QT_PLATFORMS_DIR "${QT_PREFIX_DIR}/plugins/platforms")
+
+        add_custom_command(TARGET alnoris_desktop POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:alnoris_desktop>/platforms"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${QT_PLATFORMS_DIR}/qwindowsd.dll"
+                "$<TARGET_FILE_DIR:alnoris_desktop>/platforms/qwindowsd.dll"
+        )
+
+        file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/qt.conf" "[Paths]\nPlugins = .\n")
+        add_custom_command(TARGET alnoris_desktop POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_CURRENT_BINARY_DIR}/qt.conf"
+                "$<TARGET_FILE_DIR:alnoris_desktop>/qt.conf"
+        )
+    endif()
+endif()
 
 if (MSVC)
     target_compile_options(alnoris_desktop PRIVATE /permissive- /Zc:__cplusplus)

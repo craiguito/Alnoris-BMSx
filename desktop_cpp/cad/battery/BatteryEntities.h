@@ -4,7 +4,9 @@
 #include "../math/CadMath.h"
 
 #include <string>
+#include <optional>
 #include <unordered_map>
+#include <variant>
 
 namespace cad::battery {
 
@@ -15,6 +17,12 @@ enum class EntityKind
     CoolingPlate,
     ModuleBoundary,
     PackEnclosure
+};
+
+enum class BusbarRole
+{
+    Negative,
+    Positive
 };
 
 struct EntityBase
@@ -36,27 +44,84 @@ struct CellEntity : EntityBase
 
 struct BusbarEntity : EntityBase
 {
+    BusbarRole role = BusbarRole::Negative;
     math::Vec3 center{};
     math::Vec3 size{700.0f, 12.0f, 16.0f};
 };
 
 struct CoolingPlateEntity : EntityBase
 {
+    int plate_index = 0;
     math::Vec3 center{};
     math::Vec3 size{680.0f, 24.0f, 320.0f};
 };
 
 struct ModuleBoundaryEntity : EntityBase
 {
+    int module_index = 0;
     math::Vec3 center{};
     math::Vec3 size{720.0f, 280.0f, 380.0f};
 };
 
 struct PackEnclosureEntity : EntityBase
 {
+    int enclosure_index = 0;
     math::Vec3 center{};
     math::Vec3 size{760.0f, 320.0f, 420.0f};
     float wall_thickness = 8.0f;
+};
+
+using EntityRecord = std::variant<CellEntity, BusbarEntity, CoolingPlateEntity, ModuleBoundaryEntity, PackEnclosureEntity>;
+
+struct EntitySummary
+{
+    core::EntityId id{};
+    EntityKind kind = EntityKind::Cell;
+    std::string label;
+    bool visible = true;
+};
+
+struct CellProperties
+{
+    EntitySummary summary;
+    math::Vec3 position{};
+    float radius = 0.0f;
+    float height = 0.0f;
+    int series_index = 0;
+    int parallel_index = 0;
+};
+
+struct BusbarProperties
+{
+    EntitySummary summary;
+    BusbarRole role = BusbarRole::Negative;
+    math::Vec3 center{};
+    math::Vec3 size{};
+};
+
+struct CoolingPlateProperties
+{
+    EntitySummary summary;
+    int plate_index = 0;
+    math::Vec3 center{};
+    math::Vec3 size{};
+};
+
+struct ModuleBoundaryProperties
+{
+    EntitySummary summary;
+    int module_index = 0;
+    math::Vec3 center{};
+    math::Vec3 size{};
+};
+
+struct PackEnclosureProperties
+{
+    EntitySummary summary;
+    int enclosure_index = 0;
+    math::Vec3 center{};
+    math::Vec3 size{};
+    float wall_thickness = 0.0f;
 };
 
 struct BatteryVisualizationOverlay

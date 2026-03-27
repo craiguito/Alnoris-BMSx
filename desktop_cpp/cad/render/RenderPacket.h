@@ -16,10 +16,18 @@ struct RenderVertex
 
 struct ScreenPickable
 {
+    enum class Shape
+    {
+        Circle,
+        Rectangle
+    };
+
     core::EntityId entity_id{};
+    Shape shape = Shape::Circle;
     float x = 0.0f;
     float y = 0.0f;
-    float radius = 0.0f;
+    float half_width = 0.0f;
+    float half_height = 0.0f;
     float depth = 0.0f;
 };
 
