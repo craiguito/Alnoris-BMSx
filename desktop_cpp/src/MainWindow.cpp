@@ -690,22 +690,22 @@ void MainWindow::updateCadWorkspace()
         return;
     }
 
-    cad::PackConfig cadConfig;
-    cadConfig.preset_name = m_referencePreset != nullptr ? m_referencePreset->currentText().toStdString() : std::string("Custom");
-    cadConfig.cells_in_series = m_cellsInSeries != nullptr ? static_cast<int>(m_cellsInSeries->value()) : 0;
-    cadConfig.cells_in_parallel = m_cellsInParallel != nullptr ? static_cast<int>(m_cellsInParallel->value()) : 0;
-    cadConfig.cell_nominal_voltage = m_cellNominalVoltage != nullptr ? m_cellNominalVoltage->value() : 0.0;
-    cadConfig.cell_capacity_ah = m_cellCapacity != nullptr ? m_cellCapacity->value() : 0.0;
-    cadConfig.ambient_temp_c = m_ambientTemp != nullptr ? m_ambientTemp->value() : 0.0;
-    cadConfig.internal_resistance_ohm = m_internalResistance != nullptr ? m_internalResistance->value() : 0.0;
-    cadConfig.discharge_current_a = m_dischargeCurrent != nullptr ? m_dischargeCurrent->value() : 0.0;
-    cadConfig.pack_mass_kg = m_packMass != nullptr ? m_packMass->value() : 0.0;
-    cadConfig.cooling_coeff_w_per_k = m_coolingCoeff != nullptr ? m_coolingCoeff->value() : 0.0;
-    cadConfig.initial_soc = m_initialSoc != nullptr ? m_initialSoc->value() : 0.0;
-    cadConfig.pack_voltage = m_cellNominalVoltage != nullptr && m_cellsInSeries != nullptr
+    cad::battery::BatteryCadConfig cadConfig;
+    cadConfig.layout.preset_name = m_referencePreset != nullptr ? m_referencePreset->currentText().toStdString() : std::string("Custom");
+    cadConfig.layout.cells_in_series = m_cellsInSeries != nullptr ? static_cast<int>(m_cellsInSeries->value()) : 0;
+    cadConfig.layout.cells_in_parallel = m_cellsInParallel != nullptr ? static_cast<int>(m_cellsInParallel->value()) : 0;
+    cadConfig.electrical.cell_nominal_voltage = m_cellNominalVoltage != nullptr ? m_cellNominalVoltage->value() : 0.0;
+    cadConfig.electrical.cell_capacity_ah = m_cellCapacity != nullptr ? m_cellCapacity->value() : 0.0;
+    cadConfig.thermal.ambient_temp_c = m_ambientTemp != nullptr ? m_ambientTemp->value() : 0.0;
+    cadConfig.electrical.internal_resistance_ohm = m_internalResistance != nullptr ? m_internalResistance->value() : 0.0;
+    cadConfig.electrical.discharge_current_a = m_dischargeCurrent != nullptr ? m_dischargeCurrent->value() : 0.0;
+    cadConfig.thermal.pack_mass_kg = m_packMass != nullptr ? m_packMass->value() : 0.0;
+    cadConfig.thermal.cooling_coeff_w_per_k = m_coolingCoeff != nullptr ? m_coolingCoeff->value() : 0.0;
+    cadConfig.electrical.initial_soc = m_initialSoc != nullptr ? m_initialSoc->value() : 0.0;
+    cadConfig.metrics.pack_voltage = m_cellNominalVoltage != nullptr && m_cellsInSeries != nullptr
         ? m_cellNominalVoltage->value() * m_cellsInSeries->value()
         : 0.0;
-    cadConfig.pack_capacity_ah = m_cellCapacity != nullptr && m_cellsInParallel != nullptr
+    cadConfig.metrics.pack_capacity_ah = m_cellCapacity != nullptr && m_cellsInParallel != nullptr
         ? m_cellCapacity->value() * m_cellsInParallel->value()
         : 0.0;
     m_cadWorkspaceView->setPackConfig(cadConfig);

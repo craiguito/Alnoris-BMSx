@@ -11,9 +11,30 @@ set(CMAKE_AUTORCC ON)
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
 
 qt_add_executable(alnoris_desktop WIN32
-    cad/CadModule.cpp
-    cad/CadModule.h
-    cad/CadTypes.h
+    cad/CadEngine.cpp
+    cad/CadEngine.h
+    cad/battery/BatteryConfig.h
+    cad/battery/BatteryEntities.h
+    cad/battery/BatteryVisualizationBuilder.cpp
+    cad/battery/BatteryVisualizationBuilder.h
+    cad/battery/PackLayoutGenerator.cpp
+    cad/battery/PackLayoutGenerator.h
+    cad/camera/Camera.cpp
+    cad/camera/Camera.h
+    cad/core/CadDocument.cpp
+    cad/core/CadDocument.h
+    cad/core/EntityId.h
+    cad/core/SelectionState.h
+    cad/io/JsonCadDocumentIO.h
+    cad/io/MeshLoader.cpp
+    cad/io/MeshLoader.h
+    cad/math/CadMath.h
+    cad/picking/HitTester.cpp
+    cad/picking/HitTester.h
+    cad/render/IRenderBackend.h
+    cad/render/RenderComposer.cpp
+    cad/render/RenderComposer.h
+    cad/render/RenderPacket.h
     charts/ChartModule.cpp
     charts/ChartModule.h
     charts/ChartTypes.h

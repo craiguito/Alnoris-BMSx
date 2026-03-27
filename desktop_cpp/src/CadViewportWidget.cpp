@@ -26,7 +26,7 @@ struct ProjectedTriangle
     float depth = 0.0f;
 };
 
-ProjectedVertex projectPoint(const std::array<float, 16>& mvp, const cad::Vec3& p, int width, int height)
+ProjectedVertex projectPoint(const std::array<float, 16>& mvp, const cad::math::Vec3& p, int width, int height)
 {
     const float x = p.x;
     const float y = p.y;
@@ -52,7 +52,7 @@ ProjectedVertex projectPoint(const std::array<float, 16>& mvp, const cad::Vec3& 
     };
 }
 
-QColor toColor(const cad::Vec3& color)
+QColor toColor(const cad::math::Vec3& color)
 {
     return QColor::fromRgbF(
         std::clamp(color.x, 0.0f, 1.0f),
@@ -78,7 +78,7 @@ CadViewportWidget::CadViewportWidget(QWidget* parent)
 
 bool CadViewportWidget::setCellMeshPath(const QString& path)
 {
-    const bool loaded = m_module.set_cell_mesh_path(path.toStdString());
+    const bool loaded = m_engine.setCellMeshPath(path.toStdString());
     update();
     return loaded;
 }
@@ -92,9 +92,9 @@ void CadViewportWidget::setBackgroundColor(const QColor& color)
     update();
 }
 
-void CadViewportWidget::setPackConfig(const cad::PackConfig& config)
+void CadViewportWidget::setPackConfig(const cad::battery::BatteryCadConfig& config)
 {
-    m_module.set_pack_config(config);
+    m_engine.setBatteryConfig(config);
     update();
 }
 
@@ -106,7 +106,7 @@ void CadViewportWidget::paintEvent(QPaintEvent* event)
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.fillRect(rect(), m_backgroundColor);
 
-    const cad::FrameData& frame = m_module.frame_data();
+    const cad::render::RenderPacket& frame = m_engine.renderPacket();
     if (frame.triangles.empty() && frame.lines.empty()) {
         painter.setPen(QColor(90, 102, 116));
         painter.drawText(rect(), Qt::AlignCenter, "CAD viewport has no scene geometry");
@@ -123,7 +123,7 @@ void CadViewportWidget::paintEvent(QPaintEvent* event)
             continue;
         }
 
-        const cad::Vec3 avgColor{
+        const cad::math::Vec3 avgColor{
             (frame.triangles[i].color.x + frame.triangles[i + 1].color.x + frame.triangles[i + 2].color.x) / 3.0f,
             (frame.triangles[i].color.y + frame.triangles[i + 1].color.y + frame.triangles[i + 2].color.y) / 3.0f,
             (frame.triangles[i].color.z + frame.triangles[i + 1].color.z + frame.triangles[i + 2].color.z) / 3.0f
@@ -169,7 +169,7 @@ void CadViewportWidget::paintEvent(QPaintEvent* event)
 
 void CadViewportWidget::resizeEvent(QResizeEvent* event)
 {
-    m_module.set_viewport_size(event->size().width(), event->size().height());
+    m_engine.setViewportSize(event->size().width(), event->size().height());
     QWidget::resizeEvent(event);
 }
 
@@ -187,7 +187,7 @@ void CadViewportWidget::mouseMoveEvent(QMouseEvent* event)
 {
     if (m_dragging && (event->buttons() & Qt::LeftButton)) {
         const QPoint delta = event->pos() - m_lastMousePos;
-        m_module.orbit(static_cast<float>(delta.x()) * 0.45f, static_cast<float>(delta.y()) * 0.30f);
+        m_engine.orbit(static_cast<float>(delta.x()) * 0.45f, static_cast<float>(delta.y()) * 0.30f);
         m_lastMousePos = event->pos();
         update();
     }
@@ -197,9 +197,9 @@ void CadViewportWidget::mouseMoveEvent(QMouseEvent* event)
 void CadViewportWidget::mouseReleaseEvent(QMouseEvent* event)
 {
     if (m_dragging && (event->pos() - m_pressMousePos).manhattanLength() < 4) {
-        const int hit = m_module.hit_test_cell(static_cast<float>(event->position().x()), static_cast<float>(event->position().y()));
-        if (hit >= 0) {
-            m_module.select_cell(hit);
+        const cad::core::EntityId hit = m_engine.hitTestEntity(static_cast<float>(event->position().x()), static_cast<float>(event->position().y()));
+        if (hit.isValid()) {
+            m_engine.selectEntity(hit);
             update();
         }
     }
@@ -209,7 +209,7 @@ void CadViewportWidget::mouseReleaseEvent(QMouseEvent* event)
 
 void CadViewportWidget::wheelEvent(QWheelEvent* event)
 {
-    m_module.zoom(event->angleDelta().y() > 0 ? 0.08f : -0.08f);
+    m_engine.zoom(event->angleDelta().y() > 0 ? 0.08f : -0.08f);
     update();
     event->accept();
 }

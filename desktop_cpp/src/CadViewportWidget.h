@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../cad/CadModule.h"
+#include "../cad/CadEngine.h"
 
 #include <QColor>
 #include <QPoint>
@@ -19,7 +19,7 @@ public:
 
     bool setCellMeshPath(const QString& path);
     void setBackgroundColor(const QColor& color);
-    void setPackConfig(const cad::PackConfig& config);
+    void setPackConfig(const cad::battery::BatteryCadConfig& config);
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -30,7 +30,7 @@ protected:
     void wheelEvent(QWheelEvent* event) override;
 
 private:
-    cad::Module m_module;
+    cad::CadEngine m_engine;
     QColor m_backgroundColor;
     QPoint m_pressMousePos;
     QPoint m_lastMousePos;
