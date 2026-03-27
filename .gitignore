@@ -1,0 +1,86 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.vs/
+*.suo
+*.user
+*.userossc
+*.sln.docstates
+
+# Python environments / caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Node / frontend caches
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/
+
+# Build outputs
+build/
+dist/
+out/
+bin/
+obj/
+Debug/
+Release/
+x64/
+x86/
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+CTestTestfile.cmake
+Testing/
+
+# Qt / generated UI files
+*.qrc.depends
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+
+# MSVC / native build artifacts
+*.obj
+*.o
+*.pdb
+*.idb
+*.ilk
+*.ipch
+*.tlog
+*.lastbuildstate
+*.recipe
+*.log
+
+# Generated binaries / libraries
+*.exe
+*.dll
+*.lib
+*.exp
+*.so
+*.dylib
+*.a
+
+# Temporary / package artifacts
+*.tmp
+*.temp
+*.bak
+*.cache
+*.7z
+*.zip
+*.tar
+*.gz
+*.rar
