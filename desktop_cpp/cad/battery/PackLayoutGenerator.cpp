@@ -2,8 +2,7 @@
 
 #include <algorithm>
 #include <map>
-#include <optional>
-#include <tuple>
+#include <utility>
 
 namespace cad::battery {
 namespace {
@@ -11,11 +10,115 @@ namespace {
 using CellKey = std::pair<int, int>;
 
 template <typename T>
-void copyPersistentFields(T& target, const T& source)
+void preserveCommonOverrides(T& generated, const T& existing)
 {
-    target.id = source.id;
-    target.label = source.label;
-    target.visible = source.visible;
+    generated.id = existing.id;
+
+    if (existing.property_modes.label == PropertyMode::UserOverride) {
+        generated.label = existing.label;
+    }
+    if (existing.property_modes.visibility == PropertyMode::UserOverride) {
+        generated.visible = existing.visible;
+    }
+    generated.property_modes.label = existing.property_modes.label;
+    generated.property_modes.visibility = existing.property_modes.visibility;
+}
+
+CellEntity mergeCell(const CellEntity& generated, const CellEntity* existing)
+{
+    if (existing == nullptr) {
+        return generated;
+    }
+
+    CellEntity merged = generated;
+    preserveCommonOverrides(merged, *existing);
+    if (existing->property_modes.position == PropertyMode::UserOverride) {
+        merged.position = existing->position;
+    }
+    if (existing->property_modes.geometry == PropertyMode::UserOverride) {
+        merged.radius = existing->radius;
+        merged.height = existing->height;
+    }
+    merged.property_modes.position = existing->property_modes.position;
+    merged.property_modes.geometry = existing->property_modes.geometry;
+    return merged;
+}
+
+BusbarEntity mergeBusbar(const BusbarEntity& generated, const BusbarEntity* existing)
+{
+    if (existing == nullptr) {
+        return generated;
+    }
+
+    BusbarEntity merged = generated;
+    preserveCommonOverrides(merged, *existing);
+    if (existing->property_modes.position == PropertyMode::UserOverride) {
+        merged.center = existing->center;
+    }
+    if (existing->property_modes.geometry == PropertyMode::UserOverride) {
+        merged.size = existing->size;
+    }
+    merged.property_modes.position = existing->property_modes.position;
+    merged.property_modes.geometry = existing->property_modes.geometry;
+    return merged;
+}
+
+CoolingPlateEntity mergeCoolingPlate(const CoolingPlateEntity& generated, const CoolingPlateEntity* existing)
+{
+    if (existing == nullptr) {
+        return generated;
+    }
+
+    CoolingPlateEntity merged = generated;
+    preserveCommonOverrides(merged, *existing);
+    if (existing->property_modes.position == PropertyMode::UserOverride) {
+        merged.center = existing->center;
+    }
+    if (existing->property_modes.geometry == PropertyMode::UserOverride) {
+        merged.size = existing->size;
+    }
+    merged.property_modes.position = existing->property_modes.position;
+    merged.property_modes.geometry = existing->property_modes.geometry;
+    return merged;
+}
+
+ModuleBoundaryEntity mergeModuleBoundary(const ModuleBoundaryEntity& generated, const ModuleBoundaryEntity* existing)
+{
+    if (existing == nullptr) {
+        return generated;
+    }
+
+    ModuleBoundaryEntity merged = generated;
+    preserveCommonOverrides(merged, *existing);
+    if (existing->property_modes.position == PropertyMode::UserOverride) {
+        merged.center = existing->center;
+    }
+    if (existing->property_modes.geometry == PropertyMode::UserOverride) {
+        merged.size = existing->size;
+    }
+    merged.property_modes.position = existing->property_modes.position;
+    merged.property_modes.geometry = existing->property_modes.geometry;
+    return merged;
+}
+
+PackEnclosureEntity mergeEnclosure(const PackEnclosureEntity& generated, const PackEnclosureEntity* existing)
+{
+    if (existing == nullptr) {
+        return generated;
+    }
+
+    PackEnclosureEntity merged = generated;
+    preserveCommonOverrides(merged, *existing);
+    if (existing->property_modes.position == PropertyMode::UserOverride) {
+        merged.center = existing->center;
+    }
+    if (existing->property_modes.geometry == PropertyMode::UserOverride) {
+        merged.size = existing->size;
+        merged.wall_thickness = existing->wall_thickness;
+    }
+    merged.property_modes.position = existing->property_modes.position;
+    merged.property_modes.geometry = existing->property_modes.geometry;
+    return merged;
 }
 
 } // namespace
@@ -59,83 +162,72 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
 
     for (int row = 0; row < parallel_count; ++row) {
         for (int col = 0; col < series_count; ++col) {
-            CellEntity cell;
-            cell.label = "Cell";
-            cell.position = {
+            CellEntity generated;
+            generated.label = "Cell";
+            generated.position = {
                 (col - (series_count - 1) / 2.0f) * config.x_spacing,
                 0.0f,
                 (row - (parallel_count - 1) / 2.0f) * config.z_spacing
             };
-            cell.radius = config.cell_radius;
-            cell.height = config.cell_height;
-            cell.series_index = col;
-            cell.parallel_index = row;
+            generated.radius = config.cell_radius;
+            generated.height = config.cell_height;
+            generated.series_index = col;
+            generated.parallel_index = row;
 
             const auto previousIt = previousCells.find({col, row});
-            if (previousIt != previousCells.end()) {
-                copyPersistentFields(cell, previousIt->second);
-            }
-
-            document.addCell(cell);
+            const CellEntity merged = mergeCell(generated, previousIt == previousCells.end() ? nullptr : &previousIt->second);
+            document.addCell(merged);
         }
     }
 
-    CoolingPlateEntity coolingPlate;
-    coolingPlate.label = "Cooling plate";
-    coolingPlate.plate_index = 0;
-    coolingPlate.center = {0.0f, -128.0f, 0.0f};
-    coolingPlate.size = {pack_width + 72.0f, 24.0f, pack_depth + 92.0f};
-    if (const auto previousIt = previousCoolingPlates.find(coolingPlate.plate_index); previousIt != previousCoolingPlates.end()) {
-        copyPersistentFields(coolingPlate, previousIt->second);
-    }
-    document.addCoolingPlate(coolingPlate);
+    CoolingPlateEntity generatedCoolingPlate;
+    generatedCoolingPlate.label = "Cooling plate";
+    generatedCoolingPlate.plate_index = 0;
+    generatedCoolingPlate.center = {0.0f, -128.0f, 0.0f};
+    generatedCoolingPlate.size = {pack_width + 72.0f, 24.0f, pack_depth + 92.0f};
+    const auto previousPlate = previousCoolingPlates.find(generatedCoolingPlate.plate_index);
+    document.addCoolingPlate(mergeCoolingPlate(generatedCoolingPlate, previousPlate == previousCoolingPlates.end() ? nullptr : &previousPlate->second));
 
-    BusbarEntity negativeBusbar;
-    negativeBusbar.label = "Negative busbar";
-    negativeBusbar.role = BusbarRole::Negative;
-    negativeBusbar.center = {0.0f, 112.0f, -pack_depth * 0.5f};
-    negativeBusbar.size = {pack_width + 96.0f, 12.0f, 16.0f};
-    if (const auto previousIt = previousBusbars.find(negativeBusbar.role); previousIt != previousBusbars.end()) {
-        copyPersistentFields(negativeBusbar, previousIt->second);
-    }
-    document.addBusbar(negativeBusbar);
+    BusbarEntity generatedNegativeBusbar;
+    generatedNegativeBusbar.label = "Negative busbar";
+    generatedNegativeBusbar.role = BusbarRole::Negative;
+    generatedNegativeBusbar.center = {0.0f, 112.0f, -pack_depth * 0.5f};
+    generatedNegativeBusbar.size = {pack_width + 96.0f, 12.0f, 16.0f};
+    const auto previousNegativeBusbar = previousBusbars.find(generatedNegativeBusbar.role);
+    document.addBusbar(mergeBusbar(generatedNegativeBusbar, previousNegativeBusbar == previousBusbars.end() ? nullptr : &previousNegativeBusbar->second));
 
-    BusbarEntity positiveBusbar;
-    positiveBusbar.label = "Positive busbar";
-    positiveBusbar.role = BusbarRole::Positive;
-    positiveBusbar.center = {0.0f, 112.0f, pack_depth * 0.5f};
-    positiveBusbar.size = {pack_width + 96.0f, 12.0f, 16.0f};
-    if (const auto previousIt = previousBusbars.find(positiveBusbar.role); previousIt != previousBusbars.end()) {
-        copyPersistentFields(positiveBusbar, previousIt->second);
-    }
-    document.addBusbar(positiveBusbar);
+    BusbarEntity generatedPositiveBusbar;
+    generatedPositiveBusbar.label = "Positive busbar";
+    generatedPositiveBusbar.role = BusbarRole::Positive;
+    generatedPositiveBusbar.center = {0.0f, 112.0f, pack_depth * 0.5f};
+    generatedPositiveBusbar.size = {pack_width + 96.0f, 12.0f, 16.0f};
+    const auto previousPositiveBusbar = previousBusbars.find(generatedPositiveBusbar.role);
+    document.addBusbar(mergeBusbar(generatedPositiveBusbar, previousPositiveBusbar == previousBusbars.end() ? nullptr : &previousPositiveBusbar->second));
 
-    ModuleBoundaryEntity moduleBoundary;
-    moduleBoundary.label = "Module boundary";
-    moduleBoundary.module_index = 0;
-    moduleBoundary.center = {0.0f, 0.0f, 0.0f};
-    moduleBoundary.size = {pack_width + 96.0f, config.cell_height + 56.0f, pack_depth + 92.0f};
-    if (const auto previousIt = previousModuleBoundaries.find(moduleBoundary.module_index); previousIt != previousModuleBoundaries.end()) {
-        copyPersistentFields(moduleBoundary, previousIt->second);
-    }
-    document.addModuleBoundary(moduleBoundary);
+    ModuleBoundaryEntity generatedModuleBoundary;
+    generatedModuleBoundary.label = "Module boundary";
+    generatedModuleBoundary.module_index = 0;
+    generatedModuleBoundary.center = {0.0f, 0.0f, 0.0f};
+    generatedModuleBoundary.size = {pack_width + 96.0f, config.cell_height + 56.0f, pack_depth + 92.0f};
+    const auto previousModuleBoundary = previousModuleBoundaries.find(generatedModuleBoundary.module_index);
+    document.addModuleBoundary(mergeModuleBoundary(generatedModuleBoundary, previousModuleBoundary == previousModuleBoundaries.end() ? nullptr : &previousModuleBoundary->second));
 
-    PackEnclosureEntity enclosure;
-    enclosure.label = "Pack enclosure";
-    enclosure.enclosure_index = 0;
-    enclosure.center = {0.0f, 0.0f, 0.0f};
-    enclosure.size = {pack_width + 140.0f, config.cell_height + 92.0f, pack_depth + 136.0f};
-    enclosure.wall_thickness = 8.0f;
-    if (const auto previousIt = previousEnclosures.find(enclosure.enclosure_index); previousIt != previousEnclosures.end()) {
-        copyPersistentFields(enclosure, previousIt->second);
-    }
-    document.addPackEnclosure(enclosure);
+    PackEnclosureEntity generatedEnclosure;
+    generatedEnclosure.label = "Pack enclosure";
+    generatedEnclosure.enclosure_index = 0;
+    generatedEnclosure.center = {0.0f, 0.0f, 0.0f};
+    generatedEnclosure.size = {pack_width + 140.0f, config.cell_height + 92.0f, pack_depth + 136.0f};
+    generatedEnclosure.wall_thickness = 8.0f;
+    const auto previousEnclosure = previousEnclosures.find(generatedEnclosure.enclosure_index);
+    document.addPackEnclosure(mergeEnclosure(generatedEnclosure, previousEnclosure == previousEnclosures.end() ? nullptr : &previousEnclosure->second));
 
     if (document.hasEntity(previous_selection)) {
         document.selectEntity(previous_selection);
     } else {
         document.clearSelection();
     }
+
+    // TODO: if future layout diffs become more complex, consider a richer merge strategy than logical-key replacement.
 }
 
 } // namespace cad::battery

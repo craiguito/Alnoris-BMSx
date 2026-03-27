@@ -25,12 +25,27 @@ enum class BusbarRole
     Positive
 };
 
+enum class PropertyMode
+{
+    Generated,
+    UserOverride
+};
+
+struct EntityPropertyModes
+{
+    PropertyMode position = PropertyMode::Generated;
+    PropertyMode geometry = PropertyMode::Generated;
+    PropertyMode label = PropertyMode::Generated;
+    PropertyMode visibility = PropertyMode::Generated;
+};
+
 struct EntityBase
 {
     core::EntityId id{};
     EntityKind kind = EntityKind::Cell;
     std::string label;
     bool visible = true;
+    EntityPropertyModes property_modes;
 };
 
 struct CellEntity : EntityBase
@@ -89,6 +104,7 @@ struct CellProperties
     float height = 0.0f;
     int series_index = 0;
     int parallel_index = 0;
+    EntityPropertyModes property_modes;
 };
 
 struct BusbarProperties
@@ -97,6 +113,7 @@ struct BusbarProperties
     BusbarRole role = BusbarRole::Negative;
     math::Vec3 center{};
     math::Vec3 size{};
+    EntityPropertyModes property_modes;
 };
 
 struct CoolingPlateProperties
@@ -105,6 +122,7 @@ struct CoolingPlateProperties
     int plate_index = 0;
     math::Vec3 center{};
     math::Vec3 size{};
+    EntityPropertyModes property_modes;
 };
 
 struct ModuleBoundaryProperties
@@ -113,6 +131,7 @@ struct ModuleBoundaryProperties
     int module_index = 0;
     math::Vec3 center{};
     math::Vec3 size{};
+    EntityPropertyModes property_modes;
 };
 
 struct PackEnclosureProperties
@@ -122,6 +141,49 @@ struct PackEnclosureProperties
     math::Vec3 center{};
     math::Vec3 size{};
     float wall_thickness = 0.0f;
+    EntityPropertyModes property_modes;
+};
+
+struct CellPropertiesUpdate
+{
+    std::optional<math::Vec3> position;
+    std::optional<float> radius;
+    std::optional<float> height;
+    std::optional<std::string> label;
+    std::optional<bool> visible;
+};
+
+struct BusbarPropertiesUpdate
+{
+    std::optional<math::Vec3> center;
+    std::optional<math::Vec3> size;
+    std::optional<std::string> label;
+    std::optional<bool> visible;
+};
+
+struct CoolingPlatePropertiesUpdate
+{
+    std::optional<math::Vec3> center;
+    std::optional<math::Vec3> size;
+    std::optional<std::string> label;
+    std::optional<bool> visible;
+};
+
+struct ModuleBoundaryPropertiesUpdate
+{
+    std::optional<math::Vec3> center;
+    std::optional<math::Vec3> size;
+    std::optional<std::string> label;
+    std::optional<bool> visible;
+};
+
+struct PackEnclosurePropertiesUpdate
+{
+    std::optional<math::Vec3> center;
+    std::optional<math::Vec3> size;
+    std::optional<float> wall_thickness;
+    std::optional<std::string> label;
+    std::optional<bool> visible;
 };
 
 struct BatteryVisualizationOverlay

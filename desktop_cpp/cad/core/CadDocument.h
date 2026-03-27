@@ -41,6 +41,7 @@ public:
     bool moveEntity(EntityId id, const math::Vec3& delta);
     bool setEntityPosition(EntityId id, const math::Vec3& position);
     bool setEntityLabel(EntityId id, std::string label);
+    bool setEntityVisibility(EntityId id, bool visible);
     void selectEntity(EntityId id);
     void clearSelection();
 
@@ -50,6 +51,19 @@ public:
     bool setCoolingPlateGeometry(EntityId id, const math::Vec3& center, const math::Vec3& size);
     bool setModuleBoundaryGeometry(EntityId id, const math::Vec3& center, const math::Vec3& size);
     bool setEnclosureGeometry(EntityId id, const math::Vec3& center, const math::Vec3& size, float wall_thickness);
+    bool updateCellProperties(EntityId id, const battery::CellPropertiesUpdate& update);
+    bool updateBusbarProperties(EntityId id, const battery::BusbarPropertiesUpdate& update);
+    bool updateCoolingPlateProperties(EntityId id, const battery::CoolingPlatePropertiesUpdate& update);
+    bool updateModuleBoundaryProperties(EntityId id, const battery::ModuleBoundaryPropertiesUpdate& update);
+    bool updateEnclosureProperties(EntityId id, const battery::PackEnclosurePropertiesUpdate& update);
+    bool applyCellProperties(EntityId id, const battery::CellProperties& properties);
+    bool applyBusbarProperties(EntityId id, const battery::BusbarProperties& properties);
+    bool applyCoolingPlateProperties(EntityId id, const battery::CoolingPlateProperties& properties);
+    bool applyModuleBoundaryProperties(EntityId id, const battery::ModuleBoundaryProperties& properties);
+    bool applyEnclosureProperties(EntityId id, const battery::PackEnclosureProperties& properties);
+    bool resetEntityPositionToGenerated(EntityId id);
+    bool resetEntityGeometryToGenerated(EntityId id);
+    bool resetEntityLabelToGenerated(EntityId id);
 
     [[nodiscard]] bool hasEntity(EntityId id) const;
     [[nodiscard]] std::optional<battery::EntityKind> entityKind(EntityId id) const;

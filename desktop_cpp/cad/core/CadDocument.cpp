@@ -12,6 +12,25 @@ battery::EntitySummary summaryFromEntity(const T& entity)
     return {entity.id, entity.kind, entity.label, entity.visible};
 }
 
+template <typename T>
+void assignBaseProperties(T& entity, const battery::EntitySummary& summary, const battery::EntityPropertyModes& property_modes)
+{
+    entity.label = summary.label;
+    entity.visible = summary.visible;
+    entity.property_modes = property_modes;
+}
+
+template <typename T>
+bool setVisibility(T* entity, bool visible)
+{
+    if (entity == nullptr) {
+        return false;
+    }
+    entity->visible = visible;
+    entity->property_modes.visibility = battery::PropertyMode::UserOverride;
+    return true;
+}
+
 } // namespace
 
 void CadDocument::clear()
@@ -121,22 +140,27 @@ bool CadDocument::moveEntity(EntityId id, const math::Vec3& delta)
 {
     if (battery::CellEntity* cell = findCell(id)) {
         cell->position = math::add(cell->position, delta);
+        cell->property_modes.position = battery::PropertyMode::UserOverride;
         return true;
     }
     if (battery::BusbarEntity* busbar = findBusbar(id)) {
         busbar->center = math::add(busbar->center, delta);
+        busbar->property_modes.position = battery::PropertyMode::UserOverride;
         return true;
     }
     if (battery::CoolingPlateEntity* plate = findCoolingPlate(id)) {
         plate->center = math::add(plate->center, delta);
+        plate->property_modes.position = battery::PropertyMode::UserOverride;
         return true;
     }
     if (battery::ModuleBoundaryEntity* boundary = findModuleBoundary(id)) {
         boundary->center = math::add(boundary->center, delta);
+        boundary->property_modes.position = battery::PropertyMode::UserOverride;
         return true;
     }
     if (battery::PackEnclosureEntity* enclosure = findEnclosure(id)) {
         enclosure->center = math::add(enclosure->center, delta);
+        enclosure->property_modes.position = battery::PropertyMode::UserOverride;
         return true;
     }
     return false;
@@ -146,22 +170,27 @@ bool CadDocument::setEntityPosition(EntityId id, const math::Vec3& position)
 {
     if (battery::CellEntity* cell = findCell(id)) {
         cell->position = position;
+        cell->property_modes.position = battery::PropertyMode::UserOverride;
         return true;
     }
     if (battery::BusbarEntity* busbar = findBusbar(id)) {
         busbar->center = position;
+        busbar->property_modes.position = battery::PropertyMode::UserOverride;
         return true;
     }
     if (battery::CoolingPlateEntity* plate = findCoolingPlate(id)) {
         plate->center = position;
+        plate->property_modes.position = battery::PropertyMode::UserOverride;
         return true;
     }
     if (battery::ModuleBoundaryEntity* boundary = findModuleBoundary(id)) {
         boundary->center = position;
+        boundary->property_modes.position = battery::PropertyMode::UserOverride;
         return true;
     }
     if (battery::PackEnclosureEntity* enclosure = findEnclosure(id)) {
         enclosure->center = position;
+        enclosure->property_modes.position = battery::PropertyMode::UserOverride;
         return true;
     }
     return false;
@@ -171,25 +200,47 @@ bool CadDocument::setEntityLabel(EntityId id, std::string label)
 {
     if (battery::CellEntity* cell = findCell(id)) {
         cell->label = std::move(label);
+        cell->property_modes.label = battery::PropertyMode::UserOverride;
         return true;
     }
     if (battery::BusbarEntity* busbar = findBusbar(id)) {
         busbar->label = std::move(label);
+        busbar->property_modes.label = battery::PropertyMode::UserOverride;
         return true;
     }
     if (battery::CoolingPlateEntity* plate = findCoolingPlate(id)) {
         plate->label = std::move(label);
+        plate->property_modes.label = battery::PropertyMode::UserOverride;
         return true;
     }
     if (battery::ModuleBoundaryEntity* boundary = findModuleBoundary(id)) {
         boundary->label = std::move(label);
+        boundary->property_modes.label = battery::PropertyMode::UserOverride;
         return true;
     }
     if (battery::PackEnclosureEntity* enclosure = findEnclosure(id)) {
         enclosure->label = std::move(label);
+        enclosure->property_modes.label = battery::PropertyMode::UserOverride;
         return true;
     }
     return false;
+}
+
+bool CadDocument::setEntityVisibility(EntityId id, bool visible)
+{
+    if (setVisibility(findCell(id), visible)) {
+        return true;
+    }
+    if (setVisibility(findBusbar(id), visible)) {
+        return true;
+    }
+    if (setVisibility(findCoolingPlate(id), visible)) {
+        return true;
+    }
+    if (setVisibility(findModuleBoundary(id), visible)) {
+        return true;
+    }
+    return setVisibility(findEnclosure(id), visible);
 }
 
 void CadDocument::selectEntity(EntityId id)
@@ -206,11 +257,7 @@ void CadDocument::clearSelection()
 
 bool CadDocument::setCellPosition(EntityId id, const math::Vec3& position)
 {
-    if (battery::CellEntity* cell = findCell(id)) {
-        cell->position = position;
-        return true;
-    }
-    return false;
+    return setEntityPosition(id, position);
 }
 
 bool CadDocument::setCellGeometry(EntityId id, float radius, float height)
@@ -218,6 +265,7 @@ bool CadDocument::setCellGeometry(EntityId id, float radius, float height)
     if (battery::CellEntity* cell = findCell(id)) {
         cell->radius = radius;
         cell->height = height;
+        cell->property_modes.geometry = battery::PropertyMode::UserOverride;
         return true;
     }
     return false;
@@ -228,6 +276,8 @@ bool CadDocument::setBusbarGeometry(EntityId id, const math::Vec3& center, const
     if (battery::BusbarEntity* busbar = findBusbar(id)) {
         busbar->center = center;
         busbar->size = size;
+        busbar->property_modes.position = battery::PropertyMode::UserOverride;
+        busbar->property_modes.geometry = battery::PropertyMode::UserOverride;
         return true;
     }
     return false;
@@ -238,6 +288,8 @@ bool CadDocument::setCoolingPlateGeometry(EntityId id, const math::Vec3& center,
     if (battery::CoolingPlateEntity* plate = findCoolingPlate(id)) {
         plate->center = center;
         plate->size = size;
+        plate->property_modes.position = battery::PropertyMode::UserOverride;
+        plate->property_modes.geometry = battery::PropertyMode::UserOverride;
         return true;
     }
     return false;
@@ -248,6 +300,8 @@ bool CadDocument::setModuleBoundaryGeometry(EntityId id, const math::Vec3& cente
     if (battery::ModuleBoundaryEntity* boundary = findModuleBoundary(id)) {
         boundary->center = center;
         boundary->size = size;
+        boundary->property_modes.position = battery::PropertyMode::UserOverride;
+        boundary->property_modes.geometry = battery::PropertyMode::UserOverride;
         return true;
     }
     return false;
@@ -259,6 +313,282 @@ bool CadDocument::setEnclosureGeometry(EntityId id, const math::Vec3& center, co
         enclosure->center = center;
         enclosure->size = size;
         enclosure->wall_thickness = wall_thickness;
+        enclosure->property_modes.position = battery::PropertyMode::UserOverride;
+        enclosure->property_modes.geometry = battery::PropertyMode::UserOverride;
+        return true;
+    }
+    return false;
+}
+
+bool CadDocument::updateCellProperties(EntityId id, const battery::CellPropertiesUpdate& update)
+{
+    battery::CellEntity* cell = findCell(id);
+    if (cell == nullptr) {
+        return false;
+    }
+    if (update.position.has_value()) {
+        cell->position = *update.position;
+        cell->property_modes.position = battery::PropertyMode::UserOverride;
+    }
+    if (update.radius.has_value()) {
+        cell->radius = *update.radius;
+        cell->property_modes.geometry = battery::PropertyMode::UserOverride;
+    }
+    if (update.height.has_value()) {
+        cell->height = *update.height;
+        cell->property_modes.geometry = battery::PropertyMode::UserOverride;
+    }
+    if (update.label.has_value()) {
+        cell->label = *update.label;
+        cell->property_modes.label = battery::PropertyMode::UserOverride;
+    }
+    if (update.visible.has_value()) {
+        cell->visible = *update.visible;
+        cell->property_modes.visibility = battery::PropertyMode::UserOverride;
+    }
+    return true;
+}
+
+bool CadDocument::updateBusbarProperties(EntityId id, const battery::BusbarPropertiesUpdate& update)
+{
+    battery::BusbarEntity* busbar = findBusbar(id);
+    if (busbar == nullptr) {
+        return false;
+    }
+    if (update.center.has_value()) {
+        busbar->center = *update.center;
+        busbar->property_modes.position = battery::PropertyMode::UserOverride;
+    }
+    if (update.size.has_value()) {
+        busbar->size = *update.size;
+        busbar->property_modes.geometry = battery::PropertyMode::UserOverride;
+    }
+    if (update.label.has_value()) {
+        busbar->label = *update.label;
+        busbar->property_modes.label = battery::PropertyMode::UserOverride;
+    }
+    if (update.visible.has_value()) {
+        busbar->visible = *update.visible;
+        busbar->property_modes.visibility = battery::PropertyMode::UserOverride;
+    }
+    return true;
+}
+
+bool CadDocument::updateCoolingPlateProperties(EntityId id, const battery::CoolingPlatePropertiesUpdate& update)
+{
+    battery::CoolingPlateEntity* plate = findCoolingPlate(id);
+    if (plate == nullptr) {
+        return false;
+    }
+    if (update.center.has_value()) {
+        plate->center = *update.center;
+        plate->property_modes.position = battery::PropertyMode::UserOverride;
+    }
+    if (update.size.has_value()) {
+        plate->size = *update.size;
+        plate->property_modes.geometry = battery::PropertyMode::UserOverride;
+    }
+    if (update.label.has_value()) {
+        plate->label = *update.label;
+        plate->property_modes.label = battery::PropertyMode::UserOverride;
+    }
+    if (update.visible.has_value()) {
+        plate->visible = *update.visible;
+        plate->property_modes.visibility = battery::PropertyMode::UserOverride;
+    }
+    return true;
+}
+
+bool CadDocument::updateModuleBoundaryProperties(EntityId id, const battery::ModuleBoundaryPropertiesUpdate& update)
+{
+    battery::ModuleBoundaryEntity* boundary = findModuleBoundary(id);
+    if (boundary == nullptr) {
+        return false;
+    }
+    if (update.center.has_value()) {
+        boundary->center = *update.center;
+        boundary->property_modes.position = battery::PropertyMode::UserOverride;
+    }
+    if (update.size.has_value()) {
+        boundary->size = *update.size;
+        boundary->property_modes.geometry = battery::PropertyMode::UserOverride;
+    }
+    if (update.label.has_value()) {
+        boundary->label = *update.label;
+        boundary->property_modes.label = battery::PropertyMode::UserOverride;
+    }
+    if (update.visible.has_value()) {
+        boundary->visible = *update.visible;
+        boundary->property_modes.visibility = battery::PropertyMode::UserOverride;
+    }
+    return true;
+}
+
+bool CadDocument::updateEnclosureProperties(EntityId id, const battery::PackEnclosurePropertiesUpdate& update)
+{
+    battery::PackEnclosureEntity* enclosure = findEnclosure(id);
+    if (enclosure == nullptr) {
+        return false;
+    }
+    if (update.center.has_value()) {
+        enclosure->center = *update.center;
+        enclosure->property_modes.position = battery::PropertyMode::UserOverride;
+    }
+    if (update.size.has_value()) {
+        enclosure->size = *update.size;
+        enclosure->property_modes.geometry = battery::PropertyMode::UserOverride;
+    }
+    if (update.wall_thickness.has_value()) {
+        enclosure->wall_thickness = *update.wall_thickness;
+        enclosure->property_modes.geometry = battery::PropertyMode::UserOverride;
+    }
+    if (update.label.has_value()) {
+        enclosure->label = *update.label;
+        enclosure->property_modes.label = battery::PropertyMode::UserOverride;
+    }
+    if (update.visible.has_value()) {
+        enclosure->visible = *update.visible;
+        enclosure->property_modes.visibility = battery::PropertyMode::UserOverride;
+    }
+    return true;
+}
+
+bool CadDocument::applyCellProperties(EntityId id, const battery::CellProperties& properties)
+{
+    battery::CellEntity* cell = findCell(id);
+    if (cell == nullptr) {
+        return false;
+    }
+    assignBaseProperties(*cell, properties.summary, properties.property_modes);
+    cell->position = properties.position;
+    cell->radius = properties.radius;
+    cell->height = properties.height;
+    return true;
+}
+
+bool CadDocument::applyBusbarProperties(EntityId id, const battery::BusbarProperties& properties)
+{
+    battery::BusbarEntity* busbar = findBusbar(id);
+    if (busbar == nullptr) {
+        return false;
+    }
+    assignBaseProperties(*busbar, properties.summary, properties.property_modes);
+    busbar->center = properties.center;
+    busbar->size = properties.size;
+    busbar->role = properties.role;
+    return true;
+}
+
+bool CadDocument::applyCoolingPlateProperties(EntityId id, const battery::CoolingPlateProperties& properties)
+{
+    battery::CoolingPlateEntity* plate = findCoolingPlate(id);
+    if (plate == nullptr) {
+        return false;
+    }
+    assignBaseProperties(*plate, properties.summary, properties.property_modes);
+    plate->center = properties.center;
+    plate->size = properties.size;
+    plate->plate_index = properties.plate_index;
+    return true;
+}
+
+bool CadDocument::applyModuleBoundaryProperties(EntityId id, const battery::ModuleBoundaryProperties& properties)
+{
+    battery::ModuleBoundaryEntity* boundary = findModuleBoundary(id);
+    if (boundary == nullptr) {
+        return false;
+    }
+    assignBaseProperties(*boundary, properties.summary, properties.property_modes);
+    boundary->center = properties.center;
+    boundary->size = properties.size;
+    boundary->module_index = properties.module_index;
+    return true;
+}
+
+bool CadDocument::applyEnclosureProperties(EntityId id, const battery::PackEnclosureProperties& properties)
+{
+    battery::PackEnclosureEntity* enclosure = findEnclosure(id);
+    if (enclosure == nullptr) {
+        return false;
+    }
+    assignBaseProperties(*enclosure, properties.summary, properties.property_modes);
+    enclosure->center = properties.center;
+    enclosure->size = properties.size;
+    enclosure->wall_thickness = properties.wall_thickness;
+    enclosure->enclosure_index = properties.enclosure_index;
+    return true;
+}
+
+bool CadDocument::resetEntityPositionToGenerated(EntityId id)
+{
+    if (battery::CellEntity* cell = findCell(id)) {
+        cell->property_modes.position = battery::PropertyMode::Generated;
+        return true;
+    }
+    if (battery::BusbarEntity* busbar = findBusbar(id)) {
+        busbar->property_modes.position = battery::PropertyMode::Generated;
+        return true;
+    }
+    if (battery::CoolingPlateEntity* plate = findCoolingPlate(id)) {
+        plate->property_modes.position = battery::PropertyMode::Generated;
+        return true;
+    }
+    if (battery::ModuleBoundaryEntity* boundary = findModuleBoundary(id)) {
+        boundary->property_modes.position = battery::PropertyMode::Generated;
+        return true;
+    }
+    if (battery::PackEnclosureEntity* enclosure = findEnclosure(id)) {
+        enclosure->property_modes.position = battery::PropertyMode::Generated;
+        return true;
+    }
+    return false;
+}
+
+bool CadDocument::resetEntityGeometryToGenerated(EntityId id)
+{
+    if (battery::CellEntity* cell = findCell(id)) {
+        cell->property_modes.geometry = battery::PropertyMode::Generated;
+        return true;
+    }
+    if (battery::BusbarEntity* busbar = findBusbar(id)) {
+        busbar->property_modes.geometry = battery::PropertyMode::Generated;
+        return true;
+    }
+    if (battery::CoolingPlateEntity* plate = findCoolingPlate(id)) {
+        plate->property_modes.geometry = battery::PropertyMode::Generated;
+        return true;
+    }
+    if (battery::ModuleBoundaryEntity* boundary = findModuleBoundary(id)) {
+        boundary->property_modes.geometry = battery::PropertyMode::Generated;
+        return true;
+    }
+    if (battery::PackEnclosureEntity* enclosure = findEnclosure(id)) {
+        enclosure->property_modes.geometry = battery::PropertyMode::Generated;
+        return true;
+    }
+    return false;
+}
+
+bool CadDocument::resetEntityLabelToGenerated(EntityId id)
+{
+    if (battery::CellEntity* cell = findCell(id)) {
+        cell->property_modes.label = battery::PropertyMode::Generated;
+        return true;
+    }
+    if (battery::BusbarEntity* busbar = findBusbar(id)) {
+        busbar->property_modes.label = battery::PropertyMode::Generated;
+        return true;
+    }
+    if (battery::CoolingPlateEntity* plate = findCoolingPlate(id)) {
+        plate->property_modes.label = battery::PropertyMode::Generated;
+        return true;
+    }
+    if (battery::ModuleBoundaryEntity* boundary = findModuleBoundary(id)) {
+        boundary->property_modes.label = battery::PropertyMode::Generated;
+        return true;
+    }
+    if (battery::PackEnclosureEntity* enclosure = findEnclosure(id)) {
+        enclosure->property_modes.label = battery::PropertyMode::Generated;
         return true;
     }
     return false;
@@ -418,7 +748,15 @@ std::optional<battery::CellProperties> CadDocument::getCellProperties(EntityId i
     if (cell == nullptr) {
         return std::nullopt;
     }
-    return battery::CellProperties{summaryFromEntity(*cell), cell->position, cell->radius, cell->height, cell->series_index, cell->parallel_index};
+    return battery::CellProperties{
+        summaryFromEntity(*cell),
+        cell->position,
+        cell->radius,
+        cell->height,
+        cell->series_index,
+        cell->parallel_index,
+        cell->property_modes
+    };
 }
 
 std::optional<battery::BusbarProperties> CadDocument::getBusbarProperties(EntityId id) const
@@ -427,7 +765,13 @@ std::optional<battery::BusbarProperties> CadDocument::getBusbarProperties(Entity
     if (busbar == nullptr) {
         return std::nullopt;
     }
-    return battery::BusbarProperties{summaryFromEntity(*busbar), busbar->role, busbar->center, busbar->size};
+    return battery::BusbarProperties{
+        summaryFromEntity(*busbar),
+        busbar->role,
+        busbar->center,
+        busbar->size,
+        busbar->property_modes
+    };
 }
 
 std::optional<battery::CoolingPlateProperties> CadDocument::getCoolingPlateProperties(EntityId id) const
@@ -436,7 +780,13 @@ std::optional<battery::CoolingPlateProperties> CadDocument::getCoolingPlatePrope
     if (plate == nullptr) {
         return std::nullopt;
     }
-    return battery::CoolingPlateProperties{summaryFromEntity(*plate), plate->plate_index, plate->center, plate->size};
+    return battery::CoolingPlateProperties{
+        summaryFromEntity(*plate),
+        plate->plate_index,
+        plate->center,
+        plate->size,
+        plate->property_modes
+    };
 }
 
 std::optional<battery::ModuleBoundaryProperties> CadDocument::getModuleBoundaryProperties(EntityId id) const
@@ -445,7 +795,13 @@ std::optional<battery::ModuleBoundaryProperties> CadDocument::getModuleBoundaryP
     if (boundary == nullptr) {
         return std::nullopt;
     }
-    return battery::ModuleBoundaryProperties{summaryFromEntity(*boundary), boundary->module_index, boundary->center, boundary->size};
+    return battery::ModuleBoundaryProperties{
+        summaryFromEntity(*boundary),
+        boundary->module_index,
+        boundary->center,
+        boundary->size,
+        boundary->property_modes
+    };
 }
 
 std::optional<battery::PackEnclosureProperties> CadDocument::getEnclosureProperties(EntityId id) const
@@ -454,7 +810,14 @@ std::optional<battery::PackEnclosureProperties> CadDocument::getEnclosurePropert
     if (enclosure == nullptr) {
         return std::nullopt;
     }
-    return battery::PackEnclosureProperties{summaryFromEntity(*enclosure), enclosure->enclosure_index, enclosure->center, enclosure->size, enclosure->wall_thickness};
+    return battery::PackEnclosureProperties{
+        summaryFromEntity(*enclosure),
+        enclosure->enclosure_index,
+        enclosure->center,
+        enclosure->size,
+        enclosure->wall_thickness,
+        enclosure->property_modes
+    };
 }
 
 void CadDocument::rebuildIndex()
@@ -498,6 +861,22 @@ bool CadDocument::restoreEntity(const battery::EntityRecord& entity)
 {
     return std::visit([this](const auto& value) -> bool {
         using T = std::decay_t<decltype(value)>;
+        if (hasEntity(value.id)) {
+            if constexpr (std::is_same_v<T, battery::CellEntity>) {
+                m_cells[findLocator(value.id)->index] = value;
+            } else if constexpr (std::is_same_v<T, battery::BusbarEntity>) {
+                m_busbars[findLocator(value.id)->index] = value;
+            } else if constexpr (std::is_same_v<T, battery::CoolingPlateEntity>) {
+                m_coolingPlates[findLocator(value.id)->index] = value;
+            } else if constexpr (std::is_same_v<T, battery::ModuleBoundaryEntity>) {
+                m_moduleBoundaries[findLocator(value.id)->index] = value;
+            } else if constexpr (std::is_same_v<T, battery::PackEnclosureEntity>) {
+                m_packEnclosures[findLocator(value.id)->index] = value;
+            }
+            rebuildIndex();
+            return true;
+        }
+
         if constexpr (std::is_same_v<T, battery::CellEntity>) {
             addCell(value);
         } else if constexpr (std::is_same_v<T, battery::BusbarEntity>) {

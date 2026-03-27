@@ -32,16 +32,35 @@ public:
     bool removeEntity(core::EntityId entity_id);
     bool restoreEntity(const battery::EntityRecord& entity);
     bool setEntityLabel(core::EntityId entity_id, std::string label);
+    bool setEntityVisibility(core::EntityId entity_id, bool visible);
     bool setCellPosition(core::EntityId entity_id, const math::Vec3& position);
     bool setCellGeometry(core::EntityId entity_id, float radius, float height);
     bool setBusbarGeometry(core::EntityId entity_id, const math::Vec3& center, const math::Vec3& size);
     bool setCoolingPlateGeometry(core::EntityId entity_id, const math::Vec3& center, const math::Vec3& size);
     bool setModuleBoundaryGeometry(core::EntityId entity_id, const math::Vec3& center, const math::Vec3& size);
     bool setEnclosureGeometry(core::EntityId entity_id, const math::Vec3& center, const math::Vec3& size, float wall_thickness);
+    bool updateCellProperties(core::EntityId entity_id, const battery::CellPropertiesUpdate& update);
+    bool updateBusbarProperties(core::EntityId entity_id, const battery::BusbarPropertiesUpdate& update);
+    bool updateCoolingPlateProperties(core::EntityId entity_id, const battery::CoolingPlatePropertiesUpdate& update);
+    bool updateModuleBoundaryProperties(core::EntityId entity_id, const battery::ModuleBoundaryPropertiesUpdate& update);
+    bool updateEnclosureProperties(core::EntityId entity_id, const battery::PackEnclosurePropertiesUpdate& update);
+    bool applyCellProperties(core::EntityId entity_id, const battery::CellProperties& properties);
+    bool applyBusbarProperties(core::EntityId entity_id, const battery::BusbarProperties& properties);
+    bool applyCoolingPlateProperties(core::EntityId entity_id, const battery::CoolingPlateProperties& properties);
+    bool applyModuleBoundaryProperties(core::EntityId entity_id, const battery::ModuleBoundaryProperties& properties);
+    bool applyEnclosureProperties(core::EntityId entity_id, const battery::PackEnclosureProperties& properties);
+    bool resetEntityPositionToGenerated(core::EntityId entity_id);
+    bool resetEntityGeometryToGenerated(core::EntityId entity_id);
+    bool resetEntityLabelToGenerated(core::EntityId entity_id);
 
     bool executeCommand(std::unique_ptr<commands::ICommand> command);
     bool undo();
     bool redo();
+    bool applyMoveEntity(core::EntityId entity_id, const math::Vec3& delta);
+    bool applyRemoveEntity(core::EntityId entity_id);
+    bool applyRenameEntity(core::EntityId entity_id, std::string label);
+    bool applyCellPropertiesUpdate(core::EntityId entity_id, const battery::CellPropertiesUpdate& update);
+    bool applyBusbarPropertiesUpdate(core::EntityId entity_id, const battery::BusbarPropertiesUpdate& update);
 
     [[nodiscard]] core::EntityId hitTestEntity(float x, float y) const;
 

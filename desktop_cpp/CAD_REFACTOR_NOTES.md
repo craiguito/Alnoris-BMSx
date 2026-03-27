@@ -132,13 +132,74 @@ This pass moves the CAD subsystem closer to a true editable battery document ins
   - enclosures
 - This remains a screen-space approximation and is intentionally structured so future ray/AABB or GPU picking can replace it cleanly.
 
+## Override-Aware Generated Entities Pass
+
+This pass makes compatible layout regeneration preserve manual user edits instead of only preserving IDs and labels.
+
+### Override-aware fields
+
+- Battery entities now track explicit property ownership modes:
+  - position
+  - geometry
+  - label
+  - visibility
+- Each of those fields can now be either:
+  - `Generated`
+  - `UserOverride`
+
+### Regeneration now preserves manual edits
+
+- Compatible regeneration still rebuilds generated layout entities from battery config, but now merges them against existing document entities.
+- If a field is still in `Generated` mode, regeneration recomputes it.
+- If a field is in `UserOverride` mode, regeneration preserves the user-edited value.
+- This now applies to:
+  - cell position and geometry
+  - busbar position and size
+  - cooling plate position and size
+  - module boundary position and size
+  - enclosure position and geometry
+  - labels and visibility
+
+### Typed property update APIs
+
+- The engine/document layer now exposes explicit typed property updates such as:
+  - `CellPropertiesUpdate`
+  - `BusbarPropertiesUpdate`
+  - `CoolingPlatePropertiesUpdate`
+  - `ModuleBoundaryPropertiesUpdate`
+  - `PackEnclosurePropertiesUpdate`
+- Applying one of these updates marks the edited fields as `UserOverride`.
+- Typed full-property application helpers also exist so undo/redo can restore complete entity state cleanly.
+
+### First command-driven property editing path
+
+- User-style edits can now go through commands instead of only direct mutation APIs.
+- Added command-backed operations for:
+  - move entity
+  - rename entity
+  - update cell properties
+  - update busbar properties
+  - remove entity
+- The older low-level mutation methods remain available internally for engine/document plumbing.
+
+### Reset-to-generated foundation
+
+- The engine/document now has a first reset seam for generated fields:
+  - reset position to generated
+  - reset geometry to generated
+  - reset label to generated
+- These currently trigger a regeneration pass so generated defaults are reapplied while preserving other overrides.
+
 ## Remaining future work
 
 - TODO: add JSON save/load for CAD documents
 - TODO: add full UI integration for the command stack
 - TODO: add richer property editing and document tools on top of the new mutation APIs
+- TODO: add UI actions for resetting overridden fields back to generated defaults
+- TODO: persist generated-vs-overridden state in future JSON save/load
 - TODO: add snapping, grid constraints, and object snap
 - TODO: add richer picking such as ray/volume picking
 - TODO: add OpenGL render backend implementing `IRenderBackend`
 - TODO: bind simulation overlays more directly by entity identity
+- TODO: add dirty-flag optimization to avoid rebuilding visualization/render packets more often than necessary
 - TODO: add constraints/dimensions if a future pass needs engineering-style editing workflows

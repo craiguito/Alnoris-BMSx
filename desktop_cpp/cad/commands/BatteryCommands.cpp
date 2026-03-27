@@ -2,6 +2,8 @@
 
 #include "../CadEngine.h"
 
+#include <utility>
+
 namespace cad::commands {
 
 MoveEntityCommand::MoveEntityCommand(core::EntityId entity_id, math::Vec3 delta)
@@ -75,6 +77,83 @@ void UpdateCellGeometryCommand::undo(CadEngine& engine)
         return;
     }
     engine.setCellGeometry(m_entityId, m_oldRadius, m_oldHeight);
+}
+
+RenameEntityCommand::RenameEntityCommand(core::EntityId entity_id, std::string new_label)
+    : m_entityId(entity_id)
+    , m_newLabel(std::move(new_label))
+{
+}
+
+bool RenameEntityCommand::redo(CadEngine& engine)
+{
+    if (!m_capturedInitialState) {
+        const auto summary = engine.getEntitySummary(m_entityId);
+        if (!summary.has_value()) {
+            return false;
+        }
+        m_oldLabel = summary->label;
+        m_capturedInitialState = true;
+    }
+    return engine.setEntityLabel(m_entityId, m_newLabel);
+}
+
+void RenameEntityCommand::undo(CadEngine& engine)
+{
+    if (!m_capturedInitialState) {
+        return;
+    }
+    engine.setEntityLabel(m_entityId, m_oldLabel);
+}
+
+UpdateCellPropertiesCommand::UpdateCellPropertiesCommand(core::EntityId entity_id, battery::CellPropertiesUpdate update)
+    : m_entityId(entity_id)
+    , m_update(std::move(update))
+{
+}
+
+bool UpdateCellPropertiesCommand::redo(CadEngine& engine)
+{
+    if (!m_previousProperties.has_value()) {
+        m_previousProperties = engine.getCellProperties(m_entityId);
+        if (!m_previousProperties.has_value()) {
+            return false;
+        }
+    }
+    return engine.updateCellProperties(m_entityId, m_update);
+}
+
+void UpdateCellPropertiesCommand::undo(CadEngine& engine)
+{
+    if (!m_previousProperties.has_value()) {
+        return;
+    }
+    engine.applyCellProperties(m_entityId, *m_previousProperties);
+}
+
+UpdateBusbarPropertiesCommand::UpdateBusbarPropertiesCommand(core::EntityId entity_id, battery::BusbarPropertiesUpdate update)
+    : m_entityId(entity_id)
+    , m_update(std::move(update))
+{
+}
+
+bool UpdateBusbarPropertiesCommand::redo(CadEngine& engine)
+{
+    if (!m_previousProperties.has_value()) {
+        m_previousProperties = engine.getBusbarProperties(m_entityId);
+        if (!m_previousProperties.has_value()) {
+            return false;
+        }
+    }
+    return engine.updateBusbarProperties(m_entityId, m_update);
+}
+
+void UpdateBusbarPropertiesCommand::undo(CadEngine& engine)
+{
+    if (!m_previousProperties.has_value()) {
+        return;
+    }
+    engine.applyBusbarProperties(m_entityId, *m_previousProperties);
 }
 
 } // namespace cad::commands

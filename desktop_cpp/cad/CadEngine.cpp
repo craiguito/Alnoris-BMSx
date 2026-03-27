@@ -2,6 +2,7 @@
 
 #include "battery/BatteryVisualizationBuilder.h"
 #include "battery/PackLayoutGenerator.h"
+#include "commands/BatteryCommands.h"
 
 #include <algorithm>
 #include <utility>
@@ -112,6 +113,15 @@ bool CadEngine::setEntityLabel(core::EntityId entity_id, std::string label)
     return changed;
 }
 
+bool CadEngine::setEntityVisibility(core::EntityId entity_id, bool visible)
+{
+    const bool changed = m_document.setEntityVisibility(entity_id, visible);
+    if (changed) {
+        refreshDocumentView(false);
+    }
+    return changed;
+}
+
 bool CadEngine::setCellPosition(core::EntityId entity_id, const math::Vec3& position)
 {
     const bool changed = m_document.setCellPosition(entity_id, position);
@@ -166,6 +176,129 @@ bool CadEngine::setEnclosureGeometry(core::EntityId entity_id, const math::Vec3&
     return changed;
 }
 
+bool CadEngine::updateCellProperties(core::EntityId entity_id, const battery::CellPropertiesUpdate& update)
+{
+    const bool changed = m_document.updateCellProperties(entity_id, update);
+    if (changed) {
+        refreshDocumentView(true);
+    }
+    return changed;
+}
+
+bool CadEngine::updateBusbarProperties(core::EntityId entity_id, const battery::BusbarPropertiesUpdate& update)
+{
+    const bool changed = m_document.updateBusbarProperties(entity_id, update);
+    if (changed) {
+        refreshDocumentView(true);
+    }
+    return changed;
+}
+
+bool CadEngine::updateCoolingPlateProperties(core::EntityId entity_id, const battery::CoolingPlatePropertiesUpdate& update)
+{
+    const bool changed = m_document.updateCoolingPlateProperties(entity_id, update);
+    if (changed) {
+        refreshDocumentView(true);
+    }
+    return changed;
+}
+
+bool CadEngine::updateModuleBoundaryProperties(core::EntityId entity_id, const battery::ModuleBoundaryPropertiesUpdate& update)
+{
+    const bool changed = m_document.updateModuleBoundaryProperties(entity_id, update);
+    if (changed) {
+        refreshDocumentView(true);
+    }
+    return changed;
+}
+
+bool CadEngine::updateEnclosureProperties(core::EntityId entity_id, const battery::PackEnclosurePropertiesUpdate& update)
+{
+    const bool changed = m_document.updateEnclosureProperties(entity_id, update);
+    if (changed) {
+        refreshDocumentView(true);
+    }
+    return changed;
+}
+
+bool CadEngine::applyCellProperties(core::EntityId entity_id, const battery::CellProperties& properties)
+{
+    const bool changed = m_document.applyCellProperties(entity_id, properties);
+    if (changed) {
+        refreshDocumentView(true);
+    }
+    return changed;
+}
+
+bool CadEngine::applyBusbarProperties(core::EntityId entity_id, const battery::BusbarProperties& properties)
+{
+    const bool changed = m_document.applyBusbarProperties(entity_id, properties);
+    if (changed) {
+        refreshDocumentView(true);
+    }
+    return changed;
+}
+
+bool CadEngine::applyCoolingPlateProperties(core::EntityId entity_id, const battery::CoolingPlateProperties& properties)
+{
+    const bool changed = m_document.applyCoolingPlateProperties(entity_id, properties);
+    if (changed) {
+        refreshDocumentView(true);
+    }
+    return changed;
+}
+
+bool CadEngine::applyModuleBoundaryProperties(core::EntityId entity_id, const battery::ModuleBoundaryProperties& properties)
+{
+    const bool changed = m_document.applyModuleBoundaryProperties(entity_id, properties);
+    if (changed) {
+        refreshDocumentView(true);
+    }
+    return changed;
+}
+
+bool CadEngine::applyEnclosureProperties(core::EntityId entity_id, const battery::PackEnclosureProperties& properties)
+{
+    const bool changed = m_document.applyEnclosureProperties(entity_id, properties);
+    if (changed) {
+        refreshDocumentView(true);
+    }
+    return changed;
+}
+
+bool CadEngine::resetEntityPositionToGenerated(core::EntityId entity_id)
+{
+    const bool changed = m_document.resetEntityPositionToGenerated(entity_id);
+    if (changed) {
+        rebuildDocument();
+        rebuildVisualization();
+        rebuildRenderPacket();
+    }
+    return changed;
+}
+
+bool CadEngine::resetEntityGeometryToGenerated(core::EntityId entity_id)
+{
+    const bool changed = m_document.resetEntityGeometryToGenerated(entity_id);
+    if (changed) {
+        rebuildDocument();
+        rebuildVisualization();
+        rebuildRenderPacket();
+    }
+    return changed;
+}
+
+bool CadEngine::resetEntityLabelToGenerated(core::EntityId entity_id)
+{
+    const bool changed = m_document.resetEntityLabelToGenerated(entity_id);
+    if (changed) {
+        rebuildDocument();
+        rebuildVisualization();
+        rebuildRenderPacket();
+    }
+    return changed;
+}
+
 bool CadEngine::executeCommand(std::unique_ptr<commands::ICommand> command)
 {
     return m_commandStack.execute(std::move(command), *this);
@@ -179,6 +312,31 @@ bool CadEngine::undo()
 bool CadEngine::redo()
 {
     return m_commandStack.redo(*this);
+}
+
+bool CadEngine::applyMoveEntity(core::EntityId entity_id, const math::Vec3& delta)
+{
+    return executeCommand(std::make_unique<commands::MoveEntityCommand>(entity_id, delta));
+}
+
+bool CadEngine::applyRemoveEntity(core::EntityId entity_id)
+{
+    return executeCommand(std::make_unique<commands::RemoveEntityCommand>(entity_id));
+}
+
+bool CadEngine::applyRenameEntity(core::EntityId entity_id, std::string label)
+{
+    return executeCommand(std::make_unique<commands::RenameEntityCommand>(entity_id, std::move(label)));
+}
+
+bool CadEngine::applyCellPropertiesUpdate(core::EntityId entity_id, const battery::CellPropertiesUpdate& update)
+{
+    return executeCommand(std::make_unique<commands::UpdateCellPropertiesCommand>(entity_id, update));
+}
+
+bool CadEngine::applyBusbarPropertiesUpdate(core::EntityId entity_id, const battery::BusbarPropertiesUpdate& update)
+{
+    return executeCommand(std::make_unique<commands::UpdateBusbarPropertiesCommand>(entity_id, update));
 }
 
 core::EntityId CadEngine::hitTestEntity(float x, float y) const
