@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from backend.sim_core.reference_cells import REFERENCE_CELLS
 from backend.sim_core.types import (
+    BalancingConfig,
     CurrentProfile,
     CurrentProfilePoint,
     DegradationConfig,
     ElectricalModelConfig,
+    FaultConfig,
     GroupVariationConfig,
     RcBranchParams,
     SimulationConfig,
@@ -39,6 +41,8 @@ def make_config(cell_key: str = "panasonic_ncr18650b", **overrides: object) -> S
         group_count=None,
         group_variation=GroupVariationConfig(),
         degradation=DegradationConfig(),
+        balancing=BalancingConfig(),
+        faults=FaultConfig(),
     )
     return SimulationConfig(**{**config.__dict__, **overrides})
 

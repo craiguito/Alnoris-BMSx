@@ -6,10 +6,13 @@ from typing import Any
 from .engine import run_simulation
 from .physics.electrical import validate_electrical_model
 from .types import (
+    BalancingConfig,
     CurrentProfile,
     CurrentProfilePoint,
     DegradationConfig,
     ElectricalModelConfig,
+    FaultConfig,
+    FaultSpec,
     GroupVariationConfig,
     RcBranchParams,
     SimulationConfig,
@@ -115,30 +118,73 @@ def _parse_degradation(payload: dict[str, Any]) -> DegradationConfig:
     )
 
 
+def _parse_balancing(payload: dict[str, Any]) -> BalancingConfig:
+    balancing_payload = payload.get("balancing", {})
+    return BalancingConfig(
+        enabled=bool(balancing_payload.get("enabled", False)),
+        mode=str(balancing_payload.get("mode", "passive")),
+        voltage_threshold_v=(
+            float(balancing_payload["voltage_threshold_v"])
+            if balancing_payload.get("voltage_threshold_v") is not None
+            else None
+        ),
+        soc_threshold=(
+            float(balancing_payload["soc_threshold"])
+            if balancing_payload.get("soc_threshold") is not None
+            else None
+        ),
+        bleed_current_a=float(balancing_payload.get("bleed_current_a", 0.0)),
+        max_active_groups=(
+            int(balancing_payload["max_active_groups"])
+            if balancing_payload.get("max_active_groups") is not None
+            else None
+        ),
+    )
+
+
+def _parse_faults(payload: dict[str, Any]) -> FaultConfig:
+    fault_payload = payload.get("faults", {})
+    raw_faults = fault_payload if isinstance(fault_payload, list) else fault_payload.get("faults", [])
+    faults: list[FaultSpec] = []
+    for item in raw_faults:
+        faults.append(
+            FaultSpec(
+                fault_type=str(item["fault_type"]),
+                group_index=int(item["group_index"]),
+                factor=float(item["factor"]),
+                start_time_s=float(item.get("start_time_s", 0.0)),
+                end_time_s=float(item["end_time_s"]) if item.get("end_time_s") is not None else None,
+            )
+        )
+    return FaultConfig(faults=tuple(faults))
+
+
 def simulation_config_from_dict(payload: dict[str, Any]) -> SimulationConfig:
     return validate_simulation_config(
         SimulationConfig(
-        cell_nominal_voltage=float(payload["cell_nominal_voltage"]),
-        cell_full_voltage=float(payload["cell_full_voltage"]),
-        cell_empty_voltage=float(payload["cell_empty_voltage"]),
-        cell_cutoff_voltage=float(payload["cell_cutoff_voltage"]),
-        cell_capacity_ah=float(payload["cell_capacity_ah"]),
-        cells_in_series=int(payload["cells_in_series"]),
-        cells_in_parallel=int(payload["cells_in_parallel"]),
-        internal_resistance_ohm_per_cell=float(payload["internal_resistance_ohm_per_cell"]),
-        ambient_temp_c=float(payload["ambient_temp_c"]),
-        discharge_current_a=float(payload["discharge_current_a"]),
-        duration_s=int(payload["duration_s"]),
-        time_step_s=int(payload["time_step_s"]),
-        initial_soc=float(payload["initial_soc"]),
-        pack_mass_kg=float(payload["pack_mass_kg"]),
-        pack_heat_capacity_j_per_kgk=float(payload["pack_heat_capacity_j_per_kgk"]),
-        cooling_coeff_w_per_k=float(payload["cooling_coeff_w_per_k"]),
-        electrical_model=_parse_electrical_model(payload),
-        current_profile=_parse_current_profile(payload),
-        group_count=int(payload["group_count"]) if payload.get("group_count") is not None else None,
-        group_variation=_parse_group_variation(payload),
-        degradation=_parse_degradation(payload),
+            cell_nominal_voltage=float(payload["cell_nominal_voltage"]),
+            cell_full_voltage=float(payload["cell_full_voltage"]),
+            cell_empty_voltage=float(payload["cell_empty_voltage"]),
+            cell_cutoff_voltage=float(payload["cell_cutoff_voltage"]),
+            cell_capacity_ah=float(payload["cell_capacity_ah"]),
+            cells_in_series=int(payload["cells_in_series"]),
+            cells_in_parallel=int(payload["cells_in_parallel"]),
+            internal_resistance_ohm_per_cell=float(payload["internal_resistance_ohm_per_cell"]),
+            ambient_temp_c=float(payload["ambient_temp_c"]),
+            discharge_current_a=float(payload["discharge_current_a"]),
+            duration_s=int(payload["duration_s"]),
+            time_step_s=int(payload["time_step_s"]),
+            initial_soc=float(payload["initial_soc"]),
+            pack_mass_kg=float(payload["pack_mass_kg"]),
+            pack_heat_capacity_j_per_kgk=float(payload["pack_heat_capacity_j_per_kgk"]),
+            cooling_coeff_w_per_k=float(payload["cooling_coeff_w_per_k"]),
+            electrical_model=_parse_electrical_model(payload),
+            current_profile=_parse_current_profile(payload),
+            group_count=int(payload["group_count"]) if payload.get("group_count") is not None else None,
+            group_variation=_parse_group_variation(payload),
+            degradation=_parse_degradation(payload),
+            balancing=_parse_balancing(payload),
+            faults=_parse_faults(payload),
         )
     )
 

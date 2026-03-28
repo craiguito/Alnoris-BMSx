@@ -10,6 +10,7 @@ electrochemical or distributed thermal physics.
 
 from statistics import mean
 
+from .physics.balancing import balance_currents_for_groups
 from .physics.degradation import effective_capacity_scale, effective_resistance_scale, step_degradation
 from .physics.electrical import (
     compute_heat_w,
@@ -21,6 +22,7 @@ from .physics.electrical import (
     step_electrical_state,
     validate_electrical_model,
 )
+from .physics.faults import effects_for_group
 from .physics.pack import build_group_states, derive_pack_properties
 from .physics.thermal import compute_next_temperature_c
 from .profiles import current_for_time
@@ -43,13 +45,21 @@ def _group_cutoff_voltage_v(config: SimulationConfig, series_factor: float) -> f
 def _step_group(
     group: CellGroupState,
     config: SimulationConfig,
+    time_s: int,
     group_voltage_scale: float,
     group_base_resistance_ohm: float,
     group_capacity_as: float,
     thermal_mass_j_per_k: float,
-    current_a: float,
+    pack_current_a: float,
+    balance_current_a: float,
 ) -> GroupStepResult:
-    r0_ohm = effective_r0_ohm(config, group_base_resistance_ohm) * effective_resistance_scale(group)
+    fault_effects = effects_for_group(config.faults, group.index, time_s)
+    current_a = pack_current_a + balance_current_a
+    r0_ohm = (
+        effective_r0_ohm(config, group_base_resistance_ohm)
+        * effective_resistance_scale(group)
+        * fault_effects.resistance_multiplier
+    )
     open_circuit_voltage_v = compute_open_circuit_voltage(
         soc=group.soc,
         config=config,
@@ -72,12 +82,12 @@ def _step_group(
     heat_w = compute_heat_w(
         current_a=current_a,
         r0_ohm=r0_ohm,
-    )
+    ) * fault_effects.heat_multiplier
     next_temp_c = compute_next_temperature_c(
         temp_c=group.temp_c,
         heat_w=heat_w,
         ambient_temp_c=config.ambient_temp_c,
-        cooling_coeff_w_per_k=config.cooling_coeff_w_per_k,
+        cooling_coeff_w_per_k=config.cooling_coeff_w_per_k * fault_effects.cooling_multiplier,
         thermal_mass_j_per_k=thermal_mass_j_per_k,
         dt_s=config.time_step_s,
     )
@@ -93,13 +103,15 @@ def _step_group(
         current_soc=group.soc,
         current_a=current_a,
         dt_s=config.time_step_s,
-        capacity_as=group_capacity_as * effective_capacity_scale(group),
+        capacity_as=group_capacity_as * effective_capacity_scale(group) * fault_effects.capacity_multiplier,
     )
 
     return GroupStepResult(
         terminal_voltage_v=terminal_voltage_v,
         open_circuit_voltage_v=open_circuit_voltage_v,
         heat_w=heat_w,
+        balance_current_a=balance_current_a,
+        fault_flags=list(fault_effects.flags),
         next_state=CellGroupState(
             index=group.index,
             soc=next_soc,
@@ -121,6 +133,8 @@ def _build_time_point(
     group_heats_w = [result.heat_w for result in group_step_results]
     group_temps_c = [result.next_state.temp_c for result in group_step_results]
     group_socs = [result.next_state.soc for result in group_step_results]
+    group_balance_currents_a = [result.balance_current_a for result in group_step_results]
+    group_fault_flags = [result.fault_flags for result in group_step_results]
     weakest_group_index = min(
         range(len(group_voltages_v)),
         key=lambda index: group_voltages_v[index],
@@ -164,6 +178,10 @@ def _build_time_point(
         group_soc=group_socs,
         group_voltage=group_voltages_v,
         group_temp=group_temps_c,
+        balancing_active_groups=[index for index, value in enumerate(group_balance_currents_a) if value > 0.0],
+        fault_active_groups=[index for index, flags in enumerate(group_fault_flags) if flags],
+        group_balance_current_a=group_balance_currents_a,
+        group_fault_flags=group_fault_flags,
     )
 
 
@@ -186,26 +204,35 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
 
     time_series: list[SimulationPoint] = []
     termination_reason = "duration_elapsed"
+    total_balance_ah = 0.0
 
     for step in range(total_steps + 1):
         time_s = step * validated_config.time_step_s
         current_a = current_for_time(validated_config.current_profile, validated_config.discharge_current_a, time_s)
+        balance_currents_a = balance_currents_for_groups(
+            groups=groups,
+            config=validated_config,
+            group_voltage_scale=pack.series_factor,
+        )
 
         step_results = [
             _step_group(
                 group=group,
                 config=validated_config,
+                time_s=time_s,
                 group_voltage_scale=pack.series_factor,
                 group_base_resistance_ohm=pack.group_base_resistance_ohm,
                 group_capacity_as=pack.group_capacity_as,
                 thermal_mass_j_per_k=thermal_mass_j_per_k,
-                current_a=current_a,
+                pack_current_a=current_a,
+                balance_current_a=balance_currents_a[group.index],
             )
             for group in groups
         ]
         groups = [result.next_state for result in step_results]
         point = _build_time_point(time_s=time_s, current_a=current_a, group_step_results=step_results)
         time_series.append(point)
+        total_balance_ah += sum(point.group_balance_current_a) * validated_config.time_step_s / 3600.0
 
         if point.group_voltage_min_v <= group_cutoff_voltage_v:
             termination_reason = "group_cutoff_voltage_reached"
@@ -224,6 +251,9 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
         theoretical_energy_wh=pack.theoretical_energy_wh,
         group_cutoff_voltage_v=group_cutoff_voltage_v,
         termination_reason=termination_reason,
+        total_balance_ah=total_balance_ah,
+        fault_count=len(validated_config.faults.faults),
+        balancing_enabled=validated_config.balancing.enabled,
     )
 
     return SimulationResult(
@@ -242,6 +272,9 @@ def build_summary(
     theoretical_energy_wh: float,
     group_cutoff_voltage_v: float,
     termination_reason: str,
+    total_balance_ah: float,
+    fault_count: int,
+    balancing_enabled: bool,
 ) -> SimulationSummary:
     if not time_series:
         return SimulationSummary(
@@ -268,6 +301,10 @@ def build_summary(
             min_group_voltage=0.0,
             capacity_retention=1.0,
             resistance_growth=0.0,
+            balancing_used=False,
+            total_balance_ah=0.0,
+            fault_count=fault_count,
+            first_faulted_group_index=None,
         )
 
     runtime_s = time_series[-1].time_s
@@ -298,6 +335,14 @@ def build_summary(
         max(1.0 - group.degradation.capacity_loss_fraction, 0.0) for group in groups
     )
     estimated_resistance_growth = mean(group.degradation.resistance_growth_fraction for group in groups)
+    first_faulted_group_index = next(
+        (
+            point.fault_active_groups[0]
+            for point in time_series
+            if point.fault_active_groups
+        ),
+        None,
+    )
 
     warnings: list[SimulationWarning] = []
     if max_group_temp_c >= 60.0:
@@ -377,4 +422,8 @@ def build_summary(
         min_group_voltage=min_group_voltage_v,
         capacity_retention=estimated_capacity_retention,
         resistance_growth=estimated_resistance_growth,
+        balancing_used=balancing_enabled and total_balance_ah > 0.0,
+        total_balance_ah=total_balance_ah,
+        fault_count=fault_count,
+        first_faulted_group_index=first_faulted_group_index,
     )

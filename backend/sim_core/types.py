@@ -64,6 +64,34 @@ class DegradationConfig:
 
 
 @dataclass(frozen=True)
+class BalancingConfig:
+    """Passive balancing bleeds current from the highest groups to reduce spread."""
+
+    enabled: bool = False
+    mode: str = "passive"
+    voltage_threshold_v: float | None = None
+    soc_threshold: float | None = None
+    bleed_current_a: float = 0.0
+    max_active_groups: int | None = None
+
+
+@dataclass(frozen=True)
+class FaultSpec:
+    fault_type: str
+    group_index: int
+    factor: float
+    start_time_s: float = 0.0
+    end_time_s: float | None = None
+
+
+@dataclass(frozen=True)
+class FaultConfig:
+    """Faults are engineering stress injections for analysis, not certification models."""
+
+    faults: tuple[FaultSpec, ...] = ()
+
+
+@dataclass(frozen=True)
 class SimulationConfig:
     cell_nominal_voltage: float
     cell_full_voltage: float
@@ -86,6 +114,8 @@ class SimulationConfig:
     group_count: int | None = None
     group_variation: GroupVariationConfig = field(default_factory=GroupVariationConfig)
     degradation: DegradationConfig = field(default_factory=DegradationConfig)
+    balancing: BalancingConfig = field(default_factory=BalancingConfig)
+    faults: FaultConfig = field(default_factory=FaultConfig)
 
 
 @dataclass(frozen=True)
@@ -138,6 +168,8 @@ class GroupStepResult:
     terminal_voltage_v: float
     open_circuit_voltage_v: float
     heat_w: float
+    balance_current_a: float
+    fault_flags: list[str]
     next_state: CellGroupState
 
 
@@ -167,6 +199,10 @@ class SimulationPoint:
     group_soc: list[float]
     group_voltage: list[float]
     group_temp: list[float]
+    balancing_active_groups: list[int]
+    fault_active_groups: list[int]
+    group_balance_current_a: list[float]
+    group_fault_flags: list[list[str]]
 
 
 @dataclass(frozen=True)
@@ -194,6 +230,10 @@ class SimulationSummary:
     min_group_voltage: float
     capacity_retention: float
     resistance_growth: float
+    balancing_used: bool
+    total_balance_ah: float
+    fault_count: int
+    first_faulted_group_index: int | None
 
 
 @dataclass(frozen=True)
