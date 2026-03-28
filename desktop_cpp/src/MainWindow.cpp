@@ -745,7 +745,6 @@ QFrame* MainWindow::createWorkspacePanel()
     layout->setSpacing(0);
 
     m_cadWorkspaceView = new CadViewportWidget(frame);
-    m_cadWorkspaceView->setCellMeshPath(QStringLiteral(ALNORIS_DEFAULT_CELL_STL));
     m_cadWorkspaceView->setBackgroundColor(m_theme.cadBackground);
     connect(m_cadWorkspaceView, &CadViewportWidget::selectionChanged, this, &MainWindow::refreshCadProperties);
     layout->addWidget(m_cadWorkspaceView, 1);

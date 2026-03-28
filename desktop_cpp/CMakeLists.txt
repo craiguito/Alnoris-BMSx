@@ -107,5 +107,4 @@ endif()
 
 target_compile_definitions(alnoris_desktop PRIVATE
     ALNORIS_PROJECT_ROOT="${CMAKE_SOURCE_DIR}/.."
-    ALNORIS_DEFAULT_CELL_STL="C:/Users/Craig/OneDrive/Desktop/Untitled.stl"
 )
