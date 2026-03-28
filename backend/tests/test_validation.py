@@ -129,6 +129,10 @@ class ValidationAndSafetyTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             run_simulation(config)
 
+    def test_invalid_chemistry_name_raises(self) -> None:
+        with self.assertRaises(ValueError):
+            run_simulation(make_config(chemistry_name="unknown_chemistry"))
+
 
 if __name__ == "__main__":
     unittest.main()

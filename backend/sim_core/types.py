@@ -122,6 +122,12 @@ class SocLookupPoint:
 
 
 @dataclass(frozen=True)
+class OcvLookupPoint:
+    soc: float
+    voltage_v: float
+
+
+@dataclass(frozen=True)
 class PhysicsConfig:
     """Lightweight engineering physics extensions for ECM-based pack studies."""
 
@@ -157,9 +163,12 @@ class PhysicsConfig:
     diffusion_stress_build_rate_per_s: float = 0.10
     diffusion_stress_decay_tau_s: float = 90.0
     diffusion_stress_current_scale_a: float = 8.0
+    diffusion_stress_resistance_coeff: float = 0.0
     two_node_thermal_enabled: bool = False
     core_surface_thermal_coupling_w_per_k: float = 1.8
     surface_thermal_mass_fraction: float = 0.35
+    core_thermal_mass_j_per_k: float | None = None
+    surface_thermal_mass_j_per_k: float | None = None
     nonlinear_cooling_enabled: bool = False
     nonlinear_cooling_delta_threshold_c: float = 12.0
     nonlinear_cooling_gain_per_c: float = 0.02
@@ -198,6 +207,7 @@ class SimulationConfig:
     group_zone_assignments: tuple[int, ...] = ()
     group_labels: tuple[str, ...] = ()
     group_entity_ids: tuple[str, ...] = ()
+    chemistry_name: str = "generic_liion"
     physics: PhysicsConfig = field(default_factory=PhysicsConfig)
 
 
@@ -300,6 +310,8 @@ class SimulationPoint:
     group_temp: list[float]
     group_core_temp: list[float]
     group_surface_temp: list[float]
+    group_core_temp_c: list[float]
+    group_surface_temp_c: list[float]
     group_hysteresis_v: list[float]
     group_diffusion_stress: list[float]
     group_effective_resistance_ohm: list[float]
@@ -360,6 +372,7 @@ class SimulationSummary:
     temp_gradient_max_c: float
     max_diffusion_stress: float
     nonlinear_features_enabled: list[str]
+    chemistry_name: str
 
 
 @dataclass(frozen=True)

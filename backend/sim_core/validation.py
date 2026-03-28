@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from .chemistry import available_chemistries
 from .physics.electrical import validate_electrical_model
 from .types import BalancingConfig, CurrentProfile, DegradationConfig, FaultConfig, PhysicsConfig, SimulationConfig, ThermalZoneConfig
 
@@ -185,10 +186,16 @@ def validate_physics(config: PhysicsConfig) -> PhysicsConfig:
         raise ValueError("physics.diffusion_stress_decay_tau_s must be > 0.")
     if config.diffusion_stress_current_scale_a <= 0.0:
         raise ValueError("physics.diffusion_stress_current_scale_a must be > 0.")
+    if config.diffusion_stress_resistance_coeff < 0.0:
+        raise ValueError("physics.diffusion_stress_resistance_coeff must be >= 0.")
     if config.core_surface_thermal_coupling_w_per_k < 0.0:
         raise ValueError("physics.core_surface_thermal_coupling_w_per_k must be >= 0.")
     if not 0.0 < config.surface_thermal_mass_fraction < 1.0:
         raise ValueError("physics.surface_thermal_mass_fraction must be within (0, 1).")
+    if config.core_thermal_mass_j_per_k is not None and config.core_thermal_mass_j_per_k <= 0.0:
+        raise ValueError("physics.core_thermal_mass_j_per_k must be > 0 when provided.")
+    if config.surface_thermal_mass_j_per_k is not None and config.surface_thermal_mass_j_per_k <= 0.0:
+        raise ValueError("physics.surface_thermal_mass_j_per_k must be > 0 when provided.")
     if config.nonlinear_cooling_delta_threshold_c < 0.0:
         raise ValueError("physics.nonlinear_cooling_delta_threshold_c must be >= 0.")
     if config.nonlinear_cooling_gain_per_c < 0.0:
@@ -225,6 +232,10 @@ def validate_simulation_config(config: SimulationConfig) -> SimulationConfig:
         raise ValueError("cooling_coeff_w_per_k must be >= 0.")
     if not 0.0 <= config.initial_soc <= 1.0:
         raise ValueError("initial_soc must be within [0, 1].")
+    if config.chemistry_name not in available_chemistries():
+        raise ValueError(
+            f"chemistry_name must be one of {', '.join(available_chemistries())}."
+        )
 
     validate_electrical_model(config.electrical_model)
     validate_current_profile(config.current_profile)

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import math
 
+from ..chemistry import get_chemistry_preset
 from ..types import (
     ElectricalModelConfig,
     GroupElectricalState,
+    OcvLookupPoint,
     PackProperties,
     RcBranchParams,
     SocLookupPoint,
@@ -12,11 +14,31 @@ from ..types import (
 )
 
 
+def interpolate_ocv_curve(points: tuple[OcvLookupPoint, ...], soc: float) -> float:
+    clamped_soc = min(max(soc, 0.0), 1.0)
+    if not points:
+        raise ValueError("OCV interpolation requires at least one point.")
+    if clamped_soc <= points[0].soc:
+        return points[0].voltage_v
+    if clamped_soc >= points[-1].soc:
+        return points[-1].voltage_v
+    for low, high in zip(points[:-1], points[1:]):
+        if low.soc <= clamped_soc <= high.soc:
+            span = max(high.soc - low.soc, 1e-9)
+            fraction = (clamped_soc - low.soc) / span
+            return low.voltage_v + fraction * (high.voltage_v - low.voltage_v)
+    return points[-1].voltage_v
+
+
 def compute_open_circuit_voltage(
     soc: float,
     config: SimulationConfig,
     group_voltage_scale: float = 1.0,
 ) -> float:
+    chemistry = get_chemistry_preset(config.chemistry_name)
+    if chemistry.ocv_curve:
+        return interpolate_ocv_curve(chemistry.ocv_curve, soc) * group_voltage_scale
+
     empty_voltage_v = config.cell_empty_voltage * group_voltage_scale
     full_voltage_v = config.cell_full_voltage * group_voltage_scale
     nominal_voltage_v = config.cell_nominal_voltage * group_voltage_scale
@@ -219,6 +241,16 @@ def compute_heat_w(
     r0_ohm: float,
 ) -> float:
     return (current_a**2) * r0_ohm
+
+
+def diffusion_stress_resistance_multiplier(state: GroupElectricalState, config: SimulationConfig) -> float:
+    if not config.physics.diffusion_stress_enabled or config.physics.diffusion_stress_max_v <= 0.0:
+        return 1.0
+    normalized_stress = min(
+        max(state.diffusion_stress_v / max(config.physics.diffusion_stress_max_v, 1e-9), 0.0),
+        1.0,
+    )
+    return 1.0 + normalized_stress * config.physics.diffusion_stress_resistance_coeff
 
 
 def compute_reversible_heat_w(current_a: float, temp_c: float, soc: float, config: SimulationConfig) -> float:

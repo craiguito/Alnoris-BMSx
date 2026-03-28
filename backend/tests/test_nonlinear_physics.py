@@ -9,6 +9,10 @@ from backend.tests.helpers import make_1rc_model, make_config
 
 
 class NonlinearPhysicsTests(unittest.TestCase):
+    def test_chemistry_defaults_to_generic_liion_when_omitted(self) -> None:
+        result = run_simulation(make_config(duration_s=30))
+        self.assertEqual(result.summary.chemistry_name, "generic_liion")
+
     def test_soc_dependent_resistance_changes_voltage_sag(self) -> None:
         physics = PhysicsConfig(resistance_vs_soc_enabled=True)
         low_soc = run_simulation(make_config(initial_soc=0.15, duration_s=30, discharge_current_a=5.0, physics=physics))
@@ -72,6 +76,19 @@ class NonlinearPhysicsTests(unittest.TestCase):
         self.assertGreater(result.summary.max_core_temp_c, result.summary.max_surface_temp_c)
         self.assertGreater(result.summary.temp_gradient_max_c, 0.0)
 
+    def test_stronger_cooling_affects_surface_more_directly_than_core(self) -> None:
+        physics = PhysicsConfig(two_node_thermal_enabled=True, core_surface_thermal_coupling_w_per_k=0.8)
+        weak_cooling = run_simulation(
+            make_config(duration_s=600, discharge_current_a=8.0, cooling_coeff_w_per_k=0.3, physics=physics)
+        )
+        strong_cooling = run_simulation(
+            make_config(duration_s=600, discharge_current_a=8.0, cooling_coeff_w_per_k=2.0, physics=physics)
+        )
+        surface_drop = weak_cooling.summary.max_surface_temp_c - strong_cooling.summary.max_surface_temp_c
+        core_drop = weak_cooling.summary.max_core_temp_c - strong_cooling.summary.max_core_temp_c
+        self.assertGreater(surface_drop, 0.0)
+        self.assertGreater(surface_drop, core_drop)
+
     def test_nonlinear_cooling_changes_thermal_trajectory(self) -> None:
         linear = run_simulation(make_config(duration_s=900, discharge_current_a=8.0))
         nonlinear = run_simulation(
@@ -97,6 +114,53 @@ class NonlinearPhysicsTests(unittest.TestCase):
         discharge = run_simulation(make_config(duration_s=60, current_profile=CurrentProfile(points=(CurrentProfilePoint(0, 4.0),)), physics=physics))
         charge = run_simulation(make_config(duration_s=60, current_profile=CurrentProfile(points=(CurrentProfilePoint(0, -4.0),)), physics=physics))
         self.assertNotAlmostEqual(discharge.time_series[0].group_effective_resistance_ohm[0], charge.time_series[0].group_effective_resistance_ohm[0], places=5)
+
+    def test_repeated_pulse_history_changes_later_pulse_response(self) -> None:
+        physics = PhysicsConfig(
+            diffusion_stress_enabled=True,
+            diffusion_stress_max_v=0.05,
+            diffusion_stress_build_rate_per_s=0.25,
+            diffusion_stress_decay_tau_s=120.0,
+        )
+        result = run_simulation(
+            make_config(
+                duration_s=180,
+                current_profile=CurrentProfile(
+                    points=(
+                        CurrentProfilePoint(0, 8.0),
+                        CurrentProfilePoint(20, 0.0),
+                        CurrentProfilePoint(60, 8.0),
+                        CurrentProfilePoint(80, 0.0),
+                        CurrentProfilePoint(120, 8.0),
+                        CurrentProfilePoint(140, 0.0),
+                    )
+                ),
+                physics=physics,
+            )
+        )
+        first_pulse_voltage = result.time_series[10].pack_voltage_v
+        later_pulse_voltage = result.time_series[130].pack_voltage_v
+        self.assertLess(later_pulse_voltage, first_pulse_voltage)
+
+    def test_chemistry_specific_presets_change_behavior(self) -> None:
+        generic = run_simulation(
+            make_config(
+                cell_key="a123_anr26650m1b",
+                chemistry_name="generic_liion",
+                duration_s=180,
+                discharge_current_a=6.0,
+            )
+        )
+        lfp = run_simulation(
+            make_config(
+                cell_key="a123_anr26650m1b",
+                chemistry_name="lfp",
+                duration_s=180,
+                discharge_current_a=6.0,
+            )
+        )
+        self.assertNotAlmostEqual(generic.time_series[0].pack_voltage_v, lfp.time_series[0].pack_voltage_v, places=4)
+        self.assertNotEqual(generic.summary.nonlinear_features_enabled, lfp.summary.nonlinear_features_enabled)
 
     def test_outputs_remain_serializable(self) -> None:
         payload = {
@@ -128,6 +192,7 @@ class NonlinearPhysicsTests(unittest.TestCase):
         result = run_simulation_from_dict(payload)
         self.assertIn("group_hysteresis_v", result["time_series"][-1])
         self.assertIn("group_core_temp", result["time_series"][-1])
+        self.assertIn("group_core_temp_c", result["time_series"][-1])
         self.assertIn("max_core_temp_c", result["summary"])
 
     def test_backward_compatible_simple_run_still_works(self) -> None:

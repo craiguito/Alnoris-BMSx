@@ -10,6 +10,7 @@ electrochemical or distributed thermal physics.
 
 from statistics import mean
 
+from .chemistry import apply_chemistry_defaults
 from .physics.balancing import balance_currents_for_groups
 from .physics.degradation import effective_capacity_scale, effective_resistance_scale, step_degradation
 from .physics.electrical import (
@@ -20,6 +21,7 @@ from .physics.electrical import (
     compute_power_w,
     compute_reversible_heat_w,
     compute_terminal_voltage,
+    diffusion_stress_resistance_multiplier,
     effective_r0_ohm,
     interconnect_resistance_ohm,
     step_electrical_state,
@@ -88,6 +90,7 @@ def _step_group(
         temp_c=group.core_temp_c,
         config=config,
     )
+    r0_ohm *= diffusion_stress_resistance_multiplier(next_electrical_state, config)
     terminal_voltage_v = compute_terminal_voltage(
         open_circuit_voltage_v=open_circuit_voltage_v,
         current_a=current_a,
@@ -127,7 +130,7 @@ def _step_group(
         capacity_as=(
             group_capacity_as
             * effective_capacity_scale(group)
-            * capacity_temperature_scale(group.temp_c, config)
+            * capacity_temperature_scale(thermal_step.core_temp_c, config)
             * fault_effects.capacity_multiplier
         ),
         config=config,
@@ -228,6 +231,8 @@ def _build_time_point(
         group_temp=group_temps_c,
         group_core_temp=group_core_temps_c,
         group_surface_temp=group_surface_temps_c,
+        group_core_temp_c=group_core_temps_c,
+        group_surface_temp_c=group_surface_temps_c,
         group_hysteresis_v=group_hysteresis_v,
         group_diffusion_stress=group_diffusion_stress,
         group_effective_resistance_ohm=group_effective_resistance_ohm,
@@ -253,11 +258,12 @@ def _build_time_point(
 
 
 def run_simulation(config: SimulationConfig) -> SimulationResult:
+    chemistry_config = apply_chemistry_defaults(config)
     validated_config = validate_simulation_config(
         SimulationConfig(
             **{
-                **config.__dict__,
-                "electrical_model": validate_electrical_model(config.electrical_model),
+                **chemistry_config.__dict__,
+                "electrical_model": validate_electrical_model(chemistry_config.electrical_model),
             }
         )
     )
@@ -388,6 +394,7 @@ def build_summary(
             temp_gradient_max_c=0.0,
             max_diffusion_stress=0.0,
             nonlinear_features_enabled=[],
+            chemistry_name=config.chemistry_name,
         )
 
     runtime_s = time_series[-1].time_s
@@ -565,4 +572,5 @@ def build_summary(
             )
             if enabled
         ],
+        chemistry_name=config.chemistry_name,
     )

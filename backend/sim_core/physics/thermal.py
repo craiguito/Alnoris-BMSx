@@ -93,8 +93,22 @@ def compute_next_group_temperatures(
             representative_temp_c=next_temp_c,
         )
 
-    surface_mass = max(thermal_mass_j_per_k * config.physics.surface_thermal_mass_fraction, 1e-9)
-    core_mass = max(thermal_mass_j_per_k - surface_mass, 1e-9)
+    if config.physics.core_thermal_mass_j_per_k is not None or config.physics.surface_thermal_mass_j_per_k is not None:
+        surface_mass = max(
+            config.physics.surface_thermal_mass_j_per_k
+            if config.physics.surface_thermal_mass_j_per_k is not None
+            else thermal_mass_j_per_k * config.physics.surface_thermal_mass_fraction,
+            1e-9,
+        )
+        core_mass = max(
+            config.physics.core_thermal_mass_j_per_k
+            if config.physics.core_thermal_mass_j_per_k is not None
+            else max(thermal_mass_j_per_k - surface_mass, 1e-9),
+            1e-9,
+        )
+    else:
+        surface_mass = max(thermal_mass_j_per_k * config.physics.surface_thermal_mass_fraction, 1e-9)
+        core_mass = max(thermal_mass_j_per_k - surface_mass, 1e-9)
     coupling_w = config.physics.core_surface_thermal_coupling_w_per_k * (core_temp_c - surface_temp_c)
     cooling_coeff = effective_cooling_coeff_w_per_k(surface_temp_c, ambient_temp_c, cooling_coeff_w_per_k, config)
     cooling_w = cooling_coeff * (surface_temp_c - ambient_temp_c)

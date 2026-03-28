@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any
 
+from .chemistry import get_chemistry_preset
 from .engine import run_simulation
 from .physics.electrical import validate_electrical_model
 from .test_catalog import build_test_catalog
@@ -296,13 +297,22 @@ def _parse_physics(payload: dict[str, Any]) -> PhysicsConfig:
             physics_payload.get("hysteresis_enabled", defaults.hysteresis_enabled)
         ),
         hysteresis_max_voltage_v=float(
-            physics_payload.get("hysteresis_max_voltage_v", defaults.hysteresis_max_voltage_v)
+            physics_payload.get(
+                "hysteresis_max_voltage_v",
+                physics_payload.get("hysteresis_max_v", defaults.hysteresis_max_voltage_v),
+            )
         ),
         hysteresis_response_rate_per_s=float(
-            physics_payload.get("hysteresis_response_rate_per_s", defaults.hysteresis_response_rate_per_s)
+            physics_payload.get(
+                "hysteresis_response_rate_per_s",
+                physics_payload.get("hysteresis_gain", defaults.hysteresis_response_rate_per_s),
+            )
         ),
         hysteresis_relaxation_tau_s=float(
-            physics_payload.get("hysteresis_relaxation_tau_s", defaults.hysteresis_relaxation_tau_s)
+            physics_payload.get(
+                "hysteresis_relaxation_tau_s",
+                physics_payload.get("hysteresis_decay_s", defaults.hysteresis_relaxation_tau_s),
+            )
         ),
         hysteresis_current_scale_a=float(
             physics_payload.get("hysteresis_current_scale_a", defaults.hysteresis_current_scale_a)
@@ -320,25 +330,53 @@ def _parse_physics(payload: dict[str, Any]) -> PhysicsConfig:
             physics_payload.get("diffusion_stress_enabled", defaults.diffusion_stress_enabled)
         ),
         diffusion_stress_max_v=float(
-            physics_payload.get("diffusion_stress_max_v", defaults.diffusion_stress_max_v)
+            physics_payload.get(
+                "diffusion_stress_max_v",
+                physics_payload.get("stress_voltage_coeff", defaults.diffusion_stress_max_v),
+            )
         ),
         diffusion_stress_build_rate_per_s=float(
-            physics_payload.get("diffusion_stress_build_rate_per_s", defaults.diffusion_stress_build_rate_per_s)
+            physics_payload.get(
+                "diffusion_stress_build_rate_per_s",
+                physics_payload.get("stress_gain", defaults.diffusion_stress_build_rate_per_s),
+            )
         ),
         diffusion_stress_decay_tau_s=float(
-            physics_payload.get("diffusion_stress_decay_tau_s", defaults.diffusion_stress_decay_tau_s)
+            physics_payload.get(
+                "diffusion_stress_decay_tau_s",
+                physics_payload.get("stress_decay_s", defaults.diffusion_stress_decay_tau_s),
+            )
         ),
         diffusion_stress_current_scale_a=float(
             physics_payload.get("diffusion_stress_current_scale_a", defaults.diffusion_stress_current_scale_a)
+        ),
+        diffusion_stress_resistance_coeff=float(
+            physics_payload.get(
+                "diffusion_stress_resistance_coeff",
+                physics_payload.get("stress_resistance_coeff", defaults.diffusion_stress_resistance_coeff),
+            )
         ),
         two_node_thermal_enabled=bool(
             physics_payload.get("two_node_thermal_enabled", defaults.two_node_thermal_enabled)
         ),
         core_surface_thermal_coupling_w_per_k=float(
-            physics_payload.get("core_surface_thermal_coupling_w_per_k", defaults.core_surface_thermal_coupling_w_per_k)
+            physics_payload.get(
+                "core_surface_thermal_coupling_w_per_k",
+                physics_payload.get("core_surface_coupling_w_per_k", defaults.core_surface_thermal_coupling_w_per_k),
+            )
         ),
         surface_thermal_mass_fraction=float(
             physics_payload.get("surface_thermal_mass_fraction", defaults.surface_thermal_mass_fraction)
+        ),
+        core_thermal_mass_j_per_k=(
+            float(physics_payload["core_thermal_mass_j_per_k"])
+            if physics_payload.get("core_thermal_mass_j_per_k") is not None
+            else None
+        ),
+        surface_thermal_mass_j_per_k=(
+            float(physics_payload["surface_thermal_mass_j_per_k"])
+            if physics_payload.get("surface_thermal_mass_j_per_k") is not None
+            else None
         ),
         nonlinear_cooling_enabled=bool(
             physics_payload.get("nonlinear_cooling_enabled", defaults.nonlinear_cooling_enabled)
@@ -365,12 +403,19 @@ def _parse_physics(payload: dict[str, Any]) -> PhysicsConfig:
 
 
 def simulation_config_from_dict(payload: dict[str, Any]) -> SimulationConfig:
+    chemistry_payload = payload.get("chemistry_name", payload.get("chemistry"))
+    chemistry_name = (
+        str(chemistry_payload.get("name", "generic_liion"))
+        if isinstance(chemistry_payload, dict)
+        else str(chemistry_payload or "generic_liion")
+    )
+    chemistry = get_chemistry_preset(chemistry_name)
     return validate_simulation_config(
         SimulationConfig(
-            cell_nominal_voltage=float(payload["cell_nominal_voltage"]),
-            cell_full_voltage=float(payload["cell_full_voltage"]),
-            cell_empty_voltage=float(payload["cell_empty_voltage"]),
-            cell_cutoff_voltage=float(payload["cell_cutoff_voltage"]),
+            cell_nominal_voltage=float(payload.get("cell_nominal_voltage", chemistry.cell_nominal_voltage)),
+            cell_full_voltage=float(payload.get("cell_full_voltage", chemistry.cell_full_voltage)),
+            cell_empty_voltage=float(payload.get("cell_empty_voltage", chemistry.cell_empty_voltage)),
+            cell_cutoff_voltage=float(payload.get("cell_cutoff_voltage", chemistry.cell_cutoff_voltage)),
             cell_capacity_ah=float(payload["cell_capacity_ah"]),
             cells_in_series=int(payload["cells_in_series"]),
             cells_in_parallel=int(payload["cells_in_parallel"]),
@@ -394,6 +439,7 @@ def simulation_config_from_dict(payload: dict[str, Any]) -> SimulationConfig:
             group_zone_assignments=tuple(int(zone_id) for zone_id in payload.get("group_zone_assignments", [])),
             group_labels=tuple(str(label) for label in payload.get("group_labels", [])),
             group_entity_ids=tuple(str(entity_id) for entity_id in payload.get("group_entity_ids", [])),
+            chemistry_name=chemistry.name,
             physics=_parse_physics(payload),
         )
     )
