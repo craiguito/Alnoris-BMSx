@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import os
+import tempfile
 import math
 import unittest
 
 from backend.sim_core.bridge import run_simulation_from_dict
 from backend.sim_core.engine import run_simulation
+from backend.sim_core.types import CurrentProfile
 
 from backend.tests.helpers import make_1rc_model, make_2rc_model, make_config, make_profile
 
@@ -65,6 +68,21 @@ class ProfileAndElectricalModelTests(unittest.TestCase):
         self.assertEqual(result.time_series[0].current_a, 1.0)
         self.assertEqual(result.time_series[5].current_a, 4.0)
         self.assertEqual(result.time_series[10].current_a, 2.0)
+
+    def test_current_profile_can_load_from_csv(self) -> None:
+        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".csv", encoding="utf-8") as handle:
+            handle.write("time_s,current_a\n0,1.0\n5,4.0\n10,2.0\n")
+            csv_path = handle.name
+        try:
+            profile = CurrentProfile.from_csv(csv_path)
+            config = make_config(discharge_current_a=9.0, duration_s=12, current_profile=profile)
+            result = run_simulation(config)
+
+            self.assertEqual(result.time_series[0].current_a, 1.0)
+            self.assertEqual(result.time_series[5].current_a, 4.0)
+            self.assertEqual(result.time_series[10].current_a, 2.0)
+        finally:
+            os.unlink(csv_path)
 
     def test_negative_current_increases_soc(self) -> None:
         config = make_config(

@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+"""Battery pack ECM simulator.
+
+Groups represent equal-sized series segments of the pack, not arbitrary fractional slices.
+This keeps the grouped model physically interpretable while remaining lightweight enough
+for early-stage design work. The simulator uses ECM dynamics rather than full
+electrochemical or distributed thermal physics.
+"""
+
 from statistics import mean
 
 from .physics.degradation import effective_capacity_scale, effective_resistance_scale, step_degradation
@@ -25,6 +33,7 @@ from .types import (
     SimulationSummary,
     SimulationWarning,
 )
+from .validation import validate_simulation_config
 
 
 def _group_cutoff_voltage_v(config: SimulationConfig, series_factor: float) -> float:
@@ -63,9 +72,6 @@ def _step_group(
     heat_w = compute_heat_w(
         current_a=current_a,
         r0_ohm=r0_ohm,
-        model=config.electrical_model,
-        series_factor=group_voltage_scale,
-        parallel_count=config.cells_in_parallel,
     )
     next_temp_c = compute_next_temperature_c(
         temp_c=group.temp_c,
@@ -119,6 +125,10 @@ def _build_time_point(
         range(len(group_voltages_v)),
         key=lambda index: group_voltages_v[index],
     )
+    hottest_group_index = max(
+        range(len(group_temps_c)),
+        key=lambda index: group_temps_c[index],
+    )
 
     pack_voltage_v = sum(group_voltages_v)
     pack_heat_w = sum(group_heats_w)
@@ -145,23 +155,31 @@ def _build_time_point(
         soc_min=soc_min,
         soc_max=soc_max,
         soc_avg=soc_avg,
+        temp_avg=pack_temp_avg_c,
+        temp_max=pack_temp_max_c,
         group_voltage_min_v=min(group_voltages_v),
         group_voltage_max_v=max(group_voltages_v),
         weakest_group_index=weakest_group_index,
+        hottest_group_index=hottest_group_index,
+        group_soc=group_socs,
+        group_voltage=group_voltages_v,
+        group_temp=group_temps_c,
     )
 
 
 def run_simulation(config: SimulationConfig) -> SimulationResult:
-    validated_config = SimulationConfig(
-        **{
-            **config.__dict__,
-            "electrical_model": validate_electrical_model(config.electrical_model),
-        }
+    validated_config = validate_simulation_config(
+        SimulationConfig(
+            **{
+                **config.__dict__,
+                "electrical_model": validate_electrical_model(config.electrical_model),
+            }
+        )
     )
     pack = derive_pack_properties(validated_config)
     groups = build_group_states(validated_config, pack)
     total_steps = validated_config.duration_s // validated_config.time_step_s
-    group_cutoff_voltage_v = _group_cutoff_voltage_v(validated_config, pack.series_factor)
+    group_cutoff_voltage_v = _group_cutoff_voltage_v(validated_config, int(pack.series_factor))
     thermal_mass_j_per_k = (
         validated_config.pack_mass_kg * validated_config.pack_heat_capacity_j_per_kgk / pack.group_count
     )
@@ -243,6 +261,13 @@ def build_summary(
             estimated_resistance_growth=0.0,
             electrical_model_type=config.electrical_model.model_type,
             profile_used=config.current_profile is not None and bool(config.current_profile.points),
+            total_energy_wh=0.0,
+            weakest_group_index=0,
+            hottest_group_index=0,
+            max_group_temp=config.ambient_temp_c,
+            min_group_voltage=0.0,
+            capacity_retention=1.0,
+            resistance_growth=0.0,
         )
 
     runtime_s = time_series[-1].time_s
@@ -251,6 +276,22 @@ def build_summary(
     min_terminal_voltage_v = min(point.pack_voltage_v for point in time_series)
     min_group_voltage_v = min(point.group_voltage_min_v for point in time_series)
     max_group_temp_c = max(point.pack_temp_max_c for point in time_series)
+    weakest_group_index = min(
+        (
+            (voltage, index)
+            for point in time_series
+            for index, voltage in enumerate(point.group_voltage)
+        ),
+        key=lambda item: item[0],
+    )[1]
+    hottest_group_index = max(
+        (
+            (temp_c, index)
+            for point in time_series
+            for index, temp_c in enumerate(point.group_temp)
+        ),
+        key=lambda item: item[0],
+    )[1]
     final_soc_avg = time_series[-1].soc_avg
     soc_spread = time_series[-1].soc_max - time_series[-1].soc_min
     estimated_capacity_retention = mean(
@@ -329,4 +370,11 @@ def build_summary(
         estimated_resistance_growth=estimated_resistance_growth,
         electrical_model_type=config.electrical_model.model_type,
         profile_used=config.current_profile is not None and bool(config.current_profile.points),
+        total_energy_wh=delivered_energy_wh,
+        weakest_group_index=weakest_group_index,
+        hottest_group_index=hottest_group_index,
+        max_group_temp=max_group_temp_c,
+        min_group_voltage=min_group_voltage_v,
+        capacity_retention=estimated_capacity_retention,
+        resistance_growth=estimated_resistance_growth,
     )

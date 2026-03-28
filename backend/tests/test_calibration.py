@@ -71,6 +71,8 @@ class CalibrationTests(unittest.TestCase):
         self.assertGreaterEqual(result.summary.final_soc_avg, 0.0)
         self.assertGreaterEqual(result.time_series[-1].pack_voltage_v, 0.0)
         self.assertIn("current_a", result.time_series[-1].__dict__)
+        self.assertIn("group_soc", result.time_series[-1].__dict__)
+        self.assertIn("total_energy_wh", result.summary.__dict__)
 
 
 if __name__ == "__main__":

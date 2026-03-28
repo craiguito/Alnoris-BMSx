@@ -15,6 +15,7 @@ from .types import (
     SimulationConfig,
     SimulationResult,
 )
+from .validation import validate_current_profile, validate_simulation_config
 
 
 def _parse_rc_branches(payload: Any) -> tuple[RcBranchParams, ...]:
@@ -66,6 +67,9 @@ def _parse_current_profile(payload: dict[str, Any]) -> CurrentProfile | None:
     if profile_payload is None:
         return None
 
+    if isinstance(profile_payload, str):
+        return validate_current_profile(CurrentProfile.from_csv(profile_payload))
+
     if isinstance(profile_payload, list):
         points_payload = profile_payload
     else:
@@ -78,9 +82,7 @@ def _parse_current_profile(payload: dict[str, Any]) -> CurrentProfile | None:
         )
         for point in points_payload
     )
-    if not points:
-        return None
-    return CurrentProfile(points=tuple(sorted(points, key=lambda point: point.time_s)))
+    return validate_current_profile(CurrentProfile(points=points))
 
 
 def _parse_group_variation(payload: dict[str, Any]) -> GroupVariationConfig:
@@ -114,7 +116,8 @@ def _parse_degradation(payload: dict[str, Any]) -> DegradationConfig:
 
 
 def simulation_config_from_dict(payload: dict[str, Any]) -> SimulationConfig:
-    return SimulationConfig(
+    return validate_simulation_config(
+        SimulationConfig(
         cell_nominal_voltage=float(payload["cell_nominal_voltage"]),
         cell_full_voltage=float(payload["cell_full_voltage"]),
         cell_empty_voltage=float(payload["cell_empty_voltage"]),
@@ -136,6 +139,7 @@ def simulation_config_from_dict(payload: dict[str, Any]) -> SimulationConfig:
         group_count=int(payload["group_count"]) if payload.get("group_count") is not None else None,
         group_variation=_parse_group_variation(payload),
         degradation=_parse_degradation(payload),
+        )
     )
 
 

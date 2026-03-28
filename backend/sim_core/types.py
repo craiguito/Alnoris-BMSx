@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 from dataclasses import dataclass, field
 
 
@@ -27,6 +28,23 @@ class CurrentProfilePoint:
 @dataclass(frozen=True)
 class CurrentProfile:
     points: tuple[CurrentProfilePoint, ...] = ()
+
+    @classmethod
+    def from_csv(cls, filepath: str) -> "CurrentProfile":
+        """Load a simple time_s,current_a drive cycle CSV."""
+        points: list[CurrentProfilePoint] = []
+        with open(filepath, "r", encoding="utf-8", newline="") as handle:
+            reader = csv.reader(handle)
+            for row in reader:
+                if not row:
+                    continue
+                first = row[0].strip().lower()
+                if first == "time_s":
+                    continue
+                if len(row) < 2:
+                    raise ValueError("Current profile CSV rows must contain time_s,current_a.")
+                points.append(CurrentProfilePoint(time_s=int(float(row[0])), current_a=float(row[1])))
+        return cls(points=tuple(points))
 
 
 @dataclass(frozen=True)
@@ -140,9 +158,15 @@ class SimulationPoint:
     soc_min: float
     soc_max: float
     soc_avg: float
+    temp_avg: float
+    temp_max: float
     group_voltage_min_v: float
     group_voltage_max_v: float
     weakest_group_index: int
+    hottest_group_index: int
+    group_soc: list[float]
+    group_voltage: list[float]
+    group_temp: list[float]
 
 
 @dataclass(frozen=True)
@@ -163,6 +187,13 @@ class SimulationSummary:
     estimated_resistance_growth: float
     electrical_model_type: str
     profile_used: bool
+    total_energy_wh: float
+    weakest_group_index: int
+    hottest_group_index: int
+    max_group_temp: float
+    min_group_voltage: float
+    capacity_retention: float
+    resistance_growth: float
 
 
 @dataclass(frozen=True)

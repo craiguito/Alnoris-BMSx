@@ -9,8 +9,13 @@ def effective_group_count(config: SimulationConfig) -> int:
 
 
 def derive_pack_properties(config: SimulationConfig) -> PackProperties:
+    """Groups are equal-sized series segments, not fractional virtual slices."""
     group_count = effective_group_count(config)
-    series_factor = config.cells_in_series / group_count
+    if config.cells_in_series % group_count != 0:
+        raise ValueError(
+            "group_count must evenly divide cells_in_series so each group maps to a real series segment."
+        )
+    series_factor = config.cells_in_series // group_count
     group_nominal_voltage_v = config.cell_nominal_voltage * series_factor
     group_capacity_ah = config.cell_capacity_ah * config.cells_in_parallel
     group_base_resistance_ohm = (

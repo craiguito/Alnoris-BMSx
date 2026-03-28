@@ -16,6 +16,7 @@ class DegradationTests(unittest.TestCase):
         result = run_simulation(config)
 
         self.assertLess(result.summary.estimated_capacity_retention, 1.0)
+        self.assertLess(result.summary.capacity_retention, 1.0)
 
     def test_degradation_increases_effective_resistance(self) -> None:
         config = make_config(
@@ -32,6 +33,7 @@ class DegradationTests(unittest.TestCase):
         result = run_simulation(config)
 
         self.assertGreater(result.summary.estimated_resistance_growth, 0.0)
+        self.assertGreater(result.summary.resistance_growth, 0.0)
 
 
 if __name__ == "__main__":

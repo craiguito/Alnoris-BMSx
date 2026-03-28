@@ -39,7 +39,7 @@ def effective_r0_ohm(config: SimulationConfig, base_resistance_ohm: float) -> fl
         return base_resistance_ohm
 
     group_count = max(1, config.group_count or config.cells_in_series)
-    series_factor = config.cells_in_series / group_count
+    series_factor = config.cells_in_series // group_count
     return config.electrical_model.r0_ohm_per_cell * series_factor / max(config.cells_in_parallel, 1)
 
 
@@ -98,14 +98,8 @@ def compute_power_w(terminal_voltage_v: float, current_a: float) -> float:
 def compute_heat_w(
     current_a: float,
     r0_ohm: float,
-    model: ElectricalModelConfig,
-    series_factor: float,
-    parallel_count: int,
 ) -> float:
-    total_resistance_ohm = r0_ohm
-    for branch in model.rc_branches:
-        total_resistance_ohm += effective_rc_branch(branch, series_factor, parallel_count).resistance_ohm
-    return (current_a**2) * total_resistance_ohm
+    return (current_a**2) * r0_ohm
 
 
 def compute_next_soc(current_soc: float, current_a: float, dt_s: int, capacity_as: float) -> float:
@@ -129,6 +123,13 @@ def validate_electrical_model(model: ElectricalModelConfig) -> ElectricalModelCo
             f"Electrical model '{model_type}' requires {required_branches} RC branch(es); "
             f"received {len(model.rc_branches)}."
         )
+    if model.r0_ohm_per_cell is not None and model.r0_ohm_per_cell <= 0.0:
+        raise ValueError("Electrical model r0_ohm_per_cell must be > 0.")
+    for branch in branches:
+        if branch.resistance_ohm <= 0.0:
+            raise ValueError("RC branch resistance_ohm must be > 0.")
+        if branch.capacitance_f <= 0.0:
+            raise ValueError("RC branch capacitance_f must be > 0.")
     return ElectricalModelConfig(
         model_type=model_type,
         r0_ohm_per_cell=model.r0_ohm_per_cell,

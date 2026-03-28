@@ -39,6 +39,38 @@ class MultiGroupSimulationTests(unittest.TestCase):
         result = run_simulation(config)
 
         self.assertEqual(result.time_series[0].weakest_group_index, 4)
+        self.assertLess(result.time_series[0].group_voltage[4], result.time_series[0].group_voltage[0])
+
+    def test_per_group_arrays_match_group_count(self) -> None:
+        config = make_config(
+            cells_in_series=4,
+            group_count=4,
+            duration_s=10,
+            discharge_current_a=4.0,
+        )
+        result = run_simulation(config)
+
+        point = result.time_series[-1]
+        self.assertEqual(len(point.group_soc), 4)
+        self.assertEqual(len(point.group_voltage), 4)
+        self.assertEqual(len(point.group_temp), 4)
+
+    def test_weakest_group_hits_cutoff_first(self) -> None:
+        config = make_config(
+            cells_in_series=4,
+            group_count=4,
+            duration_s=7200,
+            discharge_current_a=8.0,
+            initial_soc=0.45,
+            group_variation=GroupVariationConfig(
+                resistance_variation_fraction=0.30,
+                initial_soc_variation_abs=0.03,
+            ),
+        )
+        result = run_simulation(config)
+
+        self.assertEqual(result.summary.termination_reason, "group_cutoff_voltage_reached")
+        self.assertEqual(result.summary.weakest_group_index, result.time_series[-1].weakest_group_index)
 
     def test_profile_driven_multigroup_run_does_not_crash(self) -> None:
         config = make_config(
