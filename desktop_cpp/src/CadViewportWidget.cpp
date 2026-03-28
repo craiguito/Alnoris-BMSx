@@ -61,6 +61,45 @@ QColor toColor(const cad::math::Vec3& color)
     );
 }
 
+void drawSelectionOverlay(QPainter& painter, const cad::render::ScreenPickable& pickable)
+{
+    const QColor glow(47, 128, 237, 90);
+    const QColor outline(34, 120, 255);
+    const QColor inner(142, 198, 255);
+
+    painter.save();
+    if (pickable.shape == cad::render::ScreenPickable::Shape::Circle) {
+        const QRectF outerRect(
+            pickable.x - pickable.half_width - 8.0f,
+            pickable.y - pickable.half_height - 8.0f,
+            (pickable.half_width + 8.0f) * 2.0f,
+            (pickable.half_height + 8.0f) * 2.0f
+        );
+        painter.setPen(QPen(glow, 10.0));
+        painter.setBrush(Qt::NoBrush);
+        painter.drawEllipse(outerRect);
+        painter.setPen(QPen(outline, 4.0));
+        painter.drawEllipse(outerRect.adjusted(2.0, 2.0, -2.0, -2.0));
+        painter.setPen(QPen(inner, 1.5));
+        painter.drawEllipse(outerRect.adjusted(8.0, 8.0, -8.0, -8.0));
+    } else {
+        const QRectF outerRect(
+            pickable.x - pickable.half_width - 8.0f,
+            pickable.y - pickable.half_height - 8.0f,
+            (pickable.half_width + 8.0f) * 2.0f,
+            (pickable.half_height + 8.0f) * 2.0f
+        );
+        painter.setPen(QPen(glow, 10.0));
+        painter.setBrush(Qt::NoBrush);
+        painter.drawRoundedRect(outerRect, 10.0, 10.0);
+        painter.setPen(QPen(outline, 4.0));
+        painter.drawRoundedRect(outerRect.adjusted(2.0, 2.0, -2.0, -2.0), 8.0, 8.0);
+        painter.setPen(QPen(inner, 1.5));
+        painter.drawRoundedRect(outerRect.adjusted(8.0, 8.0, -8.0, -8.0), 6.0, 6.0);
+    }
+    painter.restore();
+}
+
 } // namespace
 
 CadViewportWidget::CadViewportWidget(QWidget* parent)
@@ -314,6 +353,18 @@ void CadViewportWidget::paintEvent(QPaintEvent* event)
         painter.drawLine(a.point, b.point);
     }
 
+    const cad::core::EntityId selectedId = m_engine.selectedEntity();
+    if (selectedId.isValid()) {
+        const auto selectedPickable = std::find_if(
+            frame.pickables.rbegin(),
+            frame.pickables.rend(),
+            [selectedId](const cad::render::ScreenPickable& pickable) { return pickable.entity_id == selectedId; }
+        );
+        if (selectedPickable != frame.pickables.rend()) {
+            drawSelectionOverlay(painter, *selectedPickable);
+        }
+    }
+
     painter.setPen(QColor(90, 102, 116));
     painter.drawText(QRect(16, 12, width() - 32, 20), Qt::AlignLeft | Qt::AlignVCenter, "Standalone CAD module");
 }
@@ -351,9 +402,11 @@ void CadViewportWidget::mouseReleaseEvent(QMouseEvent* event)
         const cad::core::EntityId hit = m_engine.hitTestEntity(static_cast<float>(event->position().x()), static_cast<float>(event->position().y()));
         if (hit.isValid()) {
             m_engine.selectEntity(hit);
-            emit selectionChanged();
-            update();
+        } else {
+            m_engine.clearSelection();
         }
+        emit selectionChanged();
+        update();
     }
     m_dragging = false;
     QWidget::mouseReleaseEvent(event);

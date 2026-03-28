@@ -21,8 +21,10 @@
 #include <QPushButton>
 #include <QFrame>
 #include <QFile>
+#include <QScrollArea>
 #include <QStringList>
 #include <QTabWidget>
+#include <QToolBar>
 #include <QHBoxLayout>
 #include <QSplitter>
 #include <QVBoxLayout>
@@ -36,6 +38,7 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
 {
     setWindowTitle("Alnoris Battery Simulator");
     resize(1560, 940);
+    createMainToolbar();
 
     auto* fileMenu = menuBar()->addMenu("File");
     fileMenu->addAction("Load Project", this, &MainWindow::loadProject);
@@ -63,24 +66,7 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
     rootLayout->setContentsMargins(10, 10, 10, 10);
     rootLayout->setSpacing(10);
 
-    auto* inputsGroup = new QGroupBox("", central);
-    inputsGroup->setMinimumWidth(280);
-    auto* inputsShellLayout = new QVBoxLayout(inputsGroup);
-    inputsShellLayout->setContentsMargins(14, 14, 14, 16);
-    inputsShellLayout->setSpacing(12);
-
-    auto* inputsHeader = new QLabel("Simulation Inputs", inputsGroup);
-    inputsHeader->setStyleSheet("font-size:15px; font-weight:700; color:#f3f7fb;");
-
-    auto* inputsLayout = new QFormLayout();
-    inputsLayout->setHorizontalSpacing(12);
-    inputsLayout->setVerticalSpacing(10);
-    inputsLayout->setContentsMargins(0, 0, 0, 0);
-
-    inputsShellLayout->addWidget(inputsHeader);
-    inputsShellLayout->addLayout(inputsLayout);
-
-    m_referencePreset = new QComboBox(inputsGroup);
+    m_referencePreset = new QComboBox(central);
     m_referencePreset->addItem("Custom");
     m_referencePreset->addItem("Panasonic NCR18650B");
     m_referencePreset->addItem("Samsung INR18650-30Q");
@@ -129,113 +115,56 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
     bindCadRefresh(m_packHeatCapacity);
     bindCadRefresh(m_coolingCoeff);
 
-    inputsLayout->addRow("Reference preset", m_referencePreset);
-    inputsLayout->addRow("Cell nominal voltage (V)", m_cellNominalVoltage);
-    inputsLayout->addRow("Cell full voltage (V)", m_cellFullVoltage);
-    inputsLayout->addRow("Cell empty voltage (V)", m_cellEmptyVoltage);
-    inputsLayout->addRow("Cell cutoff voltage (V)", m_cellCutoffVoltage);
-    inputsLayout->addRow("Cell capacity (Ah)", m_cellCapacity);
-    inputsLayout->addRow("Cells in series", m_cellsInSeries);
-    inputsLayout->addRow("Cells in parallel", m_cellsInParallel);
-    inputsLayout->addRow("Internal resistance per cell (Ohm)", m_internalResistance);
-    inputsLayout->addRow("Ambient temperature (C)", m_ambientTemp);
-    inputsLayout->addRow("Discharge current (A)", m_dischargeCurrent);
-    inputsLayout->addRow("Duration (s)", m_duration);
-    inputsLayout->addRow("Time step (s)", m_timeStep);
-    inputsLayout->addRow("Initial SOC", m_initialSoc);
-    inputsLayout->addRow("Pack mass (kg)", m_packMass);
-    inputsLayout->addRow("Pack heat capacity (J/kgK)", m_packHeatCapacity);
-    inputsLayout->addRow("Cooling coefficient (W/K)", m_coolingCoeff);
-
-    m_runButton = new QPushButton("Run Simulation", inputsGroup);
-    m_captureBaselineButton = new QPushButton("Capture Baseline", inputsGroup);
-    m_compareBaselineButton = new QPushButton("Compare to Baseline", inputsGroup);
-    m_saveProjectButton = new QPushButton("Save Project", inputsGroup);
-    m_loadProjectButton = new QPushButton("Load Project", inputsGroup);
+    m_runButton = new QPushButton("Run Simulation", central);
+    m_captureBaselineButton = new QPushButton("Capture Baseline", central);
+    m_compareBaselineButton = new QPushButton("Compare to Baseline", central);
+    m_saveProjectButton = new QPushButton("Save Project", central);
+    m_loadProjectButton = new QPushButton("Load Project", central);
     connect(m_runButton, &QPushButton::clicked, this, &MainWindow::runSimulation);
     connect(m_captureBaselineButton, &QPushButton::clicked, this, &MainWindow::captureBaseline);
     connect(m_compareBaselineButton, &QPushButton::clicked, this, &MainWindow::compareAgainstBaseline);
     connect(m_saveProjectButton, &QPushButton::clicked, this, &MainWindow::saveProject);
     connect(m_loadProjectButton, &QPushButton::clicked, this, &MainWindow::loadProject);
 
-    auto* actionsLayout = new QGridLayout();
-    actionsLayout->setContentsMargins(0, 8, 0, 0);
-    actionsLayout->setHorizontalSpacing(8);
-    actionsLayout->setVerticalSpacing(8);
-    actionsLayout->addWidget(m_runButton, 0, 0, 1, 2);
-    actionsLayout->addWidget(m_captureBaselineButton, 1, 0);
-    actionsLayout->addWidget(m_compareBaselineButton, 1, 1);
-    actionsLayout->addWidget(m_saveProjectButton, 2, 0);
-    actionsLayout->addWidget(m_loadProjectButton, 2, 1);
+    auto* mainSplitter = new QSplitter(Qt::Horizontal, central);
+    mainSplitter->setChildrenCollapsible(false);
 
-    inputsShellLayout->addSpacing(6);
-    inputsShellLayout->addLayout(actionsLayout);
-
-    auto* centerRightSplitter = new QSplitter(Qt::Horizontal, central);
-    centerRightSplitter->setChildrenCollapsible(false);
-
-    auto* centerSplitter = new QSplitter(Qt::Vertical, centerRightSplitter);
+    auto* centerSplitter = new QSplitter(Qt::Vertical, mainSplitter);
     centerSplitter->setChildrenCollapsible(false);
 
     auto* workspaceGroup = new QGroupBox("", centerSplitter);
     auto* workspaceLayout = new QVBoxLayout(workspaceGroup);
-    workspaceLayout->setContentsMargins(12, 14, 12, 12);
+    workspaceLayout->setContentsMargins(12, 12, 12, 12);
+    workspaceLayout->setSpacing(8);
     auto* workspaceHeader = new QLabel("CAD / 3D Simulation Workspace", workspaceGroup);
-    workspaceHeader->setStyleSheet("font-size:15px; font-weight:700; color:#f3f7fb;");
+    workspaceHeader->setStyleSheet("font-size:16px; font-weight:700; color:#f3f7fb;");
+    auto* workspaceSubheader = new QLabel("Primary battery design view. Select entities to inspect and edit them from the sidebar.", workspaceGroup);
+    workspaceSubheader->setWordWrap(true);
+    workspaceSubheader->setStyleSheet("font-size:12px; color:#93a6ba;");
     workspaceLayout->addWidget(workspaceHeader);
-    auto* workspacePanel = createWorkspacePanel();
-    workspaceLayout->addWidget(workspacePanel);
+    workspaceLayout->addWidget(workspaceSubheader);
+    workspaceLayout->addWidget(createWorkspacePanel(), 1);
 
-    auto* cadPropertiesGroup = createCadPropertiesPanel();
-
-    auto* outputGroup = new QGroupBox("", centerSplitter);
-    auto* outputLayout = new QVBoxLayout(outputGroup);
-    outputLayout->setContentsMargins(12, 14, 12, 12);
-    auto* outputHeader = new QLabel("Command Prompt / Output Logs", outputGroup);
-    outputHeader->setStyleSheet("font-size:15px; font-weight:700; color:#f3f7fb;");
-    outputLayout->addWidget(outputHeader);
-    m_summaryLabel = new QLabel("Run a simulation to view the desktop-first results. Capture a baseline when you want to compare design changes.", outputGroup);
-    m_summaryLabel->setWordWrap(true);
-    m_summaryLabel->setStyleSheet("font-size: 13px; color: #d8e5f2;");
-    m_outputText = new QPlainTextEdit(outputGroup);
-    m_outputText->setReadOnly(true);
-    outputLayout->addWidget(m_summaryLabel);
-    outputLayout->addWidget(m_outputText, 1);
+    auto* outputGroup = createOutputPanel();
 
     centerSplitter->addWidget(workspaceGroup);
-    centerSplitter->addWidget(cadPropertiesGroup);
     centerSplitter->addWidget(outputGroup);
-    centerSplitter->setStretchFactor(0, 4);
+    centerSplitter->setStretchFactor(0, 8);
     centerSplitter->setStretchFactor(1, 2);
-    centerSplitter->setStretchFactor(2, 1);
 
-    auto* chartsGroup = new QGroupBox("", centerRightSplitter);
-    chartsGroup->setMinimumWidth(360);
-    auto* chartsLayout = new QVBoxLayout(chartsGroup);
-    chartsLayout->setContentsMargins(12, 14, 12, 12);
-    auto* chartsHeader = new QLabel("Charts", chartsGroup);
-    chartsHeader->setStyleSheet("font-size:15px; font-weight:700; color:#f3f7fb;");
-    chartsLayout->addWidget(chartsHeader);
-    m_topChartTabs = new QTabWidget(chartsGroup);
-    m_bottomChartTabs = new QTabWidget(chartsGroup);
-    m_voltageChartView = createGraphWidget();
-    m_temperatureChartView = createGraphWidget();
-    m_socChartView = createGraphWidget();
-    m_powerChartView = createGraphWidget();
-    m_topChartTabs->addTab(m_voltageChartView, "Voltage");
-    m_topChartTabs->addTab(m_temperatureChartView, "Temperature");
-    m_bottomChartTabs->addTab(m_socChartView, "SOC");
-    m_bottomChartTabs->addTab(m_powerChartView, "Power");
-    chartsLayout->addWidget(m_topChartTabs, 1);
-    chartsLayout->addWidget(m_bottomChartTabs, 1);
+    auto* rightTabs = new QTabWidget(mainSplitter);
+    rightTabs->setMinimumWidth(360);
+    rightTabs->addTab(createCadPropertiesPanel(), "Inspector");
+    rightTabs->addTab(createResultsPanel(), "Results");
 
-    centerRightSplitter->addWidget(centerSplitter);
-    centerRightSplitter->addWidget(chartsGroup);
-    centerRightSplitter->setStretchFactor(0, 5);
-    centerRightSplitter->setStretchFactor(1, 2);
+    mainSplitter->addWidget(createInputsSidebar());
+    mainSplitter->addWidget(centerSplitter);
+    mainSplitter->addWidget(rightTabs);
+    mainSplitter->setStretchFactor(0, 2);
+    mainSplitter->setStretchFactor(1, 7);
+    mainSplitter->setStretchFactor(2, 3);
 
-    rootLayout->addWidget(inputsGroup, 0);
-    rootLayout->addWidget(centerRightSplitter, 1);
+    rootLayout->addWidget(mainSplitter, 1);
 
     setCentralWidget(central);
     applyTheme();
@@ -408,6 +337,116 @@ QDoubleSpinBox* MainWindow::createDoubleSpin(double value, double min, double ma
     return widget;
 }
 
+void MainWindow::createMainToolbar()
+{
+    auto* toolbar = addToolBar("Primary");
+    toolbar->setMovable(false);
+    toolbar->setFloatable(false);
+    toolbar->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    toolbar->addAction("Load", this, &MainWindow::loadProject);
+    toolbar->addAction("Save", this, &MainWindow::saveProject);
+    toolbar->addSeparator();
+    toolbar->addAction("CAD Undo", this, &MainWindow::undoCadEdit);
+    toolbar->addAction("CAD Redo", this, &MainWindow::redoCadEdit);
+    toolbar->addSeparator();
+    toolbar->addAction("Run", this, &MainWindow::runSimulation);
+    toolbar->addAction("Baseline", this, &MainWindow::captureBaseline);
+    toolbar->addAction("Compare", this, &MainWindow::compareAgainstBaseline);
+}
+
+QWidget* MainWindow::createInputsSidebar()
+{
+    auto* container = new QWidget(this);
+    auto* shellLayout = new QVBoxLayout(container);
+    shellLayout->setContentsMargins(0, 0, 0, 0);
+    shellLayout->setSpacing(0);
+
+    auto* scroll = new QScrollArea(container);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+
+    auto* content = new QWidget(scroll);
+    auto* layout = new QVBoxLayout(content);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(10);
+
+    auto* headerGroup = new QGroupBox("", content);
+    auto* headerLayout = new QVBoxLayout(headerGroup);
+    headerLayout->setContentsMargins(14, 14, 14, 14);
+    headerLayout->setSpacing(4);
+    auto* header = new QLabel("Simulation Setup", headerGroup);
+    header->setStyleSheet("font-size:16px; font-weight:700; color:#f3f7fb;");
+    auto* subheader = new QLabel("Configure cell, pack, environment, and run settings for the active battery scenario.", headerGroup);
+    subheader->setWordWrap(true);
+    subheader->setStyleSheet("font-size:12px; color:#93a6ba;");
+    headerLayout->addWidget(header);
+    headerLayout->addWidget(subheader);
+    layout->addWidget(headerGroup);
+
+    auto* cellGroup = new QGroupBox("Cell", content);
+    auto* cellLayout = new QFormLayout(cellGroup);
+    cellLayout->setContentsMargins(14, 16, 14, 14);
+    cellLayout->setHorizontalSpacing(10);
+    cellLayout->setVerticalSpacing(8);
+    cellLayout->addRow("Reference preset", m_referencePreset);
+    cellLayout->addRow("Nominal voltage (V)", m_cellNominalVoltage);
+    cellLayout->addRow("Full voltage (V)", m_cellFullVoltage);
+    cellLayout->addRow("Empty voltage (V)", m_cellEmptyVoltage);
+    cellLayout->addRow("Cutoff voltage (V)", m_cellCutoffVoltage);
+    cellLayout->addRow("Capacity (Ah)", m_cellCapacity);
+    cellLayout->addRow("Internal resistance (Ohm)", m_internalResistance);
+    layout->addWidget(cellGroup);
+
+    auto* packGroup = new QGroupBox("Pack Layout", content);
+    auto* packLayout = new QFormLayout(packGroup);
+    packLayout->setContentsMargins(14, 16, 14, 14);
+    packLayout->setHorizontalSpacing(10);
+    packLayout->setVerticalSpacing(8);
+    packLayout->addRow("Cells in series", m_cellsInSeries);
+    packLayout->addRow("Cells in parallel", m_cellsInParallel);
+    packLayout->addRow("Initial SOC", m_initialSoc);
+    layout->addWidget(packGroup);
+
+    auto* thermalGroup = new QGroupBox("Electrical / Thermal", content);
+    auto* thermalLayout = new QFormLayout(thermalGroup);
+    thermalLayout->setContentsMargins(14, 16, 14, 14);
+    thermalLayout->setHorizontalSpacing(10);
+    thermalLayout->setVerticalSpacing(8);
+    thermalLayout->addRow("Ambient temp (C)", m_ambientTemp);
+    thermalLayout->addRow("Discharge current (A)", m_dischargeCurrent);
+    thermalLayout->addRow("Pack mass (kg)", m_packMass);
+    thermalLayout->addRow("Heat capacity (J/kgK)", m_packHeatCapacity);
+    thermalLayout->addRow("Cooling coeff (W/K)", m_coolingCoeff);
+    layout->addWidget(thermalGroup);
+
+    auto* simGroup = new QGroupBox("Simulation Run", content);
+    auto* simLayout = new QFormLayout(simGroup);
+    simLayout->setContentsMargins(14, 16, 14, 14);
+    simLayout->setHorizontalSpacing(10);
+    simLayout->setVerticalSpacing(8);
+    simLayout->addRow("Duration (s)", m_duration);
+    simLayout->addRow("Time step (s)", m_timeStep);
+    layout->addWidget(simGroup);
+
+    auto* actionsGroup = new QGroupBox("Actions", content);
+    auto* actionsLayout = new QGridLayout(actionsGroup);
+    actionsLayout->setContentsMargins(14, 16, 14, 14);
+    actionsLayout->setHorizontalSpacing(8);
+    actionsLayout->setVerticalSpacing(8);
+    actionsLayout->addWidget(m_runButton, 0, 0, 1, 2);
+    actionsLayout->addWidget(m_captureBaselineButton, 1, 0);
+    actionsLayout->addWidget(m_compareBaselineButton, 1, 1);
+    actionsLayout->addWidget(m_saveProjectButton, 2, 0);
+    actionsLayout->addWidget(m_loadProjectButton, 2, 1);
+    layout->addWidget(actionsGroup);
+    layout->addStretch(1);
+
+    scroll->setWidget(content);
+    shellLayout->addWidget(scroll);
+    return container;
+}
+
 QJsonObject MainWindow::buildSimulationConfig() const
 {
     return QJsonObject{
@@ -576,7 +615,7 @@ QString MainWindow::formatTraceLines(const QJsonObject& payload) const
 ChartWidget* MainWindow::createGraphWidget()
 {
     auto* view = new ChartWidget(this);
-    view->setMinimumHeight(280);
+    view->setMinimumHeight(240);
     applyChartTheme(view);
     return view;
 }
@@ -610,14 +649,16 @@ QGroupBox* MainWindow::createCadPropertiesPanel()
 {
     auto* group = new QGroupBox("", this);
     auto* layout = new QVBoxLayout(group);
-    layout->setContentsMargins(12, 14, 12, 12);
-    auto* header = new QLabel("CAD Properties", group);
-    header->setStyleSheet("font-size:15px; font-weight:700; color:#f3f7fb;");
+    layout->setContentsMargins(12, 12, 12, 12);
+    layout->setSpacing(10);
+    auto* header = new QLabel("CAD Inspector", group);
+    header->setStyleSheet("font-size:16px; font-weight:700; color:#f3f7fb;");
     layout->addWidget(header);
 
-    auto* form = new QGridLayout();
-    form->setHorizontalSpacing(10);
-    form->setVerticalSpacing(8);
+    auto* subheader = new QLabel("Review the selected entity, edit its transform or geometry, then apply or undo changes.", group);
+    subheader->setWordWrap(true);
+    subheader->setStyleSheet("font-size:12px; color:#93a6ba;");
+    layout->addWidget(subheader);
 
     m_cadSelectedType = new QLabel("No selection", group);
     m_cadSelectedId = new QLabel("-", group);
@@ -645,36 +686,39 @@ QGroupBox* MainWindow::createCadPropertiesPanel()
     m_cadThicknessLabel = new QLabel("Wall Thickness", group);
     m_cadThickness = createDoubleSpin(0.0, 0.0, 10000.0, 2);
 
-    form->addWidget(new QLabel("Type", group), 0, 0);
-    form->addWidget(m_cadSelectedType, 0, 1);
-    form->addWidget(new QLabel("Entity ID", group), 1, 0);
-    form->addWidget(m_cadSelectedId, 1, 1);
-    form->addWidget(new QLabel("Label", group), 2, 0);
-    form->addWidget(m_cadLabelEdit, 2, 1);
-    form->addWidget(m_cadVisibleCheck, 3, 1);
+    auto* selectionGroup = new QGroupBox("Selection Summary", group);
+    auto* selectionLayout = new QFormLayout(selectionGroup);
+    selectionLayout->setContentsMargins(14, 16, 14, 14);
+    selectionLayout->setHorizontalSpacing(10);
+    selectionLayout->setVerticalSpacing(8);
+    selectionLayout->addRow("Type", m_cadSelectedType);
+    selectionLayout->addRow("Entity ID", m_cadSelectedId);
+    selectionLayout->addRow("Label", m_cadLabelEdit);
+    selectionLayout->addRow(QString(), m_cadVisibleCheck);
+    layout->addWidget(selectionGroup);
 
-    form->addWidget(m_cadPosXLabel, 4, 0);
-    form->addWidget(m_cadPosX, 4, 1);
-    form->addWidget(m_cadPosYLabel, 5, 0);
-    form->addWidget(m_cadPosY, 5, 1);
-    form->addWidget(m_cadPosZLabel, 6, 0);
-    form->addWidget(m_cadPosZ, 6, 1);
+    auto* transformGroup = new QGroupBox("Transform", group);
+    auto* transformLayout = new QFormLayout(transformGroup);
+    transformLayout->setContentsMargins(14, 16, 14, 14);
+    transformLayout->setHorizontalSpacing(10);
+    transformLayout->setVerticalSpacing(8);
+    transformLayout->addRow(m_cadPosXLabel, m_cadPosX);
+    transformLayout->addRow(m_cadPosYLabel, m_cadPosY);
+    transformLayout->addRow(m_cadPosZLabel, m_cadPosZ);
+    layout->addWidget(transformGroup);
 
-    form->addWidget(m_cadRadiusLabel, 7, 0);
-    form->addWidget(m_cadRadius, 7, 1);
-    form->addWidget(m_cadHeightLabel, 8, 0);
-    form->addWidget(m_cadHeight, 8, 1);
-
-    form->addWidget(m_cadSizeXLabel, 9, 0);
-    form->addWidget(m_cadSizeX, 9, 1);
-    form->addWidget(m_cadSizeYLabel, 10, 0);
-    form->addWidget(m_cadSizeY, 10, 1);
-    form->addWidget(m_cadSizeZLabel, 11, 0);
-    form->addWidget(m_cadSizeZ, 11, 1);
-    form->addWidget(m_cadThicknessLabel, 12, 0);
-    form->addWidget(m_cadThickness, 12, 1);
-
-    layout->addLayout(form);
+    auto* geometryGroup = new QGroupBox("Geometry", group);
+    auto* geometryLayout = new QFormLayout(geometryGroup);
+    geometryLayout->setContentsMargins(14, 16, 14, 14);
+    geometryLayout->setHorizontalSpacing(10);
+    geometryLayout->setVerticalSpacing(8);
+    geometryLayout->addRow(m_cadRadiusLabel, m_cadRadius);
+    geometryLayout->addRow(m_cadHeightLabel, m_cadHeight);
+    geometryLayout->addRow(m_cadSizeXLabel, m_cadSizeX);
+    geometryLayout->addRow(m_cadSizeYLabel, m_cadSizeY);
+    geometryLayout->addRow(m_cadSizeZLabel, m_cadSizeZ);
+    geometryLayout->addRow(m_cadThicknessLabel, m_cadThickness);
+    layout->addWidget(geometryGroup);
 
     auto* buttonLayout = new QGridLayout();
     m_cadApplyButton = new QPushButton("Apply", group);
@@ -695,33 +739,119 @@ QGroupBox* MainWindow::createCadPropertiesPanel()
     buttonLayout->addWidget(m_cadResetPositionButton, 2, 0);
     buttonLayout->addWidget(m_cadResetGeometryButton, 2, 1);
     buttonLayout->addWidget(m_cadResetLabelButton, 3, 0, 1, 2);
-    layout->addLayout(buttonLayout);
+    auto* actionsGroup = new QGroupBox("Actions", group);
+    auto* actionsGroupLayout = new QVBoxLayout(actionsGroup);
+    actionsGroupLayout->setContentsMargins(14, 16, 14, 14);
+    actionsGroupLayout->addLayout(buttonLayout);
+    layout->addWidget(actionsGroup);
     layout->addStretch(1);
 
     return group;
+}
+
+QGroupBox* MainWindow::createResultsPanel()
+{
+    auto* group = new QGroupBox("", this);
+    auto* layout = new QVBoxLayout(group);
+    layout->setContentsMargins(12, 12, 12, 12);
+    layout->setSpacing(10);
+
+    auto* header = new QLabel("Results & Charts", group);
+    header->setStyleSheet("font-size:16px; font-weight:700; color:#f3f7fb;");
+    auto* subheader = new QLabel("Keep simulation performance visible without stealing focus from the CAD workspace.", group);
+    subheader->setWordWrap(true);
+    subheader->setStyleSheet("font-size:12px; color:#93a6ba;");
+    layout->addWidget(header);
+    layout->addWidget(subheader);
+
+    auto* summaryGroup = new QGroupBox("Run Summary", group);
+    auto* summaryLayout = new QVBoxLayout(summaryGroup);
+    summaryLayout->setContentsMargins(14, 16, 14, 14);
+    m_summaryLabel = new QLabel("Run a simulation to view the desktop-first results. Capture a baseline when you want to compare design changes.", summaryGroup);
+    m_summaryLabel->setWordWrap(true);
+    m_summaryLabel->setStyleSheet("font-size: 13px; color: #d8e5f2;");
+    summaryLayout->addWidget(m_summaryLabel);
+    layout->addWidget(summaryGroup);
+
+    auto* chartTabs = new QTabWidget(group);
+    auto* electricalTab = new QWidget(chartTabs);
+    auto* electricalLayout = new QVBoxLayout(electricalTab);
+    electricalLayout->setContentsMargins(8, 8, 8, 8);
+    electricalLayout->setSpacing(10);
+    m_topChartTabs = new QTabWidget(electricalTab);
+    m_voltageChartView = createGraphWidget();
+    m_powerChartView = createGraphWidget();
+    m_topChartTabs->addTab(m_voltageChartView, "Voltage");
+    m_topChartTabs->addTab(m_powerChartView, "Power");
+    electricalLayout->addWidget(m_topChartTabs, 1);
+
+    auto* thermalTab = new QWidget(chartTabs);
+    auto* thermalLayout = new QVBoxLayout(thermalTab);
+    thermalLayout->setContentsMargins(8, 8, 8, 8);
+    thermalLayout->setSpacing(10);
+    m_bottomChartTabs = new QTabWidget(thermalTab);
+    m_temperatureChartView = createGraphWidget();
+    m_socChartView = createGraphWidget();
+    m_bottomChartTabs->addTab(m_temperatureChartView, "Temperature");
+    m_bottomChartTabs->addTab(m_socChartView, "SOC");
+    thermalLayout->addWidget(m_bottomChartTabs, 1);
+
+    chartTabs->addTab(electricalTab, "Electrical");
+    chartTabs->addTab(thermalTab, "Thermal / State");
+    layout->addWidget(chartTabs, 1);
+
+    return group;
+}
+
+QGroupBox* MainWindow::createOutputPanel()
+{
+    auto* outputGroup = new QGroupBox("", this);
+    auto* outputLayout = new QVBoxLayout(outputGroup);
+    outputLayout->setContentsMargins(12, 12, 12, 12);
+    outputLayout->setSpacing(8);
+    auto* outputHeader = new QLabel("Logs / Output", outputGroup);
+    outputHeader->setStyleSheet("font-size:14px; font-weight:700; color:#f3f7fb;");
+    auto* outputHint = new QLabel("Diagnostics stay available here, but the workspace remains the primary focus.", outputGroup);
+    outputHint->setWordWrap(true);
+    outputHint->setStyleSheet("font-size:12px; color:#93a6ba;");
+    m_outputText = new QPlainTextEdit(outputGroup);
+    m_outputText->setReadOnly(true);
+    m_outputText->setMinimumHeight(110);
+    outputLayout->addWidget(outputHeader);
+    outputLayout->addWidget(outputHint);
+    outputLayout->addWidget(m_outputText, 1);
+    return outputGroup;
 }
 
 void MainWindow::applyTheme()
 {
     const QString appBg = m_theme.appBackground.name();
     const QString text = m_theme.textColor.name();
-    const QString panelBg = QString("#2a2a2a");
-    const QString fieldBg = QString("#333333");
-    const QString border = QString("#6a6a6a");
+    const QString panelBg = QString("#262a31");
+    const QString fieldBg = QString("#30343c");
+    const QString border = QString("#5c6672");
+    const QString accent = QString("#3182f6");
 
     setStyleSheet(QString(
         "QMainWindow, QWidget { background:%1; color:%2; }"
-        "QGroupBox { background:%3; border:1px solid %4; border-radius:6px; margin-top:6px; }"
+        "QToolBar { background:%3; border:1px solid %4; spacing:6px; padding:4px; }"
+        "QToolBar QToolButton { background:%3; color:%2; border:1px solid %4; border-radius:5px; padding:6px 10px; }"
+        "QToolBar QToolButton:hover { border:1px solid %5; }"
+        "QGroupBox { background:%3; border:1px solid %4; border-radius:8px; margin-top:10px; padding-top:8px; }"
+        "QGroupBox::title { subcontrol-origin: margin; left:12px; padding:0 4px; color:%2; font-weight:600; }"
         "QLabel { color:%2; background:transparent; }"
         "QMenuBar { background:%1; color:%2; }"
         "QMenuBar::item:selected { background:%3; }"
         "QMenu { background:%3; color:%2; border:1px solid %4; }"
         "QMenu::item:selected { background:%4; }"
-        "QPushButton, QComboBox, QDoubleSpinBox, QPlainTextEdit, QTabWidget::pane { background:%3; color:%2; border:1px solid %4; }"
-        "QTabBar::tab { background:%3; color:%2; border:1px solid %4; padding:6px 10px; }"
-        "QTabBar::tab:selected { background:%4; }"
+        "QPushButton, QComboBox, QDoubleSpinBox, QLineEdit, QPlainTextEdit, QTabWidget::pane { background:%3; color:%2; border:1px solid %4; border-radius:6px; }"
+        "QPushButton:hover, QComboBox:hover, QDoubleSpinBox:hover, QLineEdit:hover { border:1px solid %5; }"
+        "QTabWidget::pane { padding:2px; }"
+        "QTabBar::tab { background:%3; color:%2; border:1px solid %4; border-top-left-radius:6px; border-top-right-radius:6px; padding:7px 12px; }"
+        "QTabBar::tab:selected { background:%4; border-color:%5; }"
         "QPlainTextEdit { background:%3; }"
-    ).arg(appBg, text, fieldBg, border));
+        "QScrollArea { border:none; background:transparent; }"
+    ).arg(appBg, text, fieldBg, border, accent));
 
     if (m_cadWorkspaceView != nullptr) {
         m_cadWorkspaceView->setBackgroundColor(m_theme.cadBackground);
@@ -845,10 +975,11 @@ void MainWindow::setCadEditorEnabled(bool enabled)
 
 void MainWindow::refreshCadProperties()
 {
-    if (m_cadWorkspaceView == nullptr) {
+    if (m_cadWorkspaceView == nullptr || m_isSyncingCadInspector) {
         return;
     }
 
+    m_isSyncingCadInspector = true;
     const auto summary = m_cadWorkspaceView->selectedEntitySummary();
     const bool hasSelection = summary.has_value();
     setCadEditorEnabled(hasSelection);
@@ -858,6 +989,28 @@ void MainWindow::refreshCadProperties()
         m_cadSelectedId->setText("-");
         m_cadLabelEdit->setText(QString());
         m_cadVisibleCheck->setChecked(false);
+        m_cadPosX->setValue(0.0);
+        m_cadPosY->setValue(0.0);
+        m_cadPosZ->setValue(0.0);
+        m_cadRadius->setValue(0.0);
+        m_cadHeight->setValue(0.0);
+        m_cadSizeX->setValue(0.0);
+        m_cadSizeY->setValue(0.0);
+        m_cadSizeZ->setValue(0.0);
+        m_cadThickness->setValue(0.0);
+        m_cadRadiusLabel->setVisible(false);
+        m_cadRadius->setVisible(false);
+        m_cadHeightLabel->setVisible(false);
+        m_cadHeight->setVisible(false);
+        m_cadSizeXLabel->setVisible(false);
+        m_cadSizeX->setVisible(false);
+        m_cadSizeYLabel->setVisible(false);
+        m_cadSizeY->setVisible(false);
+        m_cadSizeZLabel->setVisible(false);
+        m_cadSizeZ->setVisible(false);
+        m_cadThicknessLabel->setVisible(false);
+        m_cadThickness->setVisible(false);
+        m_isSyncingCadInspector = false;
         return;
     }
 
@@ -969,6 +1122,7 @@ void MainWindow::refreshCadProperties()
         break;
     }
     }
+    m_isSyncingCadInspector = false;
 }
 
 void MainWindow::applyCadPropertyChanges()
@@ -982,121 +1136,209 @@ void MainWindow::applyCadPropertyChanges()
         return;
     }
 
-    m_cadWorkspaceView->applyRenameToSelected(m_cadLabelEdit->text());
-    m_cadWorkspaceView->applySelectedVisibility(m_cadVisibleCheck->isChecked());
+    m_isSyncingCadInspector = true;
+
+    if (QString::fromStdString(summary->label) != m_cadLabelEdit->text()) {
+        m_cadWorkspaceView->applyRenameToSelected(m_cadLabelEdit->text());
+    }
+    if (summary->visible != m_cadVisibleCheck->isChecked()) {
+        m_cadWorkspaceView->applySelectedVisibility(m_cadVisibleCheck->isChecked());
+    }
 
     switch (summary->kind) {
     case cad::battery::EntityKind::Cell: {
+        const auto properties = m_cadWorkspaceView->selectedCellProperties();
+        if (!properties.has_value()) {
+            break;
+        }
         cad::battery::CellPropertiesUpdate update;
-        update.position = cad::math::Vec3{
+        const cad::math::Vec3 position{
             static_cast<float>(m_cadPosX->value()),
             static_cast<float>(m_cadPosY->value()),
             static_cast<float>(m_cadPosZ->value())
         };
-        update.radius = static_cast<float>(m_cadRadius->value());
-        update.height = static_cast<float>(m_cadHeight->value());
-        m_cadWorkspaceView->applySelectedCellUpdate(update);
+        const float radius = static_cast<float>(m_cadRadius->value());
+        const float height = static_cast<float>(m_cadHeight->value());
+        if (position.x != properties->position.x || position.y != properties->position.y || position.z != properties->position.z) {
+            update.position = position;
+        }
+        if (radius != properties->radius) {
+            update.radius = radius;
+        }
+        if (height != properties->height) {
+            update.height = height;
+        }
+        if (update.position.has_value() || update.radius.has_value() || update.height.has_value()) {
+            m_cadWorkspaceView->applySelectedCellUpdate(update);
+        }
         break;
     }
     case cad::battery::EntityKind::Busbar: {
+        const auto properties = m_cadWorkspaceView->selectedBusbarProperties();
+        if (!properties.has_value()) {
+            break;
+        }
         cad::battery::BusbarPropertiesUpdate update;
-        update.center = cad::math::Vec3{
+        const cad::math::Vec3 center{
             static_cast<float>(m_cadPosX->value()),
             static_cast<float>(m_cadPosY->value()),
             static_cast<float>(m_cadPosZ->value())
         };
-        update.size = cad::math::Vec3{
+        const cad::math::Vec3 size{
             static_cast<float>(m_cadSizeX->value()),
             static_cast<float>(m_cadSizeY->value()),
             static_cast<float>(m_cadSizeZ->value())
         };
-        m_cadWorkspaceView->applySelectedBusbarUpdate(update);
+        if (center.x != properties->center.x || center.y != properties->center.y || center.z != properties->center.z) {
+            update.center = center;
+        }
+        if (size.x != properties->size.x || size.y != properties->size.y || size.z != properties->size.z) {
+            update.size = size;
+        }
+        if (update.center.has_value() || update.size.has_value()) {
+            m_cadWorkspaceView->applySelectedBusbarUpdate(update);
+        }
         break;
     }
     case cad::battery::EntityKind::CoolingPlate: {
+        const auto properties = m_cadWorkspaceView->selectedCoolingPlateProperties();
+        if (!properties.has_value()) {
+            break;
+        }
         cad::battery::CoolingPlatePropertiesUpdate update;
-        update.center = cad::math::Vec3{
+        const cad::math::Vec3 center{
             static_cast<float>(m_cadPosX->value()),
             static_cast<float>(m_cadPosY->value()),
             static_cast<float>(m_cadPosZ->value())
         };
-        update.size = cad::math::Vec3{
+        const cad::math::Vec3 size{
             static_cast<float>(m_cadSizeX->value()),
             static_cast<float>(m_cadSizeY->value()),
             static_cast<float>(m_cadSizeZ->value())
         };
-        m_cadWorkspaceView->applySelectedCoolingPlateUpdate(update);
+        if (center.x != properties->center.x || center.y != properties->center.y || center.z != properties->center.z) {
+            update.center = center;
+        }
+        if (size.x != properties->size.x || size.y != properties->size.y || size.z != properties->size.z) {
+            update.size = size;
+        }
+        if (update.center.has_value() || update.size.has_value()) {
+            m_cadWorkspaceView->applySelectedCoolingPlateUpdate(update);
+        }
         break;
     }
     case cad::battery::EntityKind::ModuleBoundary: {
+        const auto properties = m_cadWorkspaceView->selectedModuleBoundaryProperties();
+        if (!properties.has_value()) {
+            break;
+        }
         cad::battery::ModuleBoundaryPropertiesUpdate update;
-        update.center = cad::math::Vec3{
+        const cad::math::Vec3 center{
             static_cast<float>(m_cadPosX->value()),
             static_cast<float>(m_cadPosY->value()),
             static_cast<float>(m_cadPosZ->value())
         };
-        update.size = cad::math::Vec3{
+        const cad::math::Vec3 size{
             static_cast<float>(m_cadSizeX->value()),
             static_cast<float>(m_cadSizeY->value()),
             static_cast<float>(m_cadSizeZ->value())
         };
-        m_cadWorkspaceView->applySelectedModuleBoundaryUpdate(update);
+        if (center.x != properties->center.x || center.y != properties->center.y || center.z != properties->center.z) {
+            update.center = center;
+        }
+        if (size.x != properties->size.x || size.y != properties->size.y || size.z != properties->size.z) {
+            update.size = size;
+        }
+        if (update.center.has_value() || update.size.has_value()) {
+            m_cadWorkspaceView->applySelectedModuleBoundaryUpdate(update);
+        }
         break;
     }
     case cad::battery::EntityKind::PackEnclosure: {
+        const auto properties = m_cadWorkspaceView->selectedEnclosureProperties();
+        if (!properties.has_value()) {
+            break;
+        }
         cad::battery::PackEnclosurePropertiesUpdate update;
-        update.center = cad::math::Vec3{
+        const cad::math::Vec3 center{
             static_cast<float>(m_cadPosX->value()),
             static_cast<float>(m_cadPosY->value()),
             static_cast<float>(m_cadPosZ->value())
         };
-        update.size = cad::math::Vec3{
+        const cad::math::Vec3 size{
             static_cast<float>(m_cadSizeX->value()),
             static_cast<float>(m_cadSizeY->value()),
             static_cast<float>(m_cadSizeZ->value())
         };
-        update.wall_thickness = static_cast<float>(m_cadThickness->value());
-        m_cadWorkspaceView->applySelectedEnclosureUpdate(update);
+        const float wallThickness = static_cast<float>(m_cadThickness->value());
+        if (center.x != properties->center.x || center.y != properties->center.y || center.z != properties->center.z) {
+            update.center = center;
+        }
+        if (size.x != properties->size.x || size.y != properties->size.y || size.z != properties->size.z) {
+            update.size = size;
+        }
+        if (wallThickness != properties->wall_thickness) {
+            update.wall_thickness = wallThickness;
+        }
+        if (update.center.has_value() || update.size.has_value() || update.wall_thickness.has_value()) {
+            m_cadWorkspaceView->applySelectedEnclosureUpdate(update);
+        }
         break;
     }
     }
 
+    m_isSyncingCadInspector = false;
     refreshCadProperties();
 }
 
 void MainWindow::undoCadEdit()
 {
+    m_isSyncingCadInspector = true;
     if (m_cadWorkspaceView != nullptr && m_cadWorkspaceView->undoLastEdit()) {
         refreshCadProperties();
     }
+    m_isSyncingCadInspector = false;
+    refreshCadProperties();
 }
 
 void MainWindow::redoCadEdit()
 {
+    m_isSyncingCadInspector = true;
     if (m_cadWorkspaceView != nullptr && m_cadWorkspaceView->redoLastEdit()) {
         refreshCadProperties();
     }
+    m_isSyncingCadInspector = false;
+    refreshCadProperties();
 }
 
 void MainWindow::resetCadPosition()
 {
+    m_isSyncingCadInspector = true;
     if (m_cadWorkspaceView != nullptr && m_cadWorkspaceView->resetSelectedPositionToGenerated()) {
         refreshCadProperties();
     }
+    m_isSyncingCadInspector = false;
+    refreshCadProperties();
 }
 
 void MainWindow::resetCadGeometry()
 {
+    m_isSyncingCadInspector = true;
     if (m_cadWorkspaceView != nullptr && m_cadWorkspaceView->resetSelectedGeometryToGenerated()) {
         refreshCadProperties();
     }
+    m_isSyncingCadInspector = false;
+    refreshCadProperties();
 }
 
 void MainWindow::resetCadLabel()
 {
+    m_isSyncingCadInspector = true;
     if (m_cadWorkspaceView != nullptr && m_cadWorkspaceView->resetSelectedLabelToGenerated()) {
         refreshCadProperties();
     }
+    m_isSyncingCadInspector = false;
+    refreshCadProperties();
 }
 
 charts::Series MainWindow::toChartSeries(const QJsonArray& timeSeries, const QString& metricKey, const QString& name, const QColor& color, bool dashed) const

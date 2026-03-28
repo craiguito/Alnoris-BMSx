@@ -19,6 +19,8 @@ class QLabel;
 class QLineEdit;
 class QPushButton;
 class QTabWidget;
+class QToolBar;
+class QWidget;
 
 class MainWindow : public QMainWindow
 {
@@ -59,9 +61,13 @@ private:
     void applySimulationConfig(const QJsonObject& config);
     QString formatSummaryLines(const QJsonObject& payload) const;
     QString formatTraceLines(const QJsonObject& payload) const;
+    void createMainToolbar();
     ChartWidget* createGraphWidget();
+    QWidget* createInputsSidebar();
     QFrame* createWorkspacePanel();
     QGroupBox* createCadPropertiesPanel();
+    QGroupBox* createResultsPanel();
+    QGroupBox* createOutputPanel();
     void applyTheme();
     void applyChartTheme(ChartWidget* graphWidget);
     void updateCadWorkspace();
@@ -140,4 +146,5 @@ private:
     ThemeSettings m_theme;
     QJsonObject m_baselineConfig;
     QJsonObject m_baselineResult;
+    bool m_isSyncingCadInspector = false;
 };

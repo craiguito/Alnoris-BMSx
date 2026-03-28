@@ -282,3 +282,64 @@ This pass makes command-backed editing the default user-facing path for the main
 - TODO: add simulation overlay editing/binding by entity identity
 - TODO: add more advanced editing tools and gizmos
 - TODO: add multi-select and marquee selection
+
+## UI Cleanup And Selection Feedback Pass
+
+This pass focuses on the Qt desktop shell around the CAD engine so the viewport feels like the primary workspace and the inspector behaves more reliably during real use.
+
+### Main UI layout improvements
+
+- The main window now follows a clearer engineering-tool hierarchy:
+  - left setup sidebar
+  - dominant center CAD workspace
+  - right sidebar tabs for inspector and results
+  - smaller bottom logs/output area
+- A lightweight toolbar was added for the most common actions:
+  - load
+  - save
+  - CAD undo / redo
+  - run
+  - baseline
+  - compare
+
+### Simulation inputs are grouped more cleanly
+
+- The left sidebar is now broken into clearer grouped sections:
+  - cell
+  - pack layout
+  - electrical / thermal
+  - simulation run
+  - actions
+- This reduces the earlier long flat wall of controls and makes scanning the setup workflow easier.
+
+### CAD inspector usability improvements
+
+- The CAD properties area now reads more like a real inspector:
+  - selection summary
+  - transform
+  - geometry
+  - actions
+- Entity-specific geometry fields are still shown only when relevant.
+
+### Property interaction fixes
+
+- The property panel now suppresses stale mid-apply refresh churn while commands are executing.
+- Apply now avoids firing redundant edits when values have not actually changed.
+- Undo, redo, and reset actions now refresh the inspector more predictably after the command stack updates the document.
+- Clicking empty space in the viewport now clears the current selection instead of leaving stale inspector state behind.
+
+### Stronger selected-entity feedback
+
+- The viewport now draws a strong blue selection overlay using the projected pickable shape of the selected entity.
+- The current software-rendered path uses a layered blue glow + outline treatment so the selected object is much more obvious.
+- This works across the currently supported selectable entity types through the shared pickable data path.
+
+### Remaining UI polish ideas
+
+- TODO: add dockable panels
+- TODO: persist panel/splitter layout state
+- TODO: polish dark/light theme variants further
+- TODO: add richer CAD toolbars and view controls
+- TODO: add direct manipulation gizmos
+- TODO: add multi-select inspector support
+- TODO: add a more advanced simulation dashboard layout
