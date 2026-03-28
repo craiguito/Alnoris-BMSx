@@ -35,6 +35,20 @@ Vec3 gradientColor(double value, double min_value, double max_value)
 Vec3 overlayCellColor(const battery::BatteryVisualizationOverlay& overlay, const battery::CellEntity& cell)
 {
     switch (overlay.active_metric) {
+    case battery::BatteryVisualizationOverlay::Metric::CoreTemperature: {
+        const auto it = overlay.cell_core_temperature_c.find(cell.id);
+        if (it != overlay.cell_core_temperature_c.end()) {
+            return temperatureColor(it->second);
+        }
+        break;
+    }
+    case battery::BatteryVisualizationOverlay::Metric::SurfaceTemperature: {
+        const auto it = overlay.cell_surface_temperature_c.find(cell.id);
+        if (it != overlay.cell_surface_temperature_c.end()) {
+            return temperatureColor(it->second);
+        }
+        break;
+    }
     case battery::BatteryVisualizationOverlay::Metric::Soc: {
         const auto it = overlay.cell_soc.find(cell.id);
         if (it != overlay.cell_soc.end()) {
@@ -49,17 +63,24 @@ Vec3 overlayCellColor(const battery::BatteryVisualizationOverlay& overlay, const
         }
         break;
     }
-    case battery::BatteryVisualizationOverlay::Metric::Temperature:
+    case battery::BatteryVisualizationOverlay::Metric::DiffusionStress: {
+        const auto it = overlay.cell_diffusion_stress.find(cell.id);
+        if (it != overlay.cell_diffusion_stress.end()) {
+            return gradientColor(it->second, 0.0, 1.0);
+        }
+        break;
+    }
+    case battery::BatteryVisualizationOverlay::Metric::EffectiveResistance:
     default: {
-        const auto it = overlay.cell_temperature_c.find(cell.id);
-        if (it != overlay.cell_temperature_c.end()) {
-            return temperatureColor(it->second);
+        const auto it = overlay.cell_effective_resistance_ohm.find(cell.id);
+        if (it != overlay.cell_effective_resistance_ohm.end()) {
+            return gradientColor(it->second, 0.0, 0.2);
         }
         break;
     }
     }
 
-    if (const auto it = overlay.cell_temperature_c.find(cell.id); it != overlay.cell_temperature_c.end()) {
+    if (const auto it = overlay.cell_core_temperature_c.find(cell.id); it != overlay.cell_core_temperature_c.end()) {
         return temperatureColor(it->second);
     }
     return {0.68f, 0.71f, 0.76f};

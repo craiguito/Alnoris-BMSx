@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, replace
+from dataclasses import replace
 from statistics import mean
 from typing import Any
 
@@ -316,6 +316,8 @@ def run_virtual_test(test_id: str, parameters: dict[str, Any], base_config: Simu
 
 
 def virtual_test_result_to_dict(result: VirtualTestResult) -> dict[str, Any]:
+    from .bridge import simulation_result_to_dict
+
     payload = {
         "test_id": result.test_id,
         "test_name": result.test_name,
@@ -334,11 +336,11 @@ def virtual_test_result_to_dict(result: VirtualTestResult) -> dict[str, Any]:
             {
                 "name": item.name,
                 "summary_metrics": item.summary_metrics,
-                "simulation_result": asdict(item.simulation_result) if item.simulation_result is not None else None,
+                "simulation_result": simulation_result_to_dict(item.simulation_result) if item.simulation_result is not None else None,
             }
             for item in result.sub_results
         ],
     }
     if result.primary_result is not None:
-        payload["primary_result"] = asdict(result.primary_result)
+        payload["primary_result"] = simulation_result_to_dict(result.primary_result)
     return payload

@@ -28,6 +28,127 @@ from .types import (
 from .validation import validate_current_profile, validate_simulation_config
 
 
+def _warning_to_dict(warning: Any) -> dict[str, Any]:
+    return {
+        "code": warning.code,
+        "message": warning.message,
+        "severity": warning.severity,
+    }
+
+
+def _simulation_point_to_dict(point: Any) -> dict[str, Any]:
+    """Serialize a point using one canonical desktop-facing schema.
+
+    Canonical names carry unit suffixes. The embedded ``legacy_aliases`` block
+    and flattened legacy keys are temporary compatibility shims while the
+    desktop migrates off older field names.
+    """
+
+    canonical = {
+        "time_s": point.time_s,
+        "current_a": point.current_a,
+        "pack_voltage_v": point.pack_voltage_v,
+        "pack_power_w": point.pack_power_w,
+        "pack_heat_w": point.pack_heat_w,
+        "pack_temp_avg_c": point.pack_temp_avg_c,
+        "pack_temp_max_c": point.pack_temp_max_c,
+        "soc_avg": point.soc_avg,
+        "soc_min": point.soc_min,
+        "soc_max": point.soc_max,
+        "group_voltage_v": point.group_voltage,
+        "group_soc": point.group_soc,
+        "group_core_temp_c": point.group_core_temp_c,
+        "group_surface_temp_c": point.group_surface_temp_c,
+        "group_heat_w": point.group_heat_w,
+        "group_hysteresis_v": point.group_hysteresis_v,
+        "group_diffusion_stress": point.group_diffusion_stress,
+        "group_effective_resistance_ohm": point.group_effective_resistance_ohm,
+        "group_zone_ids": point.group_zone_ids,
+        "group_labels": point.group_labels,
+        "group_entity_ids": point.group_entity_ids,
+        "group_voltage_min_v": point.group_voltage_min_v,
+        "group_voltage_max_v": point.group_voltage_max_v,
+        "weakest_group_index": point.weakest_group_index,
+        "hottest_group_index": point.hottest_group_index,
+        "balancing_active_groups": point.balancing_active_groups,
+        "fault_active_groups": point.fault_active_groups,
+        "group_balance_current_a": point.group_balance_current_a,
+        "group_fault_flags": point.group_fault_flags,
+        "zone_temp_max_c": {str(zone_id): temp_c for zone_id, temp_c in point.zone_temp_max_c.items()},
+        "estimated_capacity_retention": point.estimated_capacity_retention,
+        "estimated_resistance_multiplier": point.estimated_resistance_multiplier,
+        "degradation_rate_indicator": point.degradation_rate_indicator,
+        "legacy_aliases": {
+            "soc": point.soc,
+            "terminal_voltage_v": point.terminal_voltage_v,
+            "power_w": point.power_w,
+            "heat_w": point.heat_w,
+            "temp_c": point.temp_c,
+            "temp_avg": point.temp_avg,
+            "temp_max": point.temp_max,
+            "group_voltage": point.group_voltage,
+            "group_temp": point.group_temp,
+            "group_core_temp": point.group_core_temp,
+            "group_surface_temp": point.group_surface_temp,
+        },
+    }
+    canonical.update(canonical["legacy_aliases"])
+    return canonical
+
+
+def _simulation_summary_to_dict(summary: Any) -> dict[str, Any]:
+    """Serialize the canonical summary contract with explicit legacy shims."""
+
+    canonical = {
+        "runtime_s": summary.runtime_s,
+        "delivered_energy_wh": summary.delivered_energy_wh,
+        "delivered_capacity_ah": summary.delivered_capacity_ah,
+        "final_soc_avg": summary.final_soc_avg,
+        "soc_spread": summary.soc_spread,
+        "min_group_voltage_v": summary.min_group_voltage_v,
+        "max_group_temp_c": summary.max_group_temp_c,
+        "max_core_temp_c": summary.max_core_temp_c,
+        "max_surface_temp_c": summary.max_surface_temp_c,
+        "temp_gradient_max_c": summary.temp_gradient_max_c,
+        "max_diffusion_stress": summary.max_diffusion_stress,
+        "weakest_group_index": summary.weakest_group_index,
+        "hottest_group_index": summary.hottest_group_index,
+        "hottest_zone_id": summary.hottest_zone_id,
+        "max_zone_temp_c": summary.max_zone_temp_c,
+        "capacity_retention": summary.capacity_retention,
+        "resistance_growth": summary.resistance_growth,
+        "termination_reason": summary.termination_reason,
+        "warnings": [_warning_to_dict(item) for item in summary.warnings],
+        "electrical_model_type": summary.electrical_model_type,
+        "profile_used": summary.profile_used,
+        "total_energy_wh": summary.total_energy_wh,
+        "balancing_used": summary.balancing_used,
+        "total_balance_ah": summary.total_balance_ah,
+        "fault_count": summary.fault_count,
+        "first_faulted_group_index": summary.first_faulted_group_index,
+        "cumulative_charge_throughput_ah": summary.cumulative_charge_throughput_ah,
+        "cumulative_discharge_throughput_ah": summary.cumulative_discharge_throughput_ah,
+        "cumulative_high_soc_time_h": summary.cumulative_high_soc_time_h,
+        "estimated_cycle_stress": summary.estimated_cycle_stress,
+        "degradation_model_version": summary.degradation_model_version,
+        "group_capacity_retention": summary.group_capacity_retention,
+        "group_resistance_growth": summary.group_resistance_growth,
+        "nonlinear_features_enabled": summary.nonlinear_features_enabled,
+        "chemistry_name": summary.chemistry_name,
+        "legacy_aliases": {
+            "min_terminal_voltage_v": summary.min_terminal_voltage_v,
+            "peak_temp_c": summary.peak_temp_c,
+            "final_soc": summary.final_soc,
+            "estimated_capacity_retention": summary.estimated_capacity_retention,
+            "estimated_resistance_growth": summary.estimated_resistance_growth,
+            "max_group_temp": summary.max_group_temp,
+            "min_group_voltage": summary.min_group_voltage,
+        },
+    }
+    canonical.update(canonical["legacy_aliases"])
+    return canonical
+
+
 def _parse_rc_branches(payload: Any) -> tuple[RcBranchParams, ...]:
     if payload is None:
         return ()
@@ -452,7 +573,24 @@ def run_simulation_from_dict(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def simulation_result_to_dict(result: SimulationResult) -> dict[str, Any]:
-    return asdict(result)
+    top_level_group_labels: list[str] = []
+    top_level_group_entity_ids: list[str] = []
+    top_level_group_zone_ids: list[int] = []
+    if result.time_series:
+        top_level_group_labels = list(result.time_series[-1].group_labels)
+        top_level_group_entity_ids = list(result.time_series[-1].group_entity_ids)
+        top_level_group_zone_ids = list(result.time_series[-1].group_zone_ids)
+
+    return {
+        "pack_nominal_voltage_v": result.pack_nominal_voltage_v,
+        "pack_capacity_ah": result.pack_capacity_ah,
+        "theoretical_energy_wh": result.theoretical_energy_wh,
+        "group_labels": top_level_group_labels,
+        "group_entity_ids": top_level_group_entity_ids,
+        "group_zone_ids": top_level_group_zone_ids,
+        "summary": _simulation_summary_to_dict(result.summary),
+        "time_series": [_simulation_point_to_dict(point) for point in result.time_series],
+    }
 
 
 def virtual_test_catalog_to_dict() -> dict[str, Any]:

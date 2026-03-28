@@ -40,6 +40,39 @@ QStringList toStringList(const QJsonValue& value)
     return output;
 }
 
+QStringList toStringListWithFallback(const QJsonObject& object, const char* primary_key, const char* fallback_key = nullptr)
+{
+    if (object.contains(primary_key)) {
+        return toStringList(object.value(primary_key));
+    }
+    if (fallback_key != nullptr && object.contains(fallback_key)) {
+        return toStringList(object.value(fallback_key));
+    }
+    return {};
+}
+
+std::vector<double> toDoubleVectorWithFallback(const QJsonObject& object, const char* primary_key, const char* fallback_key = nullptr)
+{
+    if (object.contains(primary_key)) {
+        return toDoubleVector(object.value(primary_key));
+    }
+    if (fallback_key != nullptr && object.contains(fallback_key)) {
+        return toDoubleVector(object.value(fallback_key));
+    }
+    return {};
+}
+
+std::vector<int> toIntVectorWithFallback(const QJsonObject& object, const char* primary_key, const char* fallback_key = nullptr)
+{
+    if (object.contains(primary_key)) {
+        return toIntVector(object.value(primary_key));
+    }
+    if (fallback_key != nullptr && object.contains(fallback_key)) {
+        return toIntVector(object.value(fallback_key));
+    }
+    return {};
+}
+
 double valueWithFallback(const QJsonObject& object, const char* primary_key, const char* fallback_key, double fallback_value = 0.0)
 {
     if (object.contains(primary_key)) {
@@ -62,6 +95,36 @@ QString stringWithFallback(const QJsonObject& object, const char* primary_key, c
     return {};
 }
 
+QJsonObject legacyAliases(const QJsonObject& object)
+{
+    return object.value("legacy_aliases").toObject();
+}
+
+double valueWithLegacyFallback(const QJsonObject& object, const char* primary_key, const char* fallback_key, double fallback_value = 0.0)
+{
+    if (object.contains(primary_key) || (fallback_key != nullptr && object.contains(fallback_key))) {
+        return valueWithFallback(object, primary_key, fallback_key, fallback_value);
+    }
+    const QJsonObject legacy = legacyAliases(object);
+    return valueWithFallback(legacy, primary_key, fallback_key, fallback_value);
+}
+
+std::vector<double> vectorWithLegacyFallback(const QJsonObject& object, const char* primary_key, const char* fallback_key = nullptr)
+{
+    if (object.contains(primary_key) || (fallback_key != nullptr && object.contains(fallback_key))) {
+        return toDoubleVectorWithFallback(object, primary_key, fallback_key);
+    }
+    return toDoubleVectorWithFallback(legacyAliases(object), primary_key, fallback_key);
+}
+
+QStringList stringListWithLegacyFallback(const QJsonObject& object, const char* primary_key, const char* fallback_key = nullptr)
+{
+    if (object.contains(primary_key) || (fallback_key != nullptr && object.contains(fallback_key))) {
+        return toStringListWithFallback(object, primary_key, fallback_key);
+    }
+    return toStringListWithFallback(legacyAliases(object), primary_key, fallback_key);
+}
+
 } // namespace
 
 int SimulationResultModel::groupCount() const
@@ -76,8 +139,11 @@ int SimulationResultModel::groupCount() const
         if (!point.group_soc.empty()) {
             return static_cast<int>(point.group_soc.size());
         }
-        if (!point.group_temp_c.empty()) {
-            return static_cast<int>(point.group_temp_c.size());
+        if (!point.group_core_temp_c.empty()) {
+            return static_cast<int>(point.group_core_temp_c.size());
+        }
+        if (!point.group_surface_temp_c.empty()) {
+            return static_cast<int>(point.group_surface_temp_c.size());
         }
         if (!point.group_voltage_v.empty()) {
             return static_cast<int>(point.group_voltage_v.size());
@@ -111,6 +177,14 @@ QString SimulationResultModel::groupLabel(int index) const
     return QString("Group %1").arg(index + 1);
 }
 
+QString SimulationResultModel::groupEntityId(int index) const
+{
+    if (index >= 0 && index < group_entity_ids.size()) {
+        return group_entity_ids.at(index);
+    }
+    return {};
+}
+
 SimulationResultModel parseSimulationResultPayload(const QJsonObject& payload)
 {
     SimulationResultModel model;
@@ -123,20 +197,37 @@ SimulationResultModel parseSimulationResultPayload(const QJsonObject& payload)
     const QJsonObject summary = payload.value("summary").toObject();
     model.summary.delivered_energy_wh = summary.value("delivered_energy_wh").toDouble();
     model.summary.delivered_capacity_ah = summary.value("delivered_capacity_ah").toDouble();
-    model.summary.peak_temp_c = valueWithFallback(summary, "peak_temp_c", "max_group_temp_c");
-    model.summary.min_terminal_voltage_v = valueWithFallback(summary, "min_terminal_voltage_v", "min_group_voltage_v");
     model.summary.runtime_s = summary.value("runtime_s").toDouble();
-    model.summary.final_soc_avg = valueWithFallback(summary, "final_soc_avg", "final_soc");
+    model.summary.final_soc_avg = valueWithLegacyFallback(summary, "final_soc_avg", "final_soc");
     model.summary.soc_spread = summary.value("soc_spread").toDouble();
-    model.summary.max_group_temp_c = valueWithFallback(summary, "max_group_temp_c", "peak_temp_c");
-    model.summary.min_group_voltage_v = valueWithFallback(summary, "min_group_voltage_v", "min_terminal_voltage_v");
-    model.summary.capacity_retention = valueWithFallback(summary, "capacity_retention", "estimated_capacity_retention", 1.0);
-    model.summary.resistance_growth = valueWithFallback(summary, "resistance_growth", "estimated_resistance_growth", 0.0);
+    model.summary.max_group_temp_c = valueWithLegacyFallback(summary, "max_group_temp_c", "peak_temp_c");
+    model.summary.min_group_voltage_v = valueWithLegacyFallback(summary, "min_group_voltage_v", "min_terminal_voltage_v");
+    model.summary.capacity_retention = valueWithLegacyFallback(summary, "capacity_retention", "estimated_capacity_retention", 1.0);
+    model.summary.resistance_growth = valueWithLegacyFallback(summary, "resistance_growth", "estimated_resistance_growth", 0.0);
+    model.summary.max_core_temp_c = summary.value("max_core_temp_c").toDouble(model.summary.max_group_temp_c);
+    model.summary.max_surface_temp_c = summary.value("max_surface_temp_c").toDouble(model.summary.max_group_temp_c);
+    model.summary.temp_gradient_max_c = summary.value("temp_gradient_max_c").toDouble();
+    model.summary.max_diffusion_stress = summary.value("max_diffusion_stress").toDouble();
     model.summary.weakest_group_index = summary.value("weakest_group_index").toInt(-1);
     model.summary.hottest_group_index = summary.value("hottest_group_index").toInt(-1);
     model.summary.hottest_zone_id = summary.value("hottest_zone_id").toInt(-1);
     model.summary.max_zone_temp_c = summary.value("max_zone_temp_c").toDouble();
+    model.summary.total_balance_ah = summary.value("total_balance_ah").toDouble();
+    model.summary.first_faulted_group_index = summary.value("first_faulted_group_index").toInt(-1);
+    model.summary.fault_count = summary.value("fault_count").toInt();
+    model.summary.balancing_used = summary.value("balancing_used").toBool();
+    model.summary.profile_used = summary.value("profile_used").toBool();
     model.summary.termination_reason = stringWithFallback(summary, "termination_reason", nullptr);
+    model.summary.chemistry_name = summary.value("chemistry_name").toString();
+    model.summary.enabled_nonlinear_features = toStringList(summary.value("nonlinear_features_enabled"));
+    for (const QJsonValue& warningValue : summary.value("warnings").toArray()) {
+        const QJsonObject warning = warningValue.toObject();
+        model.summary.warnings.push_back({
+            warning.value("code").toString(),
+            warning.value("message").toString(),
+            warning.value("severity").toString(),
+        });
+    }
 
     const QJsonArray time_series = payload.value("time_series").toArray();
     model.points.reserve(static_cast<std::size_t>(time_series.size()));
@@ -145,19 +236,35 @@ SimulationResultModel parseSimulationResultPayload(const QJsonObject& payload)
         SimulationTracePoint trace;
         trace.time_s = point.value("time_s").toDouble();
         trace.current_a = point.value("current_a").toDouble(payload.value("discharge_current_a").toDouble());
-        trace.pack_voltage_v = valueWithFallback(point, "pack_voltage_v", "terminal_voltage_v");
-        trace.pack_power_w = valueWithFallback(point, "pack_power_w", "power_w");
-        trace.pack_heat_w = valueWithFallback(point, "pack_heat_w", "heat_w");
-        trace.soc_avg = valueWithFallback(point, "soc_avg", "soc");
-        trace.soc_min = valueWithFallback(point, "soc_min", "soc", trace.soc_avg);
-        trace.soc_max = valueWithFallback(point, "soc_max", "soc", trace.soc_avg);
-        trace.temp_avg_c = valueWithFallback(point, "temp_avg", "temp_c");
-        trace.temp_max_c = valueWithFallback(point, "temp_max", "temp_c", trace.temp_avg_c);
+        trace.pack_voltage_v = valueWithLegacyFallback(point, "pack_voltage_v", "terminal_voltage_v");
+        trace.pack_power_w = valueWithLegacyFallback(point, "pack_power_w", "power_w");
+        trace.pack_heat_w = valueWithLegacyFallback(point, "pack_heat_w", "heat_w");
+        trace.soc_avg = valueWithLegacyFallback(point, "soc_avg", "soc");
+        trace.soc_min = valueWithLegacyFallback(point, "soc_min", "soc", trace.soc_avg);
+        trace.soc_max = valueWithLegacyFallback(point, "soc_max", "soc", trace.soc_avg);
+        trace.pack_temp_avg_c = valueWithLegacyFallback(point, "pack_temp_avg_c", "temp_avg");
+        trace.pack_temp_max_c = valueWithLegacyFallback(point, "pack_temp_max_c", "temp_max", trace.pack_temp_avg_c);
         trace.group_soc = toDoubleVector(point.value("group_soc"));
-        trace.group_temp_c = toDoubleVector(point.value("group_temp"));
-        trace.group_voltage_v = toDoubleVector(point.value("group_voltage"));
-        trace.group_zone_ids = toIntVector(point.value("group_zone_ids"));
+        trace.group_voltage_v = vectorWithLegacyFallback(point, "group_voltage_v", "group_voltage");
+        trace.group_core_temp_c = vectorWithLegacyFallback(point, "group_core_temp_c", "group_core_temp");
+        trace.group_surface_temp_c = vectorWithLegacyFallback(point, "group_surface_temp_c", "group_surface_temp");
+        trace.group_heat_w = toDoubleVector(point.value("group_heat_w"));
+        trace.group_hysteresis_v = toDoubleVector(point.value("group_hysteresis_v"));
+        trace.group_diffusion_stress = toDoubleVector(point.value("group_diffusion_stress"));
+        trace.group_effective_resistance_ohm = toDoubleVector(point.value("group_effective_resistance_ohm"));
+        trace.group_zone_ids = toIntVectorWithFallback(point, "group_zone_ids");
+        trace.group_labels = stringListWithLegacyFallback(point, "group_labels");
+        trace.group_entity_ids = stringListWithLegacyFallback(point, "group_entity_ids");
+        trace.weakest_group_index = point.value("weakest_group_index").toInt(-1);
+        trace.hottest_group_index = point.value("hottest_group_index").toInt(-1);
         model.points.push_back(std::move(trace));
+    }
+
+    if (model.group_labels.isEmpty() && !model.points.empty()) {
+        model.group_labels = model.points.back().group_labels;
+    }
+    if (model.group_entity_ids.isEmpty() && !model.points.empty()) {
+        model.group_entity_ids = model.points.back().group_entity_ids;
     }
 
     model.valid = !model.points.empty();

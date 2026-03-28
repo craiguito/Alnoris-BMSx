@@ -284,6 +284,13 @@ class GroupStepResult:
 
 @dataclass(frozen=True)
 class SimulationPoint:
+    """One simulation timestep.
+
+    Canonical serialized field names should use explicit unit suffixes such as
+    ``pack_voltage_v`` and ``group_core_temp_c``. Some legacy aliases are still
+    emitted at the bridge layer for older desktop payload consumers.
+    """
+
     time_s: int
     soc: float
     terminal_voltage_v: float
@@ -331,6 +338,13 @@ class SimulationPoint:
 
 @dataclass(frozen=True)
 class SimulationSummary:
+    """Simulation summary.
+
+    Canonical serialized field names should prefer the explicit pack/group
+    metrics such as ``min_group_voltage_v`` and ``max_core_temp_c``. Legacy
+    aliases are preserved at the bridge layer while the desktop migrates.
+    """
+
     runtime_s: int
     delivered_energy_wh: float
     delivered_capacity_ah: float

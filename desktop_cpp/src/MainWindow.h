@@ -58,6 +58,7 @@ private slots:
     void handleVirtualTestSelectionChanged(int index);
     void vetSelectedVirtualTest();
     void runSelectedVirtualTest();
+    void exportActiveResultJson();
 
 private:
     struct ThemeSettings
@@ -99,6 +100,7 @@ private:
     void refreshSimulationViews();
     void refreshCharts();
     void refreshGroupTable();
+    void refreshGroupDetailPanel();
     void refreshCadOverlay();
     void refreshResultScrubber();
     void refreshSelectedGroupCharts();
@@ -110,6 +112,7 @@ private:
     QJsonObject buildVirtualTestPayload() const;
     void setVirtualTestStatus(const QString& text, const QColor& accent);
     void renderVirtualTestResult(const QJsonObject& payload);
+    QString formatWarningLines(const std::vector<desktop::SimulationWarningModel>& warnings) const;
 
     SimulationClient m_client;
     QComboBox* m_referencePreset = nullptr;
@@ -135,17 +138,24 @@ private:
     ChartWidget* m_voltageChartView = nullptr;
     ChartWidget* m_currentChartView = nullptr;
     ChartWidget* m_temperatureChartView = nullptr;
+    ChartWidget* m_coreTemperatureChartView = nullptr;
+    ChartWidget* m_surfaceTemperatureChartView = nullptr;
     ChartWidget* m_socChartView = nullptr;
     ChartWidget* m_socEnvelopeChartView = nullptr;
     ChartWidget* m_powerChartView = nullptr;
     ChartWidget* m_groupVoltageChartView = nullptr;
-    ChartWidget* m_groupTemperatureChartView = nullptr;
+    ChartWidget* m_groupCoreTemperatureChartView = nullptr;
+    ChartWidget* m_groupSurfaceTemperatureChartView = nullptr;
+    ChartWidget* m_groupDiffusionStressChartView = nullptr;
+    ChartWidget* m_groupHysteresisChartView = nullptr;
     ChartWidget* m_groupSocChartView = nullptr;
     QComboBox* m_overlayMetricCombo = nullptr;
     QSlider* m_resultTimeSlider = nullptr;
     QLabel* m_resultTimeLabel = nullptr;
     QLabel* m_resultSelectionLabel = nullptr;
+    QLabel* m_resultOverlayLegendLabel = nullptr;
     QTableWidget* m_groupTable = nullptr;
+    QLabel* m_groupDetailLabel = nullptr;
     CadViewportWidget* m_cadWorkspaceView = nullptr;
     QLabel* m_cadSelectedType = nullptr;
     QLabel* m_cadSelectedId = nullptr;
@@ -180,6 +190,7 @@ private:
     QLabel* m_virtualTestDescription = nullptr;
     QFormLayout* m_virtualTestFormLayout = nullptr;
     QPlainTextEdit* m_virtualTestStatus = nullptr;
+    QTableWidget* m_virtualTestComparisonTable = nullptr;
     QPushButton* m_vetTestButton = nullptr;
     QPushButton* m_runTestButton = nullptr;
     QJsonArray m_virtualTestCatalog;
@@ -192,6 +203,7 @@ private:
     ThemeSettings m_theme;
     QJsonObject m_baselineConfig;
     QJsonObject m_baselineResult;
+    QJsonObject m_lastExportPayload;
     std::optional<desktop::SimulationResultModel> m_activeResult;
     int m_activeResultPointIndex = -1;
     int m_selectedResultGroupIndex = -1;

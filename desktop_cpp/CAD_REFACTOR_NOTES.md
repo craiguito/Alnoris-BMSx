@@ -463,3 +463,86 @@ This pass makes simulation results visible and inspectable directly inside the Q
 - TODO: add playback controls beyond manual scrubbing
 - TODO: add richer comparison views for per-group behavior
 - TODO: add export / copy support for the group inspection table
+
+## Canonical Result Contract And Nonlinear Inspection Pass
+
+This pass tightens the backend-to-desktop result contract and exposes more of the nonlinear backend state inside the desktop UI.
+
+### Canonical result naming
+
+- The backend now serializes one canonical result shape with explicit unit suffixes such as:
+  - `pack_voltage_v`
+  - `pack_temp_avg_c`
+  - `group_voltage_v`
+  - `group_core_temp_c`
+  - `group_surface_temp_c`
+  - `group_effective_resistance_ohm`
+- Legacy aliases are still emitted temporarily so older desktop consumers do not break while the UI migrates.
+
+### Desktop model parity
+
+- The desktop result model now parses and exposes:
+  - group core and surface temperatures
+  - group heat
+  - group hysteresis voltage
+  - group diffusion stress
+  - group effective resistance
+  - chemistry name
+  - enabled nonlinear feature flags
+  - structured warnings
+- Parsing stays defensive so missing optional fields fall back cleanly.
+
+### Richer inspection views
+
+- Results charts now include:
+  - pack voltage
+  - current
+  - pack power
+  - SOC average and envelope
+  - pack temperature summary
+  - max core temperature
+  - max surface temperature
+- Selected-group charts now include:
+  - voltage
+  - SOC
+  - core temperature
+  - surface temperature
+  - diffusion stress
+  - hysteresis voltage
+- The group inspection area now shows the selected group’s:
+  - SOC
+  - voltage
+  - core temperature
+  - surface temperature
+  - diffusion stress
+  - hysteresis
+  - effective resistance
+  - zone and entity traceability
+
+### Overlay upgrades
+
+- CAD overlays now support:
+  - core temperature
+  - surface temperature
+  - SOC
+  - group voltage
+  - diffusion stress
+  - effective resistance
+- The selected timestep drives overlay values, charts, and group detail together.
+
+### Virtual test UX improvements
+
+- Virtual test results now show:
+  - vetted parameters used
+  - vetting warnings
+  - summary metrics
+  - pass / flagged checks
+  - a simple comparison table for multi-scenario tests
+- Result export now writes the active canonical JSON payload to disk.
+
+### Remaining follow-up
+
+- TODO: retire legacy result aliases after the desktop fully migrates
+- TODO: use backend `group_entity_ids` everywhere overlays bind to CAD groups
+- TODO: add richer comparison charts for multi-scenario tests
+- TODO: add CSV export for comparison tables

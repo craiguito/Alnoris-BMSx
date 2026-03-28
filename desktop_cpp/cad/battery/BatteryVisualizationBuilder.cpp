@@ -11,7 +11,7 @@ BatteryVisualizationOverlay BatteryVisualizationBuilder::build(
 )
 {
     BatteryVisualizationOverlay overlay;
-    overlay.active_metric = BatteryVisualizationOverlay::Metric::Temperature;
+    overlay.active_metric = BatteryVisualizationOverlay::Metric::CoreTemperature;
     const int parallel_count = std::max(1, document.metadata().layout_config.cells_in_parallel);
     const double branch_current = electrical.discharge_current_a / static_cast<double>(parallel_count);
     const double ohmic_heat = branch_current * branch_current * electrical.internal_resistance_ohm;
@@ -19,8 +19,10 @@ BatteryVisualizationOverlay BatteryVisualizationBuilder::build(
 
     for (const CellEntity& cell : document.cells()) {
         const double gradient = cell.series_index * 0.9 + cell.parallel_index * 1.3;
-        overlay.cell_temperature_c[cell.id] =
+        const double temperature_c =
             thermal.ambient_temp_c + (ohmic_heat * 13.0 / cooling_effect) + gradient;
+        overlay.cell_core_temperature_c[cell.id] = temperature_c;
+        overlay.cell_surface_temperature_c[cell.id] = temperature_c - 0.8;
     }
 
     return overlay;

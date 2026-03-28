@@ -272,15 +272,21 @@ struct BatteryVisualizationOverlay
 {
     enum class Metric
     {
-        Temperature,
+        CoreTemperature,
+        SurfaceTemperature,
         Soc,
-        Voltage
+        Voltage,
+        DiffusionStress,
+        EffectiveResistance
     };
 
-    Metric active_metric = Metric::Temperature;
-    std::unordered_map<core::EntityId, double, core::EntityIdHash> cell_temperature_c;
+    Metric active_metric = Metric::CoreTemperature;
+    std::unordered_map<core::EntityId, double, core::EntityIdHash> cell_core_temperature_c;
+    std::unordered_map<core::EntityId, double, core::EntityIdHash> cell_surface_temperature_c;
     std::unordered_map<core::EntityId, double, core::EntityIdHash> cell_soc;
     std::unordered_map<core::EntityId, double, core::EntityIdHash> cell_voltage_v;
+    std::unordered_map<core::EntityId, double, core::EntityIdHash> cell_diffusion_stress;
+    std::unordered_map<core::EntityId, double, core::EntityIdHash> cell_effective_resistance_ohm;
 };
 
 } // namespace cad::battery
