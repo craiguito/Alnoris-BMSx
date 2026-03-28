@@ -225,6 +225,7 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
     rightTabs->setMinimumWidth(360);
     rightTabs->addTab(createCadPropertiesPanel(), "Inspector");
     rightTabs->addTab(createResultsPanel(), "Results");
+    rightTabs->addTab(createVirtualTestsPanel(), "Virtual Tests");
 
     mainSplitter->addWidget(createInputsSidebar());
     mainSplitter->addWidget(centerSplitter);
@@ -237,6 +238,7 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
 
     setCentralWidget(central);
     applyTheme();
+    loadVirtualTestCatalog();
     updateCadWorkspace();
     refreshCadProperties();
     clearSimulationVisualization();
@@ -978,6 +980,62 @@ QGroupBox* MainWindow::createOutputPanel()
     outputLayout->addWidget(outputHint);
     outputLayout->addWidget(m_outputText, 1);
     return outputGroup;
+}
+
+QGroupBox* MainWindow::createVirtualTestsPanel()
+{
+    auto* group = new QGroupBox("", this);
+    auto* layout = new QVBoxLayout(group);
+    layout->setContentsMargins(12, 12, 12, 12);
+    layout->setSpacing(10);
+
+    auto* header = new QLabel("Virtual Testbench", group);
+    header->setStyleSheet("font-size:16px; font-weight:700; color:#f3f7fb;");
+    auto* subheader = new QLabel("Select an engineering test workflow, vet it against the current pack configuration, then run it into the existing desktop result views.", group);
+    subheader->setWordWrap(true);
+    subheader->setStyleSheet("font-size:12px; color:#93a6ba;");
+    layout->addWidget(header);
+    layout->addWidget(subheader);
+
+    auto* selectionGroup = new QGroupBox("Test Selection", group);
+    auto* selectionLayout = new QVBoxLayout(selectionGroup);
+    selectionLayout->setContentsMargins(14, 16, 14, 14);
+    selectionLayout->setSpacing(8);
+    m_virtualTestCombo = new QComboBox(selectionGroup);
+    connect(m_virtualTestCombo, &QComboBox::currentIndexChanged, this, &MainWindow::handleVirtualTestSelectionChanged);
+    m_virtualTestDescription = new QLabel("Loading test catalog...", selectionGroup);
+    m_virtualTestDescription->setWordWrap(true);
+    m_virtualTestDescription->setStyleSheet("color:#93a6ba;");
+    selectionLayout->addWidget(m_virtualTestCombo);
+    selectionLayout->addWidget(m_virtualTestDescription);
+    layout->addWidget(selectionGroup);
+
+    auto* parametersGroup = new QGroupBox("Parameters", group);
+    m_virtualTestFormLayout = new QFormLayout(parametersGroup);
+    m_virtualTestFormLayout->setContentsMargins(14, 16, 14, 14);
+    m_virtualTestFormLayout->setHorizontalSpacing(10);
+    m_virtualTestFormLayout->setVerticalSpacing(8);
+    layout->addWidget(parametersGroup);
+
+    auto* actionsGroup = new QGroupBox("Actions", group);
+    auto* actionsLayout = new QVBoxLayout(actionsGroup);
+    actionsLayout->setContentsMargins(14, 16, 14, 14);
+    actionsLayout->setSpacing(8);
+    auto* actionButtons = new QHBoxLayout();
+    m_vetTestButton = new QPushButton("Vet Test", actionsGroup);
+    m_runTestButton = new QPushButton("Run Test", actionsGroup);
+    connect(m_vetTestButton, &QPushButton::clicked, this, &MainWindow::vetSelectedVirtualTest);
+    connect(m_runTestButton, &QPushButton::clicked, this, &MainWindow::runSelectedVirtualTest);
+    actionButtons->addWidget(m_vetTestButton);
+    actionButtons->addWidget(m_runTestButton);
+    m_virtualTestStatus = new QPlainTextEdit(actionsGroup);
+    m_virtualTestStatus->setReadOnly(true);
+    m_virtualTestStatus->setMinimumHeight(140);
+    actionsLayout->addLayout(actionButtons);
+    actionsLayout->addWidget(m_virtualTestStatus);
+    layout->addWidget(actionsGroup, 1);
+
+    return group;
 }
 
 void MainWindow::applyTheme()
@@ -1907,4 +1965,274 @@ void MainWindow::handleGroupSelectionChanged()
         m_resultSelectionLabel->setText(QString("Selected group: %1").arg(m_activeResult->groupLabel(m_selectedResultGroupIndex)));
     }
     refreshSelectedGroupCharts();
+}
+
+void MainWindow::loadVirtualTestCatalog()
+{
+    if (m_virtualTestCombo == nullptr) {
+        return;
+    }
+
+    const SimulationClient::Result result = m_client.listVirtualTests();
+    if (!result.ok) {
+        setVirtualTestStatus(QString("Failed to load virtual test catalog.\n%1").arg(result.error), QColor(220, 78, 78));
+        return;
+    }
+
+    m_virtualTestCatalog = result.payload.value("tests").toArray();
+    m_virtualTestCombo->clear();
+    for (const QJsonValue& value : m_virtualTestCatalog) {
+        const QJsonObject test = value.toObject();
+        m_virtualTestCombo->addItem(test.value("display_name").toString(), test.value("test_id").toString());
+    }
+    rebuildVirtualTestForm();
+}
+
+void MainWindow::rebuildVirtualTestForm()
+{
+    if (m_virtualTestFormLayout == nullptr || m_virtualTestCombo == nullptr) {
+        return;
+    }
+
+    while (m_virtualTestFormLayout->rowCount() > 0) {
+        m_virtualTestFormLayout->removeRow(0);
+    }
+    m_virtualTestFields.clear();
+
+    const int index = m_virtualTestCombo->currentIndex();
+    if (index < 0 || index >= m_virtualTestCatalog.size()) {
+        if (m_virtualTestDescription != nullptr) {
+            m_virtualTestDescription->setText("No virtual tests available.");
+        }
+        return;
+    }
+
+    const QJsonObject test = m_virtualTestCatalog.at(index).toObject();
+    QString description = test.value("description").toString();
+    description += QString("\nCategory: %1 | Difficulty: %2")
+                       .arg(test.value("category").toString(), test.value("difficulty").toString());
+    if (m_virtualTestDescription != nullptr) {
+        m_virtualTestDescription->setText(description);
+    }
+
+    const QJsonArray parameters = test.value("parameters").toArray();
+    for (const QJsonValue& value : parameters) {
+        const QJsonObject parameter = value.toObject();
+        const QString type = parameter.value("param_type").toString();
+        const QString label = parameter.value("label").toString();
+        const QString unit = parameter.value("unit").toString();
+        const QString fullLabel = unit.isEmpty() ? label : QString("%1 (%2)").arg(label, unit);
+        QWidget* editor = nullptr;
+        if (type == "bool") {
+            auto* check = new QCheckBox(this);
+            check->setChecked(parameter.value("default_value").toBool());
+            editor = check;
+        } else if (type == "enum") {
+            auto* combo = new QComboBox(this);
+            for (const QJsonValue& item : parameter.value("allowed_values").toArray()) {
+                combo->addItem(item.toString());
+            }
+            combo->setCurrentText(parameter.value("default_value").toString());
+            editor = combo;
+        } else {
+            auto* line = new QLineEdit(this);
+            const QJsonValue defaultValue = parameter.value("default_value");
+            if (defaultValue.isArray()) {
+                QStringList items;
+                for (const QJsonValue& item : defaultValue.toArray()) {
+                    items << QString::number(item.toDouble());
+                }
+                line->setText(items.join(", "));
+            } else if (defaultValue.isObject()) {
+                line->setText(QString::fromUtf8(QJsonDocument(defaultValue.toObject()).toJson(QJsonDocument::Compact)));
+            } else if (defaultValue.isBool()) {
+                line->setText(defaultValue.toBool() ? "true" : "false");
+            } else if (defaultValue.isString()) {
+                line->setText(defaultValue.toString());
+            } else {
+                line->setText(QString::number(defaultValue.toDouble()));
+            }
+            line->setPlaceholderText(parameter.value("tooltip").toString());
+            editor = line;
+        }
+        if (editor != nullptr) {
+            editor->setToolTip(parameter.value("tooltip").toString());
+            m_virtualTestFormLayout->addRow(fullLabel, editor);
+            m_virtualTestFields.push_back({
+                parameter.value("key").toString(),
+                type,
+                parameter.value("required").toBool(true),
+                editor,
+            });
+        }
+    }
+
+    setVirtualTestStatus("Choose parameters, then vet the selected workflow against the current pack and simulation setup.", QColor(90, 144, 203));
+}
+
+QJsonObject MainWindow::buildVirtualTestPayload() const
+{
+    QJsonObject parameters;
+    for (const VirtualTestField& field : m_virtualTestFields) {
+        if (field.editor == nullptr) {
+            continue;
+        }
+        if (field.type == "bool") {
+            const auto* check = qobject_cast<QCheckBox*>(field.editor);
+            parameters.insert(field.key, check != nullptr && check->isChecked());
+            continue;
+        }
+        if (field.type == "enum") {
+            const auto* combo = qobject_cast<QComboBox*>(field.editor);
+            parameters.insert(field.key, combo != nullptr ? combo->currentText() : QString());
+            continue;
+        }
+
+        const auto* line = qobject_cast<QLineEdit*>(field.editor);
+        const QString text = line != nullptr ? line->text().trimmed() : QString();
+        if (field.type == "int") {
+            parameters.insert(field.key, text.toInt());
+        } else if (field.type == "float") {
+            parameters.insert(field.key, text.toDouble());
+        } else if (field.type == "list_float") {
+            QJsonArray array;
+            for (const QString& item : text.split(',', Qt::SkipEmptyParts)) {
+                array.append(item.trimmed().toDouble());
+            }
+            parameters.insert(field.key, array);
+        } else if (field.type == "json") {
+            QJsonParseError parseError;
+            const QJsonDocument json = QJsonDocument::fromJson(text.toUtf8(), &parseError);
+            if (parseError.error == QJsonParseError::NoError) {
+                if (json.isArray()) {
+                    parameters.insert(field.key, json.array());
+                } else if (json.isObject()) {
+                    parameters.insert(field.key, json.object());
+                }
+            } else {
+                parameters.insert(field.key, text);
+            }
+        } else {
+            parameters.insert(field.key, text);
+        }
+    }
+
+    return QJsonObject{
+        {"test_id", m_virtualTestCombo != nullptr ? m_virtualTestCombo->currentData().toString() : QString()},
+        {"base_config", buildSimulationConfig()},
+        {"parameters", parameters},
+    };
+}
+
+void MainWindow::setVirtualTestStatus(const QString& text, const QColor& accent)
+{
+    if (m_virtualTestStatus == nullptr) {
+        return;
+    }
+    m_virtualTestStatus->setPlainText(text);
+    m_virtualTestStatus->setStyleSheet(QString("border:1px solid %1;").arg(accent.name()));
+}
+
+void MainWindow::renderVirtualTestResult(const QJsonObject& payload)
+{
+    const QString testName = payload.value("test_name").toString();
+    const QJsonObject summary = payload.value("summary_metrics").toObject();
+    const QJsonObject passFail = payload.value("pass_fail_indicators").toObject();
+    const QJsonObject vetting = payload.value("vetting_result").toObject();
+
+    QStringList lines;
+    lines << QString("Test: %1").arg(testName);
+    lines << QString("Vetting: %1").arg(vetting.value("is_valid").toBool() ? "ready" : "blocked");
+    const QJsonArray warnings = vetting.value("warnings").toArray();
+    if (!warnings.isEmpty()) {
+        lines << "Warnings:";
+        for (const QJsonValue& warning : warnings) {
+            lines << QString("- %1").arg(warning.toString());
+        }
+    }
+    lines << "";
+    lines << "Summary Metrics:";
+    for (auto it = summary.begin(); it != summary.end(); ++it) {
+        lines << QString("- %1: %2").arg(it.key(), it.value().toVariant().toString());
+    }
+    if (!passFail.isEmpty()) {
+        lines << "";
+        lines << "Checks:";
+        for (auto it = passFail.begin(); it != passFail.end(); ++it) {
+            lines << QString("- %1: %2").arg(it.key(), it.value().toBool() ? "pass" : "flagged");
+        }
+    }
+    setVirtualTestStatus(lines.join('\n'), QColor(58, 165, 99));
+
+    const QJsonObject primaryResult = payload.value("primary_result").toObject();
+    if (!primaryResult.isEmpty()) {
+        renderResult(primaryResult);
+        return;
+    }
+
+    const QJsonArray subResults = payload.value("sub_results").toArray();
+    for (const QJsonValue& value : subResults) {
+        const QJsonObject sub = value.toObject();
+        const QJsonObject simulationResult = sub.value("simulation_result").toObject();
+        if (!simulationResult.isEmpty()) {
+            renderResult(simulationResult);
+            return;
+        }
+    }
+}
+
+void MainWindow::handleVirtualTestSelectionChanged(int index)
+{
+    Q_UNUSED(index);
+    rebuildVirtualTestForm();
+}
+
+void MainWindow::vetSelectedVirtualTest()
+{
+    const SimulationClient::Result result = m_client.vetVirtualTest(buildVirtualTestPayload());
+    if (!result.ok) {
+        setVirtualTestStatus(QString("Test vetting failed.\n%1").arg(result.error), QColor(220, 78, 78));
+        return;
+    }
+
+    const QJsonObject vetting = result.payload.value("vetting_result").toObject();
+    QStringList lines;
+    const bool isValid = vetting.value("is_valid").toBool();
+    lines << QString("Vetting: %1").arg(isValid ? "ready to run" : "blocked");
+    const QJsonArray errors = vetting.value("errors").toArray();
+    if (!errors.isEmpty()) {
+        lines << "Errors:";
+        for (const QJsonValue& error : errors) {
+            lines << QString("- %1").arg(error.toString());
+        }
+    }
+    const QJsonArray warnings = vetting.value("warnings").toArray();
+    if (!warnings.isEmpty()) {
+        lines << "Warnings:";
+        for (const QJsonValue& warning : warnings) {
+            lines << QString("- %1").arg(warning.toString());
+        }
+    }
+    setVirtualTestStatus(lines.join('\n'), isValid ? (warnings.isEmpty() ? QColor(58, 165, 99) : QColor(214, 179, 67)) : QColor(220, 78, 78));
+}
+
+void MainWindow::runSelectedVirtualTest()
+{
+    const QJsonObject payload = buildVirtualTestPayload();
+    const SimulationClient::Result vet = m_client.vetVirtualTest(payload);
+    if (!vet.ok) {
+        setVirtualTestStatus(QString("Test vetting failed.\n%1").arg(vet.error), QColor(220, 78, 78));
+        return;
+    }
+    if (!vet.payload.value("vetting_result").toObject().value("is_valid").toBool()) {
+        vetSelectedVirtualTest();
+        return;
+    }
+
+    const SimulationClient::Result result = m_client.runVirtualTest(payload);
+    if (!result.ok) {
+        setVirtualTestStatus(QString("Virtual test failed.\n%1").arg(result.error), QColor(220, 78, 78));
+        return;
+    }
+    renderVirtualTestResult(result.payload);
 }

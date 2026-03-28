@@ -9,6 +9,7 @@ from backend.sim_core.types import (
     ElectricalModelConfig,
     FaultConfig,
     GroupVariationConfig,
+    PhysicsConfig,
     RcBranchParams,
     SimulationConfig,
 )
@@ -43,6 +44,7 @@ def make_config(cell_key: str = "panasonic_ncr18650b", **overrides: object) -> S
         degradation=DegradationConfig(),
         balancing=BalancingConfig(),
         faults=FaultConfig(),
+        physics=PhysicsConfig(),
     )
     return SimulationConfig(**{**config.__dict__, **overrides})
 

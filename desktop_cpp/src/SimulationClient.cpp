@@ -16,6 +16,26 @@ SimulationClient::SimulationClient(QString projectRoot)
 
 SimulationClient::Result SimulationClient::runSimulation(const QJsonObject& config) const
 {
+    return invokeBackend({"-m", "backend.sim_core.cli", "simulate"}, &config);
+}
+
+SimulationClient::Result SimulationClient::listVirtualTests() const
+{
+    return invokeBackend({"-m", "backend.sim_core.cli", "list-tests"}, nullptr);
+}
+
+SimulationClient::Result SimulationClient::vetVirtualTest(const QJsonObject& payload) const
+{
+    return invokeBackend({"-m", "backend.sim_core.cli", "vet-test"}, &payload);
+}
+
+SimulationClient::Result SimulationClient::runVirtualTest(const QJsonObject& payload) const
+{
+    return invokeBackend({"-m", "backend.sim_core.cli", "run-test"}, &payload);
+}
+
+SimulationClient::Result SimulationClient::invokeBackend(const QStringList& arguments, const QJsonObject* payload) const
+{
     QProcess process;
     process.setWorkingDirectory(m_projectRoot);
 #ifdef Q_OS_WIN
@@ -23,20 +43,16 @@ SimulationClient::Result SimulationClient::runSimulation(const QJsonObject& conf
         args->flags |= CREATE_NO_WINDOW;
     });
 #endif
-    process.start(
-        pythonExecutable(),
-        {
-            "-m",
-            "backend.sim_core.cli"
-        }
-    );
+    process.start(pythonExecutable(), arguments);
 
     if (!process.waitForStarted()) {
         return Result{false, "Failed to start Python simulation process.", {}};
     }
 
-    const QByteArray input = QJsonDocument(config).toJson(QJsonDocument::Compact);
-    process.write(input);
+    if (payload != nullptr) {
+        const QByteArray input = QJsonDocument(*payload).toJson(QJsonDocument::Compact);
+        process.write(input);
+    }
     process.closeWriteChannel();
 
     if (!process.waitForFinished()) {

@@ -116,6 +116,23 @@ class ThermalZoneConfig:
 
 
 @dataclass(frozen=True)
+class PhysicsConfig:
+    """Lightweight engineering physics extensions for ECM-based pack studies."""
+
+    discharge_efficiency: float = 1.0
+    charge_efficiency: float = 0.995
+    resistance_temperature_alpha_per_c: float = 0.0
+    resistance_reference_temp_c: float = 25.0
+    capacity_temperature_reference_c: float = 25.0
+    capacity_cold_derate_per_c: float = 0.0
+    min_capacity_scale: float = 0.65
+    self_discharge_per_day: float = 0.0
+    interconnect_resistance_ohm_per_group: float = 0.0
+    pack_interconnect_resistance_ohm: float = 0.0
+    neighbor_thermal_coupling_w_per_k: float = 0.0
+
+
+@dataclass(frozen=True)
 class SimulationConfig:
     cell_nominal_voltage: float
     cell_full_voltage: float
@@ -144,6 +161,7 @@ class SimulationConfig:
     group_zone_assignments: tuple[int, ...] = ()
     group_labels: tuple[str, ...] = ()
     group_entity_ids: tuple[str, ...] = ()
+    physics: PhysicsConfig = field(default_factory=PhysicsConfig)
 
 
 @dataclass(frozen=True)

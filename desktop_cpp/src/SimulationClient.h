@@ -14,8 +14,12 @@ public:
 
     explicit SimulationClient(QString projectRoot);
     Result runSimulation(const QJsonObject& config) const;
+    Result listVirtualTests() const;
+    Result vetVirtualTest(const QJsonObject& payload) const;
+    Result runVirtualTest(const QJsonObject& payload) const;
 
 private:
+    Result invokeBackend(const QStringList& arguments, const QJsonObject* payload) const;
     QString pythonExecutable() const;
 
     QString m_projectRoot;

@@ -6,6 +6,7 @@
 #include "SimulationResultModel.h"
 
 #include <QColor>
+#include <QJsonArray>
 #include <QMainWindow>
 #include <QJsonObject>
 #include <QVariantList>
@@ -17,6 +18,7 @@ class QComboBox;
 class QCheckBox;
 class QDoubleSpinBox;
 class QFrame;
+class QFormLayout;
 class QGroupBox;
 class QPlainTextEdit;
 class QLabel;
@@ -53,6 +55,9 @@ private slots:
     void handleResultScrubChanged(int value);
     void handleOverlayMetricChanged(int index);
     void handleGroupSelectionChanged();
+    void handleVirtualTestSelectionChanged(int index);
+    void vetSelectedVirtualTest();
+    void runSelectedVirtualTest();
 
 private:
     struct ThemeSettings
@@ -61,6 +66,14 @@ private:
         QColor textColor = QColor(243, 247, 251);
         QColor cadBackground = QColor(198, 205, 214);
         QColor chartBackground = QColor(198, 205, 214);
+    };
+
+    struct VirtualTestField
+    {
+        QString key;
+        QString type;
+        bool required = true;
+        QWidget* editor = nullptr;
     };
 
     QDoubleSpinBox* createDoubleSpin(double value, double min, double max, int decimals);
@@ -76,6 +89,7 @@ private:
     QFrame* createWorkspacePanel();
     QGroupBox* createCadPropertiesPanel();
     QGroupBox* createResultsPanel();
+    QGroupBox* createVirtualTestsPanel();
     QGroupBox* createOutputPanel();
     void applyTheme();
     void applyChartTheme(ChartWidget* graphWidget);
@@ -91,6 +105,11 @@ private:
     std::vector<charts::Point> pointSeriesForMetric(const desktop::SimulationResultModel& result, const QString& metricKey) const;
     std::vector<charts::Point> pointSeriesForGroupMetric(const desktop::SimulationResultModel& result, int groupIndex, const QString& metricKey) const;
     void clearSimulationVisualization();
+    void loadVirtualTestCatalog();
+    void rebuildVirtualTestForm();
+    QJsonObject buildVirtualTestPayload() const;
+    void setVirtualTestStatus(const QString& text, const QColor& accent);
+    void renderVirtualTestResult(const QJsonObject& payload);
 
     SimulationClient m_client;
     QComboBox* m_referencePreset = nullptr;
@@ -157,6 +176,14 @@ private:
     QPushButton* m_cadResetGeometryButton = nullptr;
     QPushButton* m_cadResetLabelButton = nullptr;
     QPlainTextEdit* m_outputText = nullptr;
+    QComboBox* m_virtualTestCombo = nullptr;
+    QLabel* m_virtualTestDescription = nullptr;
+    QFormLayout* m_virtualTestFormLayout = nullptr;
+    QPlainTextEdit* m_virtualTestStatus = nullptr;
+    QPushButton* m_vetTestButton = nullptr;
+    QPushButton* m_runTestButton = nullptr;
+    QJsonArray m_virtualTestCatalog;
+    std::vector<VirtualTestField> m_virtualTestFields;
     QPushButton* m_runButton = nullptr;
     QPushButton* m_captureBaselineButton = nullptr;
     QPushButton* m_compareBaselineButton = nullptr;

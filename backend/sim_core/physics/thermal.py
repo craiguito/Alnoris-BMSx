@@ -23,13 +23,21 @@ def compute_next_temperature_c(
     cooling_coeff_w_per_k: float,
     thermal_mass_j_per_k: float,
     dt_s: int,
+    left_neighbor_temp_c: float | None = None,
+    right_neighbor_temp_c: float | None = None,
+    neighbor_coupling_w_per_k: float = 0.0,
 ) -> float:
     cooling_w = compute_cooling_w(
         temp_c=temp_c,
         ambient_temp_c=ambient_temp_c,
         cooling_coeff_w_per_k=cooling_coeff_w_per_k,
     )
-    net_heat_w = heat_w - cooling_w
+    neighbor_exchange_w = 0.0
+    if left_neighbor_temp_c is not None:
+        neighbor_exchange_w += neighbor_coupling_w_per_k * (left_neighbor_temp_c - temp_c)
+    if right_neighbor_temp_c is not None:
+        neighbor_exchange_w += neighbor_coupling_w_per_k * (right_neighbor_temp_c - temp_c)
+    net_heat_w = heat_w - cooling_w + neighbor_exchange_w
     delta_temp_c = net_heat_w * dt_s / max(thermal_mass_j_per_k, 1e-9)
     return temp_c + delta_temp_c
 

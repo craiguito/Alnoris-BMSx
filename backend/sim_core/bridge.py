@@ -5,6 +5,9 @@ from typing import Any
 
 from .engine import run_simulation
 from .physics.electrical import validate_electrical_model
+from .test_catalog import build_test_catalog
+from .test_runner import run_virtual_test, virtual_test_result_to_dict
+from .test_vetting import vet_virtual_test
 from .types import (
     BalancingConfig,
     CurrentProfile,
@@ -14,6 +17,7 @@ from .types import (
     FaultConfig,
     FaultSpec,
     GroupVariationConfig,
+    PhysicsConfig,
     RcBranchParams,
     SimulationConfig,
     SimulationResult,
@@ -240,6 +244,42 @@ def _parse_thermal_zones(payload: dict[str, Any]) -> tuple[ThermalZoneConfig, ..
     return tuple(zones)
 
 
+def _parse_physics(payload: dict[str, Any]) -> PhysicsConfig:
+    physics_payload = payload.get("physics", {})
+    defaults = PhysicsConfig()
+    return PhysicsConfig(
+        discharge_efficiency=float(physics_payload.get("discharge_efficiency", defaults.discharge_efficiency)),
+        charge_efficiency=float(physics_payload.get("charge_efficiency", defaults.charge_efficiency)),
+        resistance_temperature_alpha_per_c=float(
+            physics_payload.get("resistance_temperature_alpha_per_c", defaults.resistance_temperature_alpha_per_c)
+        ),
+        resistance_reference_temp_c=float(
+            physics_payload.get("resistance_reference_temp_c", defaults.resistance_reference_temp_c)
+        ),
+        capacity_temperature_reference_c=float(
+            physics_payload.get("capacity_temperature_reference_temp_c", physics_payload.get("capacity_temperature_reference_c", defaults.capacity_temperature_reference_c))
+        ),
+        capacity_cold_derate_per_c=float(
+            physics_payload.get("capacity_cold_derate_per_c", defaults.capacity_cold_derate_per_c)
+        ),
+        min_capacity_scale=float(
+            physics_payload.get("min_capacity_scale", defaults.min_capacity_scale)
+        ),
+        self_discharge_per_day=float(
+            physics_payload.get("self_discharge_per_day", defaults.self_discharge_per_day)
+        ),
+        interconnect_resistance_ohm_per_group=float(
+            physics_payload.get("interconnect_resistance_ohm_per_group", defaults.interconnect_resistance_ohm_per_group)
+        ),
+        pack_interconnect_resistance_ohm=float(
+            physics_payload.get("pack_interconnect_resistance_ohm", defaults.pack_interconnect_resistance_ohm)
+        ),
+        neighbor_thermal_coupling_w_per_k=float(
+            physics_payload.get("neighbor_thermal_coupling_w_per_k", defaults.neighbor_thermal_coupling_w_per_k)
+        ),
+    )
+
+
 def simulation_config_from_dict(payload: dict[str, Any]) -> SimulationConfig:
     return validate_simulation_config(
         SimulationConfig(
@@ -270,6 +310,7 @@ def simulation_config_from_dict(payload: dict[str, Any]) -> SimulationConfig:
             group_zone_assignments=tuple(int(zone_id) for zone_id in payload.get("group_zone_assignments", [])),
             group_labels=tuple(str(label) for label in payload.get("group_labels", [])),
             group_entity_ids=tuple(str(entity_id) for entity_id in payload.get("group_entity_ids", [])),
+            physics=_parse_physics(payload),
         )
     )
 
@@ -282,3 +323,35 @@ def run_simulation_from_dict(payload: dict[str, Any]) -> dict[str, Any]:
 
 def simulation_result_to_dict(result: SimulationResult) -> dict[str, Any]:
     return asdict(result)
+
+
+def virtual_test_catalog_to_dict() -> dict[str, Any]:
+    return {
+        "tests": [
+            asdict(definition)
+            for definition in build_test_catalog()
+        ]
+    }
+
+
+def vet_virtual_test_from_dict(payload: dict[str, Any]) -> dict[str, Any]:
+    base_config = simulation_config_from_dict(payload["base_config"])
+    vetting = vet_virtual_test(
+        test_id=str(payload["test_id"]),
+        parameters=dict(payload.get("parameters", {})),
+        base_config=base_config,
+    )
+    return {
+        "test_id": str(payload["test_id"]),
+        "vetting_result": asdict(vetting),
+    }
+
+
+def run_virtual_test_from_dict(payload: dict[str, Any]) -> dict[str, Any]:
+    base_config = simulation_config_from_dict(payload["base_config"])
+    result = run_virtual_test(
+        test_id=str(payload["test_id"]),
+        parameters=dict(payload.get("parameters", {})),
+        base_config=base_config,
+    )
+    return virtual_test_result_to_dict(result)

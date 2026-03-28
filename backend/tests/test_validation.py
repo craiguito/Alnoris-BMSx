@@ -7,7 +7,7 @@ import unittest
 from backend.sim_core.bridge import simulation_config_from_dict
 from backend.sim_core.engine import run_simulation
 from backend.sim_core.physics.electrical import compute_heat_w
-from backend.sim_core.types import DegradationConfig
+from backend.sim_core.types import DegradationConfig, PhysicsConfig
 from backend.tests.helpers import make_1rc_model, make_config
 
 
@@ -108,6 +108,13 @@ class ValidationAndSafetyTests(unittest.TestCase):
             degradation=DegradationConfig(
                 calendar_capacity_fade_per_hour=-1.0,
             )
+        )
+        with self.assertRaises(ValueError):
+            run_simulation(config)
+
+    def test_invalid_physics_config_raises(self) -> None:
+        config = make_config(
+            physics=PhysicsConfig(discharge_efficiency=1.5),
         )
         with self.assertRaises(ValueError):
             run_simulation(config)

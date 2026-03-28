@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from .physics.electrical import validate_electrical_model
-from .types import BalancingConfig, CurrentProfile, DegradationConfig, FaultConfig, SimulationConfig, ThermalZoneConfig
+from .types import BalancingConfig, CurrentProfile, DegradationConfig, FaultConfig, PhysicsConfig, SimulationConfig, ThermalZoneConfig
 
 
 def validate_current_profile(profile: CurrentProfile | None) -> CurrentProfile | None:
@@ -136,6 +136,26 @@ def validate_thermal_zones(
         raise ValueError("group_entity_ids length must match group_count.")
 
 
+def validate_physics(config: PhysicsConfig) -> PhysicsConfig:
+    if not 0.0 < config.discharge_efficiency <= 1.0:
+        raise ValueError("physics.discharge_efficiency must be within (0, 1].")
+    if not 0.0 < config.charge_efficiency <= 1.0:
+        raise ValueError("physics.charge_efficiency must be within (0, 1].")
+    if config.capacity_cold_derate_per_c < 0.0:
+        raise ValueError("physics.capacity_cold_derate_per_c must be >= 0.")
+    if not 0.0 < config.min_capacity_scale <= 1.0:
+        raise ValueError("physics.min_capacity_scale must be within (0, 1].")
+    if config.self_discharge_per_day < 0.0:
+        raise ValueError("physics.self_discharge_per_day must be >= 0.")
+    if config.interconnect_resistance_ohm_per_group < 0.0:
+        raise ValueError("physics.interconnect_resistance_ohm_per_group must be >= 0.")
+    if config.pack_interconnect_resistance_ohm < 0.0:
+        raise ValueError("physics.pack_interconnect_resistance_ohm must be >= 0.")
+    if config.neighbor_thermal_coupling_w_per_k < 0.0:
+        raise ValueError("physics.neighbor_thermal_coupling_w_per_k must be >= 0.")
+    return config
+
+
 def validate_simulation_config(config: SimulationConfig) -> SimulationConfig:
     if config.duration_s <= 0:
         raise ValueError("duration_s must be > 0.")
@@ -164,6 +184,7 @@ def validate_simulation_config(config: SimulationConfig) -> SimulationConfig:
     validate_current_profile(config.current_profile)
     validate_degradation(config.degradation)
     validate_balancing(config.balancing)
+    validate_physics(config.physics)
 
     group_count = max(1, config.group_count or config.cells_in_series)
     if config.cells_in_series % group_count != 0:

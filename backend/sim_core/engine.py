@@ -13,13 +13,16 @@ from statistics import mean
 from .physics.balancing import balance_currents_for_groups
 from .physics.degradation import effective_capacity_scale, effective_resistance_scale, step_degradation
 from .physics.electrical import (
+    capacity_temperature_scale,
     compute_heat_w,
     compute_next_soc,
     compute_open_circuit_voltage,
     compute_power_w,
     compute_terminal_voltage,
     effective_r0_ohm,
+    interconnect_resistance_ohm,
     step_electrical_state,
+    temperature_adjusted_resistance_ohm,
     validate_electrical_model,
 )
 from .physics.faults import effects_for_group
@@ -52,6 +55,8 @@ def _step_group(
     thermal_mass_j_per_k: float,
     pack_current_a: float,
     balance_current_a: float,
+    left_neighbor_temp_c: float | None,
+    right_neighbor_temp_c: float | None,
 ) -> GroupStepResult:
     fault_effects = effects_for_group(config.faults, group.index, time_s)
     thermal_context = resolve_group_thermal_context(config, group.index)
@@ -61,6 +66,7 @@ def _step_group(
         * effective_resistance_scale(group)
         * fault_effects.resistance_multiplier
     )
+    r0_ohm = temperature_adjusted_resistance_ohm(r0_ohm, group.temp_c, config) + interconnect_resistance_ohm(config)
     open_circuit_voltage_v = compute_open_circuit_voltage(
         soc=group.soc,
         config=config,
@@ -91,6 +97,9 @@ def _step_group(
         cooling_coeff_w_per_k=thermal_context.cooling_coeff_w_per_k * fault_effects.cooling_multiplier,
         thermal_mass_j_per_k=thermal_mass_j_per_k,
         dt_s=config.time_step_s,
+        left_neighbor_temp_c=left_neighbor_temp_c,
+        right_neighbor_temp_c=right_neighbor_temp_c,
+        neighbor_coupling_w_per_k=config.physics.neighbor_thermal_coupling_w_per_k,
     )
     degradation_result = step_degradation(
         state=group.degradation,
@@ -104,7 +113,13 @@ def _step_group(
         current_soc=group.soc,
         current_a=current_a,
         dt_s=config.time_step_s,
-        capacity_as=group_capacity_as * effective_capacity_scale(group) * fault_effects.capacity_multiplier,
+        capacity_as=(
+            group_capacity_as
+            * effective_capacity_scale(group)
+            * capacity_temperature_scale(group.temp_c, config)
+            * fault_effects.capacity_multiplier
+        ),
+        config=config,
     )
 
     return GroupStepResult(
@@ -249,6 +264,8 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
                 thermal_mass_j_per_k=thermal_mass_j_per_k,
                 pack_current_a=current_a,
                 balance_current_a=balance_currents_a[group.index],
+                left_neighbor_temp_c=groups[group.index - 1].temp_c if group.index > 0 else None,
+                right_neighbor_temp_c=groups[group.index + 1].temp_c if group.index + 1 < len(groups) else None,
             )
             for group in groups
         ]
