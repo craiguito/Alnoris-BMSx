@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from .physics.electrical import validate_electrical_model
-from .types import BalancingConfig, CurrentProfile, DegradationConfig, FaultConfig, SimulationConfig
+from .types import BalancingConfig, CurrentProfile, DegradationConfig, FaultConfig, SimulationConfig, ThermalZoneConfig
 
 
 def validate_current_profile(profile: CurrentProfile | None) -> CurrentProfile | None:
@@ -82,6 +82,36 @@ def validate_faults(config: FaultConfig, group_count: int) -> FaultConfig:
     return config
 
 
+def validate_thermal_zones(
+    zones: tuple[ThermalZoneConfig, ...],
+    group_count: int,
+    group_zone_assignments: tuple[int, ...],
+    group_labels: tuple[str, ...],
+    group_entity_ids: tuple[str, ...],
+) -> None:
+    seen_zone_ids: set[int] = set()
+    for zone in zones:
+        if zone.zone_id in seen_zone_ids:
+            raise ValueError(f"Thermal zone id {zone.zone_id} is duplicated.")
+        if zone.cooling_coeff_w_per_k is not None and zone.cooling_coeff_w_per_k < 0.0:
+            raise ValueError("Thermal zone cooling_coeff_w_per_k must be >= 0.")
+        if zone.cooling_coeff_multiplier is not None and zone.cooling_coeff_multiplier <= 0.0:
+            raise ValueError("Thermal zone cooling_coeff_multiplier must be > 0.")
+        seen_zone_ids.add(zone.zone_id)
+
+    if group_zone_assignments and len(group_zone_assignments) != group_count:
+        raise ValueError("group_zone_assignments length must match group_count.")
+    valid_zone_ids = {0, *seen_zone_ids}
+    for zone_id in group_zone_assignments:
+        if zone_id not in valid_zone_ids:
+            raise ValueError(f"group_zone_assignments references unknown zone id {zone_id}.")
+
+    if group_labels and len(group_labels) != group_count:
+        raise ValueError("group_labels length must match group_count.")
+    if group_entity_ids and len(group_entity_ids) != group_count:
+        raise ValueError("group_entity_ids length must match group_count.")
+
+
 def validate_simulation_config(config: SimulationConfig) -> SimulationConfig:
     if config.duration_s <= 0:
         raise ValueError("duration_s must be > 0.")
@@ -118,4 +148,11 @@ def validate_simulation_config(config: SimulationConfig) -> SimulationConfig:
             "number of series cells."
         )
     validate_faults(config.faults, group_count)
+    validate_thermal_zones(
+        config.thermal_zones,
+        group_count,
+        config.group_zone_assignments,
+        config.group_labels,
+        config.group_entity_ids,
+    )
     return config

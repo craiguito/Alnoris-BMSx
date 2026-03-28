@@ -24,7 +24,7 @@ from .physics.electrical import (
 )
 from .physics.faults import effects_for_group
 from .physics.pack import build_group_states, derive_pack_properties
-from .physics.thermal import compute_next_temperature_c
+from .physics.thermal import compute_next_temperature_c, resolve_group_thermal_context
 from .profiles import current_for_time
 from .types import (
     CellGroupState,
@@ -54,6 +54,7 @@ def _step_group(
     balance_current_a: float,
 ) -> GroupStepResult:
     fault_effects = effects_for_group(config.faults, group.index, time_s)
+    thermal_context = resolve_group_thermal_context(config, group.index)
     current_a = pack_current_a + balance_current_a
     r0_ohm = (
         effective_r0_ohm(config, group_base_resistance_ohm)
@@ -86,8 +87,8 @@ def _step_group(
     next_temp_c = compute_next_temperature_c(
         temp_c=group.temp_c,
         heat_w=heat_w,
-        ambient_temp_c=config.ambient_temp_c,
-        cooling_coeff_w_per_k=config.cooling_coeff_w_per_k * fault_effects.cooling_multiplier,
+        ambient_temp_c=thermal_context.ambient_temp_c,
+        cooling_coeff_w_per_k=thermal_context.cooling_coeff_w_per_k * fault_effects.cooling_multiplier,
         thermal_mass_j_per_k=thermal_mass_j_per_k,
         dt_s=config.time_step_s,
     )
@@ -125,6 +126,7 @@ def _step_group(
 
 
 def _build_time_point(
+    config: SimulationConfig,
     time_s: int,
     current_a: float,
     group_step_results: list[GroupStepResult],
@@ -135,6 +137,9 @@ def _build_time_point(
     group_socs = [result.next_state.soc for result in group_step_results]
     group_balance_currents_a = [result.balance_current_a for result in group_step_results]
     group_fault_flags = [result.fault_flags for result in group_step_results]
+    group_zone_ids = list(config.group_zone_assignments) if config.group_zone_assignments else [0 for _ in group_step_results]
+    group_labels = list(config.group_labels) if config.group_labels else [f"Group {index}" for index in range(len(group_step_results))]
+    group_entity_ids = list(config.group_entity_ids) if config.group_entity_ids else [f"group-{index}" for index in range(len(group_step_results))]
     weakest_group_index = min(
         range(len(group_voltages_v)),
         key=lambda index: group_voltages_v[index],
@@ -152,6 +157,9 @@ def _build_time_point(
     soc_min = min(group_socs)
     soc_max = max(group_socs)
     soc_avg = mean(group_socs)
+    zone_temp_max_c: dict[int, float] = {}
+    for zone_id, temp_c in zip(group_zone_ids, group_temps_c):
+        zone_temp_max_c[zone_id] = max(zone_temp_max_c.get(zone_id, temp_c), temp_c)
 
     return SimulationPoint(
         time_s=time_s,
@@ -182,6 +190,10 @@ def _build_time_point(
         fault_active_groups=[index for index, flags in enumerate(group_fault_flags) if flags],
         group_balance_current_a=group_balance_currents_a,
         group_fault_flags=group_fault_flags,
+        group_zone_ids=group_zone_ids,
+        group_labels=group_labels,
+        group_entity_ids=group_entity_ids,
+        zone_temp_max_c=zone_temp_max_c,
     )
 
 
@@ -230,7 +242,7 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
             for group in groups
         ]
         groups = [result.next_state for result in step_results]
-        point = _build_time_point(time_s=time_s, current_a=current_a, group_step_results=step_results)
+        point = _build_time_point(config=validated_config, time_s=time_s, current_a=current_a, group_step_results=step_results)
         time_series.append(point)
         total_balance_ah += sum(point.group_balance_current_a) * validated_config.time_step_s / 3600.0
 
@@ -305,6 +317,8 @@ def build_summary(
             total_balance_ah=0.0,
             fault_count=fault_count,
             first_faulted_group_index=None,
+            hottest_zone_id=0,
+            max_zone_temp_c=config.ambient_temp_c,
         )
 
     runtime_s = time_series[-1].time_s
@@ -343,6 +357,13 @@ def build_summary(
         ),
         None,
     )
+    hottest_zone_id = 0
+    max_zone_temp_c = config.ambient_temp_c
+    for point in time_series:
+        for zone_id, temp_c in point.zone_temp_max_c.items():
+            if temp_c >= max_zone_temp_c:
+                max_zone_temp_c = temp_c
+                hottest_zone_id = zone_id
 
     warnings: list[SimulationWarning] = []
     if max_group_temp_c >= 60.0:
@@ -426,4 +447,6 @@ def build_summary(
         total_balance_ah=total_balance_ah,
         fault_count=fault_count,
         first_faulted_group_index=first_faulted_group_index,
+        hottest_zone_id=hottest_zone_id,
+        max_zone_temp_c=max_zone_temp_c,
     )

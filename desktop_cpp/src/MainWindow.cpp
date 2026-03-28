@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "SimulationMappingBuilder.h"
 
 #include <QComboBox>
 #include <QCheckBox>
@@ -29,6 +30,7 @@
 #include <QSplitter>
 #include <QVBoxLayout>
 #include <QWidget>
+#include <algorithm>
 #include <functional>
 #include <string>
 
@@ -449,7 +451,7 @@ QWidget* MainWindow::createInputsSidebar()
 
 QJsonObject MainWindow::buildSimulationConfig() const
 {
-    return QJsonObject{
+    QJsonObject config{
         {"cell_nominal_voltage", m_cellNominalVoltage->value()},
         {"cell_full_voltage", m_cellFullVoltage->value()},
         {"cell_empty_voltage", m_cellEmptyVoltage->value()},
@@ -467,6 +469,24 @@ QJsonObject MainWindow::buildSimulationConfig() const
         {"pack_heat_capacity_j_per_kgk", m_packHeatCapacity->value()},
         {"cooling_coeff_w_per_k", m_coolingCoeff->value()}
     };
+
+    const int fallbackGroupCount = std::max(1, static_cast<int>(m_cellsInSeries->value()));
+    config.insert("group_count", fallbackGroupCount);
+
+    if (m_cadWorkspaceView != nullptr) {
+        const auto mapping = SimulationMappingBuilder::build(
+            m_cadWorkspaceView->document(),
+            m_ambientTemp->value(),
+            m_coolingCoeff->value()
+        );
+        config.insert("group_count", mapping.groupCount);
+        config.insert("thermal_zones", mapping.thermalZones);
+        config.insert("group_zone_assignments", mapping.groupZoneAssignments);
+        config.insert("group_labels", mapping.groupLabels);
+        config.insert("group_entity_ids", mapping.groupEntityIds);
+    }
+
+    return config;
 }
 
 void MainWindow::renderResult(const QJsonObject& payload)

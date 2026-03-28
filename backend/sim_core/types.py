@@ -92,6 +92,16 @@ class FaultConfig:
 
 
 @dataclass(frozen=True)
+class ThermalZoneConfig:
+    zone_id: int
+    name: str
+    ambient_temp_c: float | None = None
+    cooling_coeff_w_per_k: float | None = None
+    cooling_coeff_multiplier: float | None = None
+    note: str = ""
+
+
+@dataclass(frozen=True)
 class SimulationConfig:
     cell_nominal_voltage: float
     cell_full_voltage: float
@@ -116,6 +126,10 @@ class SimulationConfig:
     degradation: DegradationConfig = field(default_factory=DegradationConfig)
     balancing: BalancingConfig = field(default_factory=BalancingConfig)
     faults: FaultConfig = field(default_factory=FaultConfig)
+    thermal_zones: tuple[ThermalZoneConfig, ...] = ()
+    group_zone_assignments: tuple[int, ...] = ()
+    group_labels: tuple[str, ...] = ()
+    group_entity_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -203,6 +217,10 @@ class SimulationPoint:
     fault_active_groups: list[int]
     group_balance_current_a: list[float]
     group_fault_flags: list[list[str]]
+    group_zone_ids: list[int]
+    group_labels: list[str]
+    group_entity_ids: list[str]
+    zone_temp_max_c: dict[int, float]
 
 
 @dataclass(frozen=True)
@@ -234,6 +252,8 @@ class SimulationSummary:
     total_balance_ah: float
     fault_count: int
     first_faulted_group_index: int | None
+    hottest_zone_id: int
+    max_zone_temp_c: float
 
 
 @dataclass(frozen=True)

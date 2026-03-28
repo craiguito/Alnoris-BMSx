@@ -138,6 +138,11 @@ void CadViewportWidget::setPackConfig(const cad::battery::BatteryCadConfig& conf
     update();
 }
 
+const cad::core::CadDocument& CadViewportWidget::document() const
+{
+    return m_engine.document();
+}
+
 std::optional<cad::battery::EntitySummary> CadViewportWidget::selectedEntitySummary() const
 {
     return m_engine.getSelectedEntitySummary();

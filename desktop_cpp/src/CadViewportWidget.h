@@ -22,6 +22,7 @@ public:
     bool setCellMeshPath(const QString& path);
     void setBackgroundColor(const QColor& color);
     void setPackConfig(const cad::battery::BatteryCadConfig& config);
+    [[nodiscard]] const cad::core::CadDocument& document() const;
     [[nodiscard]] std::optional<cad::battery::EntitySummary> selectedEntitySummary() const;
     [[nodiscard]] std::optional<cad::battery::CellProperties> selectedCellProperties() const;
     [[nodiscard]] std::optional<cad::battery::BusbarProperties> selectedBusbarProperties() const;

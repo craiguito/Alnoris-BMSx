@@ -344,3 +344,49 @@ This pass focuses on the Qt desktop shell around the CAD engine so the viewport 
 - TODO: add direct manipulation gizmos
 - TODO: add multi-select inspector support
 - TODO: add a more advanced simulation dashboard layout
+
+## CAD-To-Simulation Thermal Coupling Pass
+
+This pass adds the first practical bridge from the battery CAD document into the backend thermal model.
+
+### Thermal zones in the backend
+
+- The Python backend now accepts:
+  - `thermal_zones`
+  - `group_zone_assignments`
+  - `group_labels`
+  - `group_entity_ids`
+- Each simulation group can now inherit:
+  - a zone-specific cooling coefficient
+  - a zone-specific ambient temperature override
+- The thermal model remains lumped per group, but it is now ready to reflect simple CAD-informed cooling differences.
+
+### Desktop-side mapping
+
+- The desktop host now builds a lightweight simulation mapping from the CAD document before sending a simulation request.
+- `SimulationMappingBuilder` derives:
+  - `group_count`
+  - stable per-group labels
+  - stable group entity IDs
+  - thermal zone assignments
+  - thermal zone definitions
+
+### Current CAD heuristics
+
+- Cells are grouped by series index into simulation groups.
+- Cells near visible cooling plates are assigned to cooling-derived thermal zones.
+- Cells that are not mapped to a cooling plate but fall inside a visible module boundary inherit a module-derived thermal zone.
+- If no more specific mapping exists, groups fall back to thermal zone `0`.
+
+### Current limitations
+
+- This is a deterministic approximation, not CFD or full conductive thermal coupling.
+- Cooling-plate and module-zone influence is currently inferred from simple spatial heuristics.
+- There is not yet a dedicated UI for editing thermal zones directly.
+
+### Future work
+
+- TODO: expose thermal zone editing in the desktop inspector
+- TODO: bind backend per-group thermal results back onto CAD cells and modules
+- TODO: persist thermal-zone metadata in CAD document save/load
+- TODO: add richer geometric mapping beyond simple proximity/containment rules

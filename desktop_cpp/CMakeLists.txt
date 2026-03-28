@@ -54,6 +54,8 @@ qt_add_executable(alnoris_desktop WIN32
     src/MainWindow.h
     src/SimulationClient.cpp
     src/SimulationClient.h
+    src/SimulationMappingBuilder.cpp
+    src/SimulationMappingBuilder.h
 )
 
 target_link_libraries(alnoris_desktop

@@ -17,6 +17,7 @@ from .types import (
     RcBranchParams,
     SimulationConfig,
     SimulationResult,
+    ThermalZoneConfig,
 )
 from .validation import validate_current_profile, validate_simulation_config
 
@@ -159,6 +160,23 @@ def _parse_faults(payload: dict[str, Any]) -> FaultConfig:
     return FaultConfig(faults=tuple(faults))
 
 
+def _parse_thermal_zones(payload: dict[str, Any]) -> tuple[ThermalZoneConfig, ...]:
+    zones_payload = payload.get("thermal_zones", [])
+    zones: list[ThermalZoneConfig] = []
+    for zone_payload in zones_payload:
+        zones.append(
+            ThermalZoneConfig(
+                zone_id=int(zone_payload["zone_id"]),
+                name=str(zone_payload.get("name", f"Zone {zone_payload['zone_id']}")),
+                ambient_temp_c=float(zone_payload["ambient_temp_c"]) if zone_payload.get("ambient_temp_c") is not None else None,
+                cooling_coeff_w_per_k=float(zone_payload["cooling_coeff_w_per_k"]) if zone_payload.get("cooling_coeff_w_per_k") is not None else None,
+                cooling_coeff_multiplier=float(zone_payload["cooling_coeff_multiplier"]) if zone_payload.get("cooling_coeff_multiplier") is not None else None,
+                note=str(zone_payload.get("note", "")),
+            )
+        )
+    return tuple(zones)
+
+
 def simulation_config_from_dict(payload: dict[str, Any]) -> SimulationConfig:
     return validate_simulation_config(
         SimulationConfig(
@@ -185,6 +203,10 @@ def simulation_config_from_dict(payload: dict[str, Any]) -> SimulationConfig:
             degradation=_parse_degradation(payload),
             balancing=_parse_balancing(payload),
             faults=_parse_faults(payload),
+            thermal_zones=_parse_thermal_zones(payload),
+            group_zone_assignments=tuple(int(zone_id) for zone_id in payload.get("group_zone_assignments", [])),
+            group_labels=tuple(str(label) for label in payload.get("group_labels", [])),
+            group_entity_ids=tuple(str(entity_id) for entity_id in payload.get("group_entity_ids", [])),
         )
     )
 
