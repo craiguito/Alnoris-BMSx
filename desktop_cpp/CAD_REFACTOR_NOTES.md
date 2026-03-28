@@ -546,3 +546,41 @@ This pass tightens the backend-to-desktop result contract and exposes more of th
 - TODO: use backend `group_entity_ids` everywhere overlays bind to CAD groups
 - TODO: add richer comparison charts for multi-scenario tests
 - TODO: add CSV export for comparison tables
+
+## Battery System Preset Pass
+
+This pass adds full battery-system presets rather than only cell presets or demo startup content.
+
+### Preset architecture
+
+- System presets now live in a typed backend registry instead of being hardcoded inside desktop UI code.
+- Each preset can define:
+  - chemistry
+  - reference cell
+  - module count
+  - pack topology
+  - CAD layout defaults
+  - cooling / thermal assumptions
+  - balancing defaults
+  - operating limits
+  - recommended virtual tests
+
+### Generative startup workflow
+
+- The desktop now queries the preset catalog from the backend.
+- A selected preset populates simulation defaults and drives battery-aware CAD generation.
+- Default startup now prefers a generated preset scene rather than sample mesh content.
+
+### CAD layout expansion
+
+- The battery CAD generator now supports:
+  - multiple modules
+  - cylindrical cells
+  - prismatic cells
+  - pouch-style cells
+  - preset-driven busbar thickness, cooling channel thickness, enclosure wall thickness, and module gap
+
+### Current limitations
+
+- Preset thermal-zone multipliers still flow most strongly through generated CAD cooling/module heuristics rather than a full explicit zone editor.
+- The desktop still exposes only a compact subset of preset parameters for direct manual editing after load.

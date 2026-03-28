@@ -6,6 +6,7 @@ from typing import Any
 from .chemistry import get_chemistry_preset
 from .engine import run_simulation
 from .physics.electrical import validate_electrical_model
+from .system_presets import battery_system_preset_catalog_to_dict
 from .test_catalog import build_test_catalog
 from .test_runner import run_virtual_test, virtual_test_result_to_dict
 from .test_vetting import vet_virtual_test
@@ -600,6 +601,10 @@ def virtual_test_catalog_to_dict() -> dict[str, Any]:
             for definition in build_test_catalog()
         ]
     }
+
+
+def battery_system_preset_catalog_to_bridge_dict() -> dict[str, Any]:
+    return battery_system_preset_catalog_to_dict()
 
 
 def vet_virtual_test_from_dict(payload: dict[str, Any]) -> dict[str, Any]:

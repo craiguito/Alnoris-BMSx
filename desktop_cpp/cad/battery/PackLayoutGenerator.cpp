@@ -8,6 +8,7 @@ namespace cad::battery {
 namespace {
 
 using CellKey = std::pair<int, int>;
+using BusbarKey = std::pair<int, BusbarRole>;
 
 template <typename T>
 void preserveCommonOverrides(T& generated, const T& existing)
@@ -172,9 +173,13 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
         previousCells[{cell.series_index, cell.parallel_index}] = cell;
     }
 
-    std::map<BusbarRole, BusbarEntity> previousBusbars;
+    std::map<BusbarKey, BusbarEntity> previousBusbars;
     for (const BusbarEntity& busbar : document.busbars()) {
-        previousBusbars[busbar.role] = busbar;
+        int moduleIndex = 0;
+        if (const auto* parent = document.findModuleBoundary(busbar.parent_id); parent != nullptr) {
+            moduleIndex = parent->module_index;
+        }
+        previousBusbars[{moduleIndex, busbar.role}] = busbar;
     }
 
     std::map<int, CoolingPlateEntity> previousCoolingPlates;
@@ -202,12 +207,18 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
 
     const int series_count = std::max(1, config.cells_in_series);
     const int parallel_count = std::max(1, config.cells_in_parallel);
-    const float pack_width = std::max(240.0f, (series_count - 1) * config.x_spacing + config.cell_radius * 2.8f);
-    const float pack_depth = std::max(180.0f, (parallel_count - 1) * config.z_spacing + config.cell_radius * 2.8f);
+    const int module_count = std::max(1, std::min(config.module_count, series_count));
+    const int base_series_per_module = series_count / module_count;
+    const int module_remainder = series_count % module_count;
+    const bool cylindrical = config.cell_form_factor == CellFormFactor::Cylindrical;
+    const float cell_width = cylindrical ? config.cell_radius * 2.0f : std::max(10.0f, config.cell_width);
+    const float cell_depth = cylindrical ? config.cell_radius * 2.0f : std::max(10.0f, config.cell_depth);
+    const float pack_width = std::max(240.0f, (series_count - 1) * config.x_spacing + cell_width * 1.8f + (module_count - 1) * config.module_gap_x);
+    const float pack_depth = std::max(180.0f, (parallel_count - 1) * config.z_spacing + cell_depth * 1.8f);
     const float module_height = config.cell_height + 56.0f;
     const float enclosure_height = config.cell_height + 92.0f;
-    const float group_width = std::max(config.x_spacing * 0.78f, config.cell_radius * 2.8f);
-    const float group_depth = std::max(pack_depth + 28.0f, config.cell_radius * 2.8f);
+    const float group_width = std::max(config.x_spacing * 0.78f, cell_width * 1.35f);
+    const float group_depth = std::max(pack_depth + 28.0f, cell_depth * 1.35f);
 
     BatteryPackEntity generatedPack;
     generatedPack.label = "Battery pack";
@@ -215,6 +226,7 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
     generatedPack.size = {pack_width + 140.0f, enclosure_height, pack_depth + 136.0f};
     generatedPack.series_count = series_count;
     generatedPack.parallel_count = parallel_count;
+    generatedPack.layout_type = LayoutType::Grid;
     generatedPack.cell_radius = config.cell_radius;
     generatedPack.cell_height = config.cell_height;
     generatedPack.spacing_x = config.x_spacing;
@@ -222,35 +234,75 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
     const BatteryPackEntity mergedPack = mergePack(generatedPack, previousPack);
     BatteryPackEntity& pack = document.addPack(mergedPack);
 
-    ModuleBoundaryEntity generatedModuleBoundary;
-    generatedModuleBoundary.label = "Battery module";
-    generatedModuleBoundary.parent_id = pack.id;
-    generatedModuleBoundary.module_index = 0;
-    generatedModuleBoundary.center = {0.0f, 0.0f, 0.0f};
-    generatedModuleBoundary.size = {pack_width + 96.0f, module_height, pack_depth + 92.0f};
-    generatedModuleBoundary.series_span = series_count;
-    generatedModuleBoundary.parallel_span = parallel_count;
-    const auto previousModuleBoundary = previousModuleBoundaries.find(generatedModuleBoundary.module_index);
-    ModuleBoundaryEntity& module = document.addModuleBoundary(
-        mergeModuleBoundary(generatedModuleBoundary, previousModuleBoundary == previousModuleBoundaries.end() ? nullptr : &previousModuleBoundary->second)
-    );
+    int runningSeriesStart = 0;
+    float runningCenterX = -((series_count - 1) * config.x_spacing + (module_count - 1) * config.module_gap_x) * 0.5f;
+    for (int moduleIndex = 0; moduleIndex < module_count; ++moduleIndex) {
+        const int moduleSeriesCount = base_series_per_module + (moduleIndex < module_remainder ? 1 : 0);
+        const float moduleWidth = std::max(180.0f, (moduleSeriesCount - 1) * config.x_spacing + group_width + 52.0f);
+        const float moduleCenterX = runningCenterX + moduleWidth * 0.5f;
 
-    for (int col = 0; col < series_count; ++col) {
-        CellGroupEntity generatedGroup;
-        generatedGroup.label = "Cell group";
-        generatedGroup.parent_id = module.id;
-        generatedGroup.group_index = col;
-        generatedGroup.series_index = col;
-        generatedGroup.simulation_group_index = col;
-        generatedGroup.center = {
-            (col - (series_count - 1) / 2.0f) * config.x_spacing,
-            0.0f,
-            0.0f
-        };
-        generatedGroup.size = {group_width, config.cell_height + 24.0f, group_depth};
-        generatedGroup.cell_count = parallel_count;
-        const auto previousGroup = previousGroups.find(col);
-        document.addCellGroup(mergeGroup(generatedGroup, previousGroup == previousGroups.end() ? nullptr : &previousGroup->second));
+        ModuleBoundaryEntity generatedModuleBoundary;
+        generatedModuleBoundary.label = module_count == 1
+            ? "Battery module"
+            : ("Battery module " + std::to_string(moduleIndex + 1));
+        generatedModuleBoundary.parent_id = pack.id;
+        generatedModuleBoundary.module_index = moduleIndex;
+        generatedModuleBoundary.center = {moduleCenterX, 0.0f, 0.0f};
+        generatedModuleBoundary.size = {moduleWidth, module_height, pack_depth + 92.0f};
+        generatedModuleBoundary.series_span = moduleSeriesCount;
+        generatedModuleBoundary.parallel_span = parallel_count;
+        const auto previousModuleBoundary = previousModuleBoundaries.find(moduleIndex);
+        ModuleBoundaryEntity& module = document.addModuleBoundary(
+            mergeModuleBoundary(generatedModuleBoundary, previousModuleBoundary == previousModuleBoundaries.end() ? nullptr : &previousModuleBoundary->second)
+        );
+        for (int localSeries = 0; localSeries < moduleSeriesCount; ++localSeries) {
+            const int globalSeries = runningSeriesStart + localSeries;
+            const float localCenterX = (localSeries - (moduleSeriesCount - 1) / 2.0f) * config.x_spacing;
+
+            CellGroupEntity generatedGroup;
+            generatedGroup.label = "Cell group";
+            generatedGroup.parent_id = module.id;
+            generatedGroup.group_index = globalSeries;
+            generatedGroup.series_index = globalSeries;
+            generatedGroup.simulation_group_index = globalSeries;
+            generatedGroup.center = {localCenterX, 0.0f, 0.0f};
+            generatedGroup.size = {group_width, config.cell_height + 24.0f, group_depth};
+            generatedGroup.cell_count = parallel_count;
+            const auto previousGroup = previousGroups.find(globalSeries);
+            document.addCellGroup(mergeGroup(generatedGroup, previousGroup == previousGroups.end() ? nullptr : &previousGroup->second));
+        }
+
+        CoolingPlateEntity generatedCoolingPlate;
+        generatedCoolingPlate.label = module_count == 1
+            ? "Cooling channel"
+            : ("Cooling channel " + std::to_string(moduleIndex + 1));
+        generatedCoolingPlate.parent_id = module.id;
+        generatedCoolingPlate.plate_index = moduleIndex;
+        generatedCoolingPlate.center = {0.0f, -128.0f, 0.0f};
+        generatedCoolingPlate.size = {moduleWidth - 24.0f, config.cooling_channel_thickness, pack_depth + 92.0f};
+        const auto previousPlate = previousCoolingPlates.find(generatedCoolingPlate.plate_index);
+        document.addCoolingPlate(mergeCoolingPlate(generatedCoolingPlate, previousPlate == previousCoolingPlates.end() ? nullptr : &previousPlate->second));
+
+        BusbarEntity generatedNegativeBusbar;
+        generatedNegativeBusbar.label = "Negative busbar";
+        generatedNegativeBusbar.parent_id = module.id;
+        generatedNegativeBusbar.role = BusbarRole::Negative;
+        generatedNegativeBusbar.center = {0.0f, 112.0f, -pack_depth * 0.5f};
+        generatedNegativeBusbar.size = {moduleWidth, config.busbar_thickness, 16.0f};
+        const auto previousNegativeBusbar = previousBusbars.find({moduleIndex, generatedNegativeBusbar.role});
+        document.addBusbar(mergeBusbar(generatedNegativeBusbar, previousNegativeBusbar == previousBusbars.end() ? nullptr : &previousNegativeBusbar->second));
+
+        BusbarEntity generatedPositiveBusbar;
+        generatedPositiveBusbar.label = "Positive busbar";
+        generatedPositiveBusbar.parent_id = module.id;
+        generatedPositiveBusbar.role = BusbarRole::Positive;
+        generatedPositiveBusbar.center = {0.0f, 112.0f, pack_depth * 0.5f};
+        generatedPositiveBusbar.size = {moduleWidth, config.busbar_thickness, 16.0f};
+        const auto previousPositiveBusbar = previousBusbars.find({moduleIndex, generatedPositiveBusbar.role});
+        document.addBusbar(mergeBusbar(generatedPositiveBusbar, previousPositiveBusbar == previousBusbars.end() ? nullptr : &previousPositiveBusbar->second));
+
+        runningSeriesStart += moduleSeriesCount;
+        runningCenterX += moduleWidth + config.module_gap_x;
     }
 
     for (int row = 0; row < parallel_count; ++row) {
@@ -263,12 +315,17 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
                 0.0f,
                 (row - (parallel_count - 1) / 2.0f) * config.z_spacing
             };
+            generated.form_factor = config.cell_form_factor;
             generated.radius = config.cell_radius;
             generated.height = config.cell_height;
+            generated.width = cell_width;
+            generated.depth = cell_depth;
             generated.series_index = col;
             generated.parallel_index = row;
             generated.simulation_group_index = col;
-            generated.cell_type = config.cell_radius >= 32.0f ? "21700" : "18650";
+            generated.cell_type = config.cell_form_factor == CellFormFactor::Prismatic
+                ? "prismatic"
+                : (config.cell_form_factor == CellFormFactor::Pouch ? "pouch" : (config.cell_radius >= 32.0f ? "21700" : "18650"));
 
             const auto previousIt = previousCells.find({col, row});
             const CellEntity merged = mergeCell(generated, previousIt == previousCells.end() ? nullptr : &previousIt->second);
@@ -276,40 +333,13 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
         }
     }
 
-    CoolingPlateEntity generatedCoolingPlate;
-    generatedCoolingPlate.label = "Cooling channel";
-    generatedCoolingPlate.parent_id = module.id;
-    generatedCoolingPlate.plate_index = 0;
-    generatedCoolingPlate.center = {0.0f, -128.0f, 0.0f};
-    generatedCoolingPlate.size = {pack_width + 72.0f, 24.0f, pack_depth + 92.0f};
-    const auto previousPlate = previousCoolingPlates.find(generatedCoolingPlate.plate_index);
-    document.addCoolingPlate(mergeCoolingPlate(generatedCoolingPlate, previousPlate == previousCoolingPlates.end() ? nullptr : &previousPlate->second));
-
-    BusbarEntity generatedNegativeBusbar;
-    generatedNegativeBusbar.label = "Negative busbar";
-    generatedNegativeBusbar.parent_id = module.id;
-    generatedNegativeBusbar.role = BusbarRole::Negative;
-    generatedNegativeBusbar.center = {0.0f, 112.0f, -pack_depth * 0.5f};
-    generatedNegativeBusbar.size = {pack_width + 96.0f, 12.0f, 16.0f};
-    const auto previousNegativeBusbar = previousBusbars.find(generatedNegativeBusbar.role);
-    document.addBusbar(mergeBusbar(generatedNegativeBusbar, previousNegativeBusbar == previousBusbars.end() ? nullptr : &previousNegativeBusbar->second));
-
-    BusbarEntity generatedPositiveBusbar;
-    generatedPositiveBusbar.label = "Positive busbar";
-    generatedPositiveBusbar.parent_id = module.id;
-    generatedPositiveBusbar.role = BusbarRole::Positive;
-    generatedPositiveBusbar.center = {0.0f, 112.0f, pack_depth * 0.5f};
-    generatedPositiveBusbar.size = {pack_width + 96.0f, 12.0f, 16.0f};
-    const auto previousPositiveBusbar = previousBusbars.find(generatedPositiveBusbar.role);
-    document.addBusbar(mergeBusbar(generatedPositiveBusbar, previousPositiveBusbar == previousBusbars.end() ? nullptr : &previousPositiveBusbar->second));
-
     PackEnclosureEntity generatedEnclosure;
     generatedEnclosure.label = "Enclosure";
     generatedEnclosure.parent_id = pack.id;
     generatedEnclosure.enclosure_index = 0;
     generatedEnclosure.center = {0.0f, 0.0f, 0.0f};
     generatedEnclosure.size = {pack_width + 140.0f, enclosure_height, pack_depth + 136.0f};
-    generatedEnclosure.wall_thickness = 8.0f;
+    generatedEnclosure.wall_thickness = config.enclosure_wall_thickness;
     const auto previousEnclosure = previousEnclosures.find(generatedEnclosure.enclosure_index);
     document.addPackEnclosure(mergeEnclosure(generatedEnclosure, previousEnclosure == previousEnclosures.end() ? nullptr : &previousEnclosure->second));
 

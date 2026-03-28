@@ -71,6 +71,18 @@ QString formatMaybeNumber(double value, int decimals = 3)
     return QString::number(value, 'f', decimals);
 }
 
+cad::battery::CellFormFactor cellFormFactorFromString(const QString& value)
+{
+    const QString normalized = value.trimmed().toLower();
+    if (normalized == "prismatic") {
+        return cad::battery::CellFormFactor::Prismatic;
+    }
+    if (normalized == "pouch") {
+        return cad::battery::CellFormFactor::Pouch;
+    }
+    return cad::battery::CellFormFactor::Cylindrical;
+}
+
 cad::battery::BatteryVisualizationOverlay buildSimulationOverlay(
     const cad::core::CadDocument& document,
     const desktop::SimulationResultModel& result,
@@ -214,6 +226,16 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
     connect(m_saveProjectButton, &QPushButton::clicked, this, &MainWindow::saveProject);
     connect(m_loadProjectButton, &QPushButton::clicked, this, &MainWindow::loadProject);
 
+    m_systemPresetCategoryCombo = new QComboBox(central);
+    connect(m_systemPresetCategoryCombo, &QComboBox::currentIndexChanged, this, &MainWindow::handleSystemPresetCategoryChanged);
+    m_systemPresetCombo = new QComboBox(central);
+    m_systemPresetDescription = new QLabel("Loading battery system presets...", central);
+    m_systemPresetDescription->setWordWrap(true);
+    m_systemPresetDescription->setStyleSheet("font-size:12px; color:#93a6ba;");
+    connect(m_systemPresetCombo, &QComboBox::currentIndexChanged, this, &MainWindow::handleSystemPresetCategoryChanged);
+    m_applySystemPresetButton = new QPushButton("Load Preset", central);
+    connect(m_applySystemPresetButton, &QPushButton::clicked, this, &MainWindow::applySelectedSystemPreset);
+
     auto* mainSplitter = new QSplitter(Qt::Horizontal, central);
     mainSplitter->setChildrenCollapsible(false);
 
@@ -257,8 +279,13 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
 
     setCentralWidget(central);
     applyTheme();
+    loadSystemPresetCatalog();
     loadVirtualTestCatalog();
-    updateCadWorkspace();
+    if (m_systemPresetCombo != nullptr && m_systemPresetCombo->count() > 0) {
+        applySelectedSystemPreset();
+    } else {
+        updateCadWorkspace();
+    }
     refreshCadProperties();
     clearSimulationVisualization();
 }
@@ -321,6 +348,7 @@ void MainWindow::saveProject()
 
     QJsonObject root;
     root.insert("reference_preset_index", m_referencePreset->currentIndex());
+    root.insert("system_preset", m_activeSystemPreset);
     root.insert("simulation_config", buildSimulationConfig());
     root.insert("baseline_config", m_baselineConfig);
     root.insert("baseline_result", m_baselineResult);
@@ -361,9 +389,20 @@ void MainWindow::loadProject()
 
     const QJsonObject root = document.object();
     applySimulationConfig(root.value("simulation_config").toObject());
+    m_activeSystemPreset = root.value("system_preset").toObject();
     m_baselineConfig = root.value("baseline_config").toObject();
     m_baselineResult = root.value("baseline_result").toObject();
     m_referencePreset->setCurrentIndex(root.value("reference_preset_index").toInt(0));
+    if (m_systemPresetCombo != nullptr && !m_activeSystemPreset.isEmpty()) {
+        const QString presetId = m_activeSystemPreset.value("preset_id").toString();
+        for (int index = 0; index < m_systemPresetCombo->count(); ++index) {
+            if (m_systemPresetCombo->itemData(index).toString() == presetId) {
+                m_systemPresetCombo->setCurrentIndex(index);
+                break;
+            }
+        }
+    }
+    updateCadWorkspace();
 
     if (!m_baselineResult.isEmpty()) {
         m_summaryLabel->setText(QString("Loaded project from %1 with a saved baseline.").arg(path));
@@ -378,6 +417,9 @@ void MainWindow::loadProject()
 
 void MainWindow::applyReferencePreset(int index)
 {
+    if (index > 0) {
+        m_activeSystemPreset = {};
+    }
     switch (index) {
     case 1:
         m_cellNominalVoltage->setValue(3.6);
@@ -477,6 +519,17 @@ QWidget* MainWindow::createInputsSidebar()
     headerLayout->addWidget(subheader);
     layout->addWidget(headerGroup);
 
+    auto* presetGroup = new QGroupBox("Battery System Preset", content);
+    auto* presetLayout = new QFormLayout(presetGroup);
+    presetLayout->setContentsMargins(14, 16, 14, 14);
+    presetLayout->setHorizontalSpacing(10);
+    presetLayout->setVerticalSpacing(8);
+    presetLayout->addRow("Category", m_systemPresetCategoryCombo);
+    presetLayout->addRow("Preset", m_systemPresetCombo);
+    presetLayout->addRow("", m_applySystemPresetButton);
+    presetLayout->addRow("Description", m_systemPresetDescription);
+    layout->addWidget(presetGroup);
+
     auto* cellGroup = new QGroupBox("Cell", content);
     auto* cellLayout = new QFormLayout(cellGroup);
     cellLayout->setContentsMargins(14, 16, 14, 14);
@@ -542,24 +595,23 @@ QWidget* MainWindow::createInputsSidebar()
 
 QJsonObject MainWindow::buildSimulationConfig() const
 {
-    QJsonObject config{
-        {"cell_nominal_voltage", m_cellNominalVoltage->value()},
-        {"cell_full_voltage", m_cellFullVoltage->value()},
-        {"cell_empty_voltage", m_cellEmptyVoltage->value()},
-        {"cell_cutoff_voltage", m_cellCutoffVoltage->value()},
-        {"cell_capacity_ah", m_cellCapacity->value()},
-        {"cells_in_series", static_cast<int>(m_cellsInSeries->value())},
-        {"cells_in_parallel", static_cast<int>(m_cellsInParallel->value())},
-        {"internal_resistance_ohm_per_cell", m_internalResistance->value()},
-        {"ambient_temp_c", m_ambientTemp->value()},
-        {"discharge_current_a", m_dischargeCurrent->value()},
-        {"duration_s", static_cast<int>(m_duration->value())},
-        {"time_step_s", static_cast<int>(m_timeStep->value())},
-        {"initial_soc", m_initialSoc->value()},
-        {"pack_mass_kg", m_packMass->value()},
-        {"pack_heat_capacity_j_per_kgk", m_packHeatCapacity->value()},
-        {"cooling_coeff_w_per_k", m_coolingCoeff->value()}
-    };
+    QJsonObject config = m_activeSystemPreset.value("simulation_defaults").toObject();
+    config.insert("cell_nominal_voltage", m_cellNominalVoltage->value());
+    config.insert("cell_full_voltage", m_cellFullVoltage->value());
+    config.insert("cell_empty_voltage", m_cellEmptyVoltage->value());
+    config.insert("cell_cutoff_voltage", m_cellCutoffVoltage->value());
+    config.insert("cell_capacity_ah", m_cellCapacity->value());
+    config.insert("cells_in_series", static_cast<int>(m_cellsInSeries->value()));
+    config.insert("cells_in_parallel", static_cast<int>(m_cellsInParallel->value()));
+    config.insert("internal_resistance_ohm_per_cell", m_internalResistance->value());
+    config.insert("ambient_temp_c", m_ambientTemp->value());
+    config.insert("discharge_current_a", m_dischargeCurrent->value());
+    config.insert("duration_s", static_cast<int>(m_duration->value()));
+    config.insert("time_step_s", static_cast<int>(m_timeStep->value()));
+    config.insert("initial_soc", m_initialSoc->value());
+    config.insert("pack_mass_kg", m_packMass->value());
+    config.insert("pack_heat_capacity_j_per_kgk", m_packHeatCapacity->value());
+    config.insert("cooling_coeff_w_per_k", m_coolingCoeff->value());
 
     const int fallbackGroupCount = std::max(1, static_cast<int>(m_cellsInSeries->value()));
     config.insert("group_count", fallbackGroupCount);
@@ -1223,9 +1275,14 @@ void MainWindow::updateCadWorkspace()
     }
 
     cad::battery::BatteryCadConfig cadConfig;
-    cadConfig.layout.preset_name = m_referencePreset != nullptr ? m_referencePreset->currentText().toStdString() : std::string("Custom");
+    const QJsonObject cadDefaults = m_activeSystemPreset.value("cad_defaults").toObject();
+    cadConfig.layout.preset_name = !cadDefaults.isEmpty()
+        ? m_activeSystemPreset.value("display_name").toString().toStdString()
+        : (m_referencePreset != nullptr ? m_referencePreset->currentText().toStdString() : std::string("Custom"));
     cadConfig.layout.cells_in_series = m_cellsInSeries != nullptr ? static_cast<int>(m_cellsInSeries->value()) : 0;
     cadConfig.layout.cells_in_parallel = m_cellsInParallel != nullptr ? static_cast<int>(m_cellsInParallel->value()) : 0;
+    cadConfig.layout.module_count = cadDefaults.value("module_count").toInt(1);
+    cadConfig.layout.cell_form_factor = cellFormFactorFromString(cadDefaults.value("cell_form_factor").toString("cylindrical"));
     cadConfig.electrical.cell_nominal_voltage = m_cellNominalVoltage != nullptr ? m_cellNominalVoltage->value() : 0.0;
     cadConfig.electrical.cell_capacity_ah = m_cellCapacity != nullptr ? m_cellCapacity->value() : 0.0;
     cadConfig.thermal.ambient_temp_c = m_ambientTemp != nullptr ? m_ambientTemp->value() : 0.0;
@@ -1240,6 +1297,16 @@ void MainWindow::updateCadWorkspace()
     cadConfig.metrics.pack_capacity_ah = m_cellCapacity != nullptr && m_cellsInParallel != nullptr
         ? m_cellCapacity->value() * m_cellsInParallel->value()
         : 0.0;
+    cadConfig.layout.cell_radius = static_cast<float>(cadDefaults.value("cell_radius_mm").toDouble(cadConfig.layout.cell_radius));
+    cadConfig.layout.cell_height = static_cast<float>(cadDefaults.value("cell_height_mm").toDouble(cadConfig.layout.cell_height));
+    cadConfig.layout.cell_width = static_cast<float>(cadDefaults.value("cell_width_mm").toDouble(cadConfig.layout.cell_width));
+    cadConfig.layout.cell_depth = static_cast<float>(cadDefaults.value("cell_depth_mm").toDouble(cadConfig.layout.cell_depth));
+    cadConfig.layout.x_spacing = static_cast<float>(cadDefaults.value("x_spacing_mm").toDouble(cadConfig.layout.x_spacing));
+    cadConfig.layout.z_spacing = static_cast<float>(cadDefaults.value("z_spacing_mm").toDouble(cadConfig.layout.z_spacing));
+    cadConfig.layout.module_gap_x = static_cast<float>(cadDefaults.value("module_gap_x_mm").toDouble(cadConfig.layout.module_gap_x));
+    cadConfig.layout.busbar_thickness = static_cast<float>(cadDefaults.value("busbar_thickness_mm").toDouble(cadConfig.layout.busbar_thickness));
+    cadConfig.layout.cooling_channel_thickness = static_cast<float>(cadDefaults.value("cooling_channel_thickness_mm").toDouble(cadConfig.layout.cooling_channel_thickness));
+    cadConfig.layout.enclosure_wall_thickness = static_cast<float>(cadDefaults.value("enclosure_wall_thickness_mm").toDouble(cadConfig.layout.enclosure_wall_thickness));
     m_cadWorkspaceView->setPackConfig(cadConfig);
     refreshCadOverlay();
 }
@@ -2227,6 +2294,135 @@ void MainWindow::handleGroupSelectionChanged()
     }
     refreshGroupDetailPanel();
     refreshSelectedGroupCharts();
+}
+
+void MainWindow::loadSystemPresetCatalog()
+{
+    if (m_systemPresetCategoryCombo == nullptr || m_systemPresetCombo == nullptr) {
+        return;
+    }
+
+    const SimulationClient::Result result = m_client.listSystemPresets();
+    if (!result.ok) {
+        if (m_systemPresetDescription != nullptr) {
+            m_systemPresetDescription->setText(QString("Failed to load battery system presets.\n%1").arg(result.error));
+        }
+        return;
+    }
+
+    m_systemPresetCatalog = result.payload.value("presets").toArray();
+    m_systemPresetCategoryCombo->clear();
+    m_systemPresetCategoryCombo->addItem("All Categories");
+    for (const QJsonValue& value : result.payload.value("categories").toArray()) {
+        m_systemPresetCategoryCombo->addItem(value.toString());
+    }
+    rebuildSystemPresetOptions();
+
+    const QString defaultPresetId = result.payload.value("default_preset_id").toString();
+    for (int index = 0; index < m_systemPresetCombo->count(); ++index) {
+        if (m_systemPresetCombo->itemData(index).toString() == defaultPresetId) {
+            m_systemPresetCombo->setCurrentIndex(index);
+            break;
+        }
+    }
+}
+
+void MainWindow::rebuildSystemPresetOptions()
+{
+    if (m_systemPresetCombo == nullptr) {
+        return;
+    }
+
+    const QString selectedCategory = m_systemPresetCategoryCombo != nullptr ? m_systemPresetCategoryCombo->currentText() : QString();
+    m_systemPresetCombo->clear();
+    for (const QJsonValue& value : m_systemPresetCatalog) {
+        const QJsonObject preset = value.toObject();
+        if (!selectedCategory.isEmpty() && selectedCategory != "All Categories" && preset.value("category").toString() != selectedCategory) {
+            continue;
+        }
+        m_systemPresetCombo->addItem(preset.value("display_name").toString(), preset.value("preset_id").toString());
+    }
+
+    handleSystemPresetCategoryChanged(m_systemPresetCombo->currentIndex());
+}
+
+void MainWindow::handleSystemPresetCategoryChanged(int)
+{
+    if (sender() == m_systemPresetCategoryCombo) {
+        rebuildSystemPresetOptions();
+        return;
+    }
+
+    if (m_systemPresetDescription == nullptr || m_systemPresetCombo == nullptr) {
+        return;
+    }
+
+    const QString presetId = m_systemPresetCombo->currentData().toString();
+    for (const QJsonValue& value : m_systemPresetCatalog) {
+        const QJsonObject preset = value.toObject();
+        if (preset.value("preset_id").toString() != presetId) {
+            continue;
+        }
+        const QStringList recommended = [&]() {
+            QStringList output;
+            for (const QJsonValue& item : preset.value("recommended_virtual_tests").toArray()) {
+                output << item.toString();
+            }
+            return output;
+        }();
+        m_systemPresetDescription->setText(QString("%1\nChemistry: %2 | Cell: %3\nRecommended tests: %4")
+            .arg(preset.value("description").toString())
+            .arg(preset.value("chemistry_display_name").toString())
+            .arg(preset.value("cell_preset_name").toString())
+            .arg(recommended.isEmpty() ? "None" : recommended.join(", ")));
+        break;
+    }
+}
+
+void MainWindow::applySystemPreset(const QJsonObject& preset)
+{
+    if (preset.isEmpty()) {
+        return;
+    }
+
+    m_activeSystemPreset = preset;
+    const QJsonObject simulation = preset.value("simulation_defaults").toObject();
+    applySimulationConfig(simulation);
+    if (m_referencePreset != nullptr) {
+        m_referencePreset->setCurrentIndex(0);
+    }
+    updateCadWorkspace();
+
+    const QJsonArray recommendedTests = preset.value("recommended_virtual_tests").toArray();
+    if (m_virtualTestCombo != nullptr && !recommendedTests.isEmpty()) {
+        const QString firstTestId = recommendedTests.first().toString();
+        for (int index = 0; index < m_virtualTestCombo->count(); ++index) {
+            if (m_virtualTestCombo->itemData(index).toString() == firstTestId) {
+                m_virtualTestCombo->setCurrentIndex(index);
+                break;
+            }
+        }
+    }
+
+    if (m_summaryLabel != nullptr) {
+        m_summaryLabel->setText(QString("Loaded battery system preset: %1").arg(preset.value("display_name").toString()));
+    }
+}
+
+void MainWindow::applySelectedSystemPreset()
+{
+    if (m_systemPresetCombo == nullptr) {
+        return;
+    }
+
+    const QString presetId = m_systemPresetCombo->currentData().toString();
+    for (const QJsonValue& value : m_systemPresetCatalog) {
+        const QJsonObject preset = value.toObject();
+        if (preset.value("preset_id").toString() == presetId) {
+            applySystemPreset(preset);
+            return;
+        }
+    }
 }
 
 void MainWindow::loadVirtualTestCatalog()

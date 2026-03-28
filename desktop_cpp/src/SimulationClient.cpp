@@ -19,6 +19,11 @@ SimulationClient::Result SimulationClient::runSimulation(const QJsonObject& conf
     return invokeBackend({"-m", "backend.sim_core.cli", "simulate"}, &config);
 }
 
+SimulationClient::Result SimulationClient::listSystemPresets() const
+{
+    return invokeBackend({"-m", "backend.sim_core.cli", "list-presets"}, nullptr);
+}
+
 SimulationClient::Result SimulationClient::listVirtualTests() const
 {
     return invokeBackend({"-m", "backend.sim_core.cli", "list-tests"}, nullptr);

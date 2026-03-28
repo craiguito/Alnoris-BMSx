@@ -14,6 +14,7 @@ public:
 
     explicit SimulationClient(QString projectRoot);
     Result runSimulation(const QJsonObject& config) const;
+    Result listSystemPresets() const;
     Result listVirtualTests() const;
     Result vetVirtualTest(const QJsonObject& payload) const;
     Result runVirtualTest(const QJsonObject& payload) const;

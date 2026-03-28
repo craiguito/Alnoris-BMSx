@@ -59,6 +59,8 @@ private slots:
     void vetSelectedVirtualTest();
     void runSelectedVirtualTest();
     void exportActiveResultJson();
+    void handleSystemPresetCategoryChanged(int index);
+    void applySelectedSystemPreset();
 
 private:
     struct ThemeSettings
@@ -107,6 +109,9 @@ private:
     std::vector<charts::Point> pointSeriesForMetric(const desktop::SimulationResultModel& result, const QString& metricKey) const;
     std::vector<charts::Point> pointSeriesForGroupMetric(const desktop::SimulationResultModel& result, int groupIndex, const QString& metricKey) const;
     void clearSimulationVisualization();
+    void loadSystemPresetCatalog();
+    void rebuildSystemPresetOptions();
+    void applySystemPreset(const QJsonObject& preset);
     void loadVirtualTestCatalog();
     void rebuildVirtualTestForm();
     QJsonObject buildVirtualTestPayload() const;
@@ -115,6 +120,10 @@ private:
     QString formatWarningLines(const std::vector<desktop::SimulationWarningModel>& warnings) const;
 
     SimulationClient m_client;
+    QComboBox* m_systemPresetCategoryCombo = nullptr;
+    QComboBox* m_systemPresetCombo = nullptr;
+    QLabel* m_systemPresetDescription = nullptr;
+    QPushButton* m_applySystemPresetButton = nullptr;
     QComboBox* m_referencePreset = nullptr;
     QDoubleSpinBox* m_cellNominalVoltage = nullptr;
     QDoubleSpinBox* m_cellFullVoltage = nullptr;
@@ -194,6 +203,7 @@ private:
     QPushButton* m_vetTestButton = nullptr;
     QPushButton* m_runTestButton = nullptr;
     QJsonArray m_virtualTestCatalog;
+    QJsonArray m_systemPresetCatalog;
     std::vector<VirtualTestField> m_virtualTestFields;
     QPushButton* m_runButton = nullptr;
     QPushButton* m_captureBaselineButton = nullptr;
@@ -201,6 +211,7 @@ private:
     QPushButton* m_saveProjectButton = nullptr;
     QPushButton* m_loadProjectButton = nullptr;
     ThemeSettings m_theme;
+    QJsonObject m_activeSystemPreset;
     QJsonObject m_baselineConfig;
     QJsonObject m_baselineResult;
     QJsonObject m_lastExportPayload;

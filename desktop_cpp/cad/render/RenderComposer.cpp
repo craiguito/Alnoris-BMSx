@@ -423,38 +423,50 @@ RenderPacket RenderComposer::compose(
                 appendMeshBoundsWireframe(packet.selection_overlay_lines, *cell_mesh, world_position, selected_overlay_color);
             }
         } else {
-            appendCylinder(packet.triangles, world_position, cell.radius, cell.height, 28, color);
-            appendCylinder(
-                packet.triangles,
-                {world_position.x, world_position.y + (cell.height * 0.52f), world_position.z},
-                cell.radius * 0.34f,
-                10.0f,
-                24,
-                Vec3{0.84f, 0.90f, 0.96f}
-            );
-            if (isSelectedOrDescendant(cell.id)) {
-                appendWireCylinder(packet.selection_overlay_lines, world_position, cell.radius + 2.5f, cell.height + 6.0f, 32, selected_overlay_color);
+            if (cell.form_factor == battery::CellFormFactor::Cylindrical) {
+                appendCylinder(packet.triangles, world_position, cell.radius, cell.height, 28, color);
+                appendCylinder(
+                    packet.triangles,
+                    {world_position.x, world_position.y + (cell.height * 0.52f), world_position.z},
+                    cell.radius * 0.34f,
+                    10.0f,
+                    24,
+                    Vec3{0.84f, 0.90f, 0.96f}
+                );
+                if (isSelectedOrDescendant(cell.id)) {
+                    appendWireCylinder(packet.selection_overlay_lines, world_position, cell.radius + 2.5f, cell.height + 6.0f, 32, selected_overlay_color);
+                }
+            } else {
+                appendBox(packet.triangles, world_position, {cell.width, cell.height, cell.depth}, color);
+                appendBox(packet.lines, world_position, {cell.width, cell.height, cell.depth}, cad::math::mix(color, {0.10f, 0.16f, 0.24f}, 0.35f));
+                if (isSelectedOrDescendant(cell.id)) {
+                    appendWireBox(packet.selection_overlay_lines, world_position, {cell.width + 4.0f, cell.height + 4.0f, cell.depth + 4.0f}, selected_overlay_color);
+                }
             }
         }
 
-        const ProjectionResult center = projectPoint(mvp, world_position, viewport_width, viewport_height);
-        const ProjectionResult edge = projectPoint(
-            mvp,
-            {world_position.x + (cell.radius + 4.0f), world_position.y, world_position.z},
-            viewport_width,
-            viewport_height
-        );
-        if (center.valid && edge.valid) {
-            packet.pickables.push_back({
-                cell.id,
-                ScreenPickable::Shape::Circle,
-                500,
-                center.x,
-                center.y,
-                std::max(6.0f, std::abs(edge.x - center.x)),
-                std::max(6.0f, std::abs(edge.x - center.x)),
-                center.depth
-            });
+        if (cell.form_factor == battery::CellFormFactor::Cylindrical) {
+            const ProjectionResult center = projectPoint(mvp, world_position, viewport_width, viewport_height);
+            const ProjectionResult edge = projectPoint(
+                mvp,
+                {world_position.x + (cell.radius + 4.0f), world_position.y, world_position.z},
+                viewport_width,
+                viewport_height
+            );
+            if (center.valid && edge.valid) {
+                packet.pickables.push_back({
+                    cell.id,
+                    ScreenPickable::Shape::Circle,
+                    500,
+                    center.x,
+                    center.y,
+                    std::max(6.0f, std::abs(edge.x - center.x)),
+                    std::max(6.0f, std::abs(edge.x - center.x)),
+                    center.depth
+                });
+            }
+        } else {
+            appendBoxPickable(packet.pickables, cell.id, 500, mvp, world_position, {cell.width, cell.height, cell.depth}, viewport_width, viewport_height);
         }
     }
 

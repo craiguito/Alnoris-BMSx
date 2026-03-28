@@ -4,15 +4,30 @@
 
 namespace cad::battery {
 
+enum class CellFormFactor
+{
+    Cylindrical,
+    Prismatic,
+    Pouch
+};
+
 struct PackLayoutConfig
 {
     std::string preset_name = "Custom";
     int cells_in_series = 4;
     int cells_in_parallel = 2;
+    int module_count = 1;
+    CellFormFactor cell_form_factor = CellFormFactor::Cylindrical;
     float cell_radius = 28.0f;
     float cell_height = 220.0f;
+    float cell_width = 56.0f;
+    float cell_depth = 56.0f;
     float x_spacing = 92.0f;
     float z_spacing = 114.0f;
+    float module_gap_x = 64.0f;
+    float busbar_thickness = 12.0f;
+    float cooling_channel_thickness = 24.0f;
+    float enclosure_wall_thickness = 8.0f;
 };
 
 struct ElectricalConfig
