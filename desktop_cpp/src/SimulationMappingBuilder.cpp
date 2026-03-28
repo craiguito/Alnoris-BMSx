@@ -60,6 +60,19 @@ SimulationMappingBuilder::MappingResult SimulationMappingBuilder::build(
         groups[static_cast<std::size_t>(seriesIndex)].seriesIndex = seriesIndex;
         groups[static_cast<std::size_t>(seriesIndex)].entityId = QString("series-%1").arg(seriesIndex);
 
+        const auto groupIt = std::find_if(
+            document.cellGroups().begin(),
+            document.cellGroups().end(),
+            [seriesIndex](const cad::battery::CellGroupEntity& group) {
+                return group.series_index == seriesIndex;
+            }
+        );
+        if (groupIt != document.cellGroups().end()) {
+            groups[static_cast<std::size_t>(seriesIndex)].entityId = QString::number(
+                static_cast<qulonglong>(groupIt->id.value)
+            );
+        }
+
         const auto found = cellsBySeries.find(seriesIndex);
         if (found == cellsBySeries.end() || found->second.empty()) {
             continue;
@@ -68,9 +81,10 @@ SimulationMappingBuilder::MappingResult SimulationMappingBuilder::build(
         cad::math::Vec3 centroid{};
         float totalHeight = 0.0f;
         for (const cad::battery::CellEntity* cell : found->second) {
-            centroid.x += cell->position.x;
-            centroid.y += cell->position.y;
-            centroid.z += cell->position.z;
+            const cad::math::Vec3 worldPosition = document.worldPosition(cell->id);
+            centroid.x += worldPosition.x;
+            centroid.y += worldPosition.y;
+            centroid.z += worldPosition.z;
             totalHeight += cell->height;
         }
         const float count = static_cast<float>(found->second.size());
@@ -79,9 +93,6 @@ SimulationMappingBuilder::MappingResult SimulationMappingBuilder::build(
         centroid.z /= count;
         groups[static_cast<std::size_t>(seriesIndex)].centroid = centroid;
         groups[static_cast<std::size_t>(seriesIndex)].averageHeight = totalHeight / count;
-        groups[static_cast<std::size_t>(seriesIndex)].entityId = QString::number(
-            static_cast<qulonglong>(found->second.front()->id.value)
-        );
     }
 
     std::vector<const cad::battery::CoolingPlateEntity*> coolingPlates;
@@ -116,10 +127,11 @@ SimulationMappingBuilder::MappingResult SimulationMappingBuilder::build(
         int assignedZoneId = 0;
         float bestCoolingDistance = std::numeric_limits<float>::max();
         for (const cad::battery::CoolingPlateEntity* plate : coolingPlates) {
+            const cad::math::Vec3 plateCenter = document.worldPosition(plate->id);
             const bool withinPlanarFootprint =
-                std::abs(group.centroid.x - plate->center.x) <= plate->size.x * 0.5f &&
-                std::abs(group.centroid.z - plate->center.z) <= plate->size.z * 0.5f;
-            const float verticalDistance = std::abs(group.centroid.y - plate->center.y)
+                std::abs(group.centroid.x - plateCenter.x) <= plate->size.x * 0.5f &&
+                std::abs(group.centroid.z - plateCenter.z) <= plate->size.z * 0.5f;
+            const float verticalDistance = std::abs(group.centroid.y - plateCenter.y)
                 - (plate->size.y * 0.5f + group.averageHeight * 0.5f);
             if (withinPlanarFootprint && verticalDistance <= 80.0f && verticalDistance < bestCoolingDistance) {
                 bestCoolingDistance = verticalDistance;
@@ -129,7 +141,7 @@ SimulationMappingBuilder::MappingResult SimulationMappingBuilder::build(
 
         if (assignedZoneId == 0) {
             for (const cad::battery::ModuleBoundaryEntity* boundary : moduleBoundaries) {
-                if (isInsideBox(group.centroid, boundary->center, boundary->size)) {
+                if (isInsideBox(group.centroid, document.worldPosition(boundary->id), boundary->size)) {
                     assignedZoneId = 200 + boundary->module_index;
                     break;
                 }

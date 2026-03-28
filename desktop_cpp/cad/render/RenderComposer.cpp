@@ -305,7 +305,12 @@ RenderPacket RenderComposer::compose(
     const Mat4 mvp = cad::math::multiply(projection, view);
     packet.mvp = mvp.m;
 
-    const Vec3 grid_color{0.16f, 0.23f, 0.30f};
+    const std::vector<core::EntityId> selected_subtree = document.subtreeIds(document.selection().primary);
+    const auto isSelectedOrDescendant = [&selected_subtree](core::EntityId id) {
+        return std::find(selected_subtree.begin(), selected_subtree.end(), id) != selected_subtree.end();
+    };
+
+    const Vec3 grid_color{0.29f, 0.35f, 0.42f};
     const Vec3 selected_overlay_color{0.12f, 0.47f, 1.0f};
     const int grid_extent = 14;
     const float grid_step = 70.0f;
@@ -317,61 +322,104 @@ RenderPacket RenderComposer::compose(
         packet.lines.push_back({{grid_extent * grid_step, -120.0f, offset}, grid_color});
     }
 
+    for (const battery::BatteryPackEntity& pack : document.packs()) {
+        if (!pack.visible) {
+            continue;
+        }
+        const battery::BoundingBox bounds = document.worldBounds(pack.id);
+        appendWireBox(packet.lines, bounds.center, bounds.size, {0.46f, 0.50f, 0.55f});
+        appendBoxPickable(packet.pickables, pack.id, 80, mvp, bounds.center, bounds.size, viewport_width, viewport_height);
+        if (isSelectedOrDescendant(pack.id)) {
+            appendWireBox(packet.selection_overlay_lines, bounds.center, bounds.size, selected_overlay_color);
+        }
+    }
+    for (const battery::ModuleBoundaryEntity& module : document.modules()) {
+        if (!module.visible) {
+            continue;
+        }
+        const battery::BoundingBox bounds = document.worldBounds(module.id);
+        appendWireBox(packet.lines, bounds.center, bounds.size, {0.37f, 0.53f, 0.82f});
+        appendBoxPickable(packet.pickables, module.id, 160, mvp, bounds.center, bounds.size, viewport_width, viewport_height);
+        if (isSelectedOrDescendant(module.id)) {
+            appendWireBox(packet.selection_overlay_lines, bounds.center, bounds.size, selected_overlay_color);
+        }
+    }
+    for (const battery::CellGroupEntity& group : document.cellGroups()) {
+        if (!group.visible) {
+            continue;
+        }
+        const battery::BoundingBox bounds = document.worldBounds(group.id);
+        appendWireBox(packet.lines, bounds.center, bounds.size, {0.64f, 0.71f, 0.77f});
+        appendBoxPickable(packet.pickables, group.id, 240, mvp, bounds.center, bounds.size, viewport_width, viewport_height);
+        if (isSelectedOrDescendant(group.id)) {
+            appendWireBox(packet.selection_overlay_lines, bounds.center, bounds.size, selected_overlay_color);
+        }
+    }
+
     for (const battery::CoolingPlateEntity& plate : document.coolingPlates()) {
-        appendBox(packet.triangles, plate.center, plate.size, {0.08f, 0.16f, 0.24f});
-        appendBoxPickable(packet.pickables, plate.id, 300, mvp, plate.center, plate.size, viewport_width, viewport_height);
-        if (document.selection().primary == plate.id) {
-            appendWireBox(packet.selection_overlay_lines, plate.center, plate.size, selected_overlay_color);
+        if (!plate.visible) {
+            continue;
+        }
+        const battery::BoundingBox bounds = document.worldBounds(plate.id);
+        appendBox(packet.triangles, bounds.center, bounds.size, {0.22f, 0.49f, 0.82f});
+        appendBoxPickable(packet.pickables, plate.id, 300, mvp, bounds.center, bounds.size, viewport_width, viewport_height);
+        if (isSelectedOrDescendant(plate.id)) {
+            appendWireBox(packet.selection_overlay_lines, bounds.center, bounds.size, selected_overlay_color);
         }
     }
     for (const battery::BusbarEntity& busbar : document.busbars()) {
-        appendBox(packet.triangles, busbar.center, busbar.size, {0.86f, 0.68f, 0.30f});
-        appendBoxPickable(packet.pickables, busbar.id, 400, mvp, busbar.center, busbar.size, viewport_width, viewport_height);
-        if (document.selection().primary == busbar.id) {
-            appendWireBox(packet.selection_overlay_lines, busbar.center, busbar.size, selected_overlay_color);
+        if (!busbar.visible) {
+            continue;
         }
-    }
-    for (const battery::ModuleBoundaryEntity& boundary : document.moduleBoundaries()) {
-        appendWireBox(packet.lines, boundary.center, boundary.size, {0.25f, 0.45f, 0.86f});
-        appendBoxPickable(packet.pickables, boundary.id, 200, mvp, boundary.center, boundary.size, viewport_width, viewport_height);
-        if (document.selection().primary == boundary.id) {
-            appendWireBox(packet.selection_overlay_lines, boundary.center, boundary.size, selected_overlay_color);
+        const battery::BoundingBox bounds = document.worldBounds(busbar.id);
+        appendBox(packet.triangles, bounds.center, bounds.size, {0.87f, 0.53f, 0.19f});
+        appendBoxPickable(packet.pickables, busbar.id, 400, mvp, bounds.center, bounds.size, viewport_width, viewport_height);
+        if (isSelectedOrDescendant(busbar.id)) {
+            appendWireBox(packet.selection_overlay_lines, bounds.center, bounds.size, selected_overlay_color);
         }
     }
     for (const battery::PackEnclosureEntity& enclosure : document.packEnclosures()) {
-        appendWireBox(packet.lines, enclosure.center, enclosure.size, {0.42f, 0.48f, 0.54f});
-        appendBoxPickable(packet.pickables, enclosure.id, 100, mvp, enclosure.center, enclosure.size, viewport_width, viewport_height);
-        if (document.selection().primary == enclosure.id) {
-            appendWireBox(packet.selection_overlay_lines, enclosure.center, enclosure.size, selected_overlay_color);
+        if (!enclosure.visible) {
+            continue;
+        }
+        const battery::BoundingBox bounds = document.worldBounds(enclosure.id);
+        appendWireBox(packet.lines, bounds.center, bounds.size, {0.58f, 0.62f, 0.67f});
+        appendBoxPickable(packet.pickables, enclosure.id, 120, mvp, bounds.center, bounds.size, viewport_width, viewport_height);
+        if (isSelectedOrDescendant(enclosure.id)) {
+            appendWireBox(packet.selection_overlay_lines, bounds.center, bounds.size, selected_overlay_color);
         }
     }
 
     for (const battery::CellEntity& cell : document.cells()) {
+        if (!cell.visible) {
+            continue;
+        }
         const Vec3 color = overlayCellColor(overlay, cell);
+        const Vec3 world_position = document.worldPosition(cell.id);
         if (cell_mesh != nullptr && !cell_mesh->vertices.empty()) {
-            appendMesh(packet.triangles, *cell_mesh, cell.position, color);
-            if (document.selection().primary == cell.id) {
-                appendMeshBoundsWireframe(packet.selection_overlay_lines, *cell_mesh, cell.position, selected_overlay_color);
+            appendMesh(packet.triangles, *cell_mesh, world_position, color);
+            if (isSelectedOrDescendant(cell.id)) {
+                appendMeshBoundsWireframe(packet.selection_overlay_lines, *cell_mesh, world_position, selected_overlay_color);
             }
         } else {
-            appendCylinder(packet.triangles, cell.position, cell.radius, cell.height, 28, color);
+            appendCylinder(packet.triangles, world_position, cell.radius, cell.height, 28, color);
             appendCylinder(
                 packet.triangles,
-                {cell.position.x, cell.position.y + (cell.height * 0.52f), cell.position.z},
+                {world_position.x, world_position.y + (cell.height * 0.52f), world_position.z},
                 cell.radius * 0.34f,
                 10.0f,
                 24,
                 Vec3{0.84f, 0.90f, 0.96f}
             );
-            if (document.selection().primary == cell.id) {
-                appendWireCylinder(packet.selection_overlay_lines, cell.position, cell.radius + 2.5f, cell.height + 6.0f, 32, selected_overlay_color);
+            if (isSelectedOrDescendant(cell.id)) {
+                appendWireCylinder(packet.selection_overlay_lines, world_position, cell.radius + 2.5f, cell.height + 6.0f, 32, selected_overlay_color);
             }
         }
 
-        const ProjectionResult center = projectPoint(mvp, cell.position, viewport_width, viewport_height);
+        const ProjectionResult center = projectPoint(mvp, world_position, viewport_width, viewport_height);
         const ProjectionResult edge = projectPoint(
             mvp,
-            {cell.position.x + (cell.radius + 4.0f), cell.position.y, cell.position.z},
+            {world_position.x + (cell.radius + 4.0f), world_position.y, world_position.z},
             viewport_width,
             viewport_height
         );

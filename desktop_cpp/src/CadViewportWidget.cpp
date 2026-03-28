@@ -1,12 +1,14 @@
 #include "CadViewportWidget.h"
 
 #include <QMouseEvent>
+#include <QKeyEvent>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPaintEvent>
 #include <QResizeEvent>
 #include <QWheelEvent>
 #include <algorithm>
+#include <cmath>
 
 namespace {
 
@@ -98,6 +100,14 @@ void drawSelectionOverlay(QPainter& painter, const cad::render::ScreenPickable& 
         painter.drawRoundedRect(outerRect.adjusted(8.0, 8.0, -8.0, -8.0), 6.0, 6.0);
     }
     painter.restore();
+}
+
+float snapCoordinate(float value, float step)
+{
+    if (step <= 0.0f) {
+        return value;
+    }
+    return std::round(value / step) * step;
 }
 
 } // namespace
@@ -400,7 +410,13 @@ void CadViewportWidget::paintEvent(QPaintEvent* event)
     }
 
     painter.setPen(QColor(90, 102, 116));
-    painter.drawText(QRect(16, 12, width() - 32, 20), Qt::AlignLeft | Qt::AlignVCenter, "Standalone CAD module");
+    painter.drawText(
+        QRect(16, 12, width() - 32, 20),
+        Qt::AlignLeft | Qt::AlignVCenter,
+        QString("Battery CAD viewport  |  Shift-drag move  |  G snap %1  |  Axis %2")
+            .arg(m_gridSnapEnabled ? "on" : "off")
+            .arg(m_moveAxis == MoveAxis::X ? "X" : m_moveAxis == MoveAxis::Y ? "Y" : m_moveAxis == MoveAxis::Z ? "Z" : "XZ")
+    );
 }
 
 void CadViewportWidget::resizeEvent(QResizeEvent* event)
@@ -413,6 +429,7 @@ void CadViewportWidget::mousePressEvent(QMouseEvent* event)
 {
     if (event->button() == Qt::LeftButton) {
         m_dragging = true;
+        m_moveDragging = event->modifiers().testFlag(Qt::ShiftModifier) && m_engine.selectedEntity().isValid();
         m_pressMousePos = event->pos();
         m_lastMousePos = event->pos();
     }
@@ -423,7 +440,42 @@ void CadViewportWidget::mouseMoveEvent(QMouseEvent* event)
 {
     if (m_dragging && (event->buttons() & Qt::LeftButton)) {
         const QPoint delta = event->pos() - m_lastMousePos;
-        m_engine.orbit(static_cast<float>(delta.x()) * 0.45f, static_cast<float>(delta.y()) * 0.30f);
+        if (m_moveDragging) {
+            cad::math::Vec3 moveDelta{};
+            const float moveScale = 0.8f;
+            switch (m_moveAxis) {
+            case MoveAxis::X:
+                moveDelta.x = static_cast<float>(delta.x()) * moveScale;
+                break;
+            case MoveAxis::Y:
+                moveDelta.y = static_cast<float>(-delta.y()) * moveScale;
+                break;
+            case MoveAxis::Z:
+                moveDelta.z = static_cast<float>(delta.y()) * moveScale;
+                break;
+            case MoveAxis::FreeXZ:
+            default:
+                moveDelta.x = static_cast<float>(delta.x()) * moveScale;
+                moveDelta.z = static_cast<float>(delta.y()) * moveScale;
+                break;
+            }
+            if (m_gridSnapEnabled) {
+                const cad::core::EntityId selectedId = m_engine.selectedEntity();
+                const cad::math::Vec3 currentPosition = m_engine.document().worldPosition(selectedId);
+                cad::math::Vec3 snappedTarget = cad::math::add(currentPosition, moveDelta);
+                snappedTarget.x = snapCoordinate(snappedTarget.x, m_gridSnapStep);
+                snappedTarget.y = snapCoordinate(snappedTarget.y, m_gridSnapStep);
+                snappedTarget.z = snapCoordinate(snappedTarget.z, m_gridSnapStep);
+                moveDelta = {
+                    snappedTarget.x - currentPosition.x,
+                    snappedTarget.y - currentPosition.y,
+                    snappedTarget.z - currentPosition.z
+                };
+            }
+            m_engine.moveEntity(m_engine.selectedEntity(), moveDelta);
+        } else {
+            m_engine.orbit(static_cast<float>(delta.x()) * 0.45f, static_cast<float>(delta.y()) * 0.30f);
+        }
         m_lastMousePos = event->pos();
         update();
     }
@@ -432,7 +484,7 @@ void CadViewportWidget::mouseMoveEvent(QMouseEvent* event)
 
 void CadViewportWidget::mouseReleaseEvent(QMouseEvent* event)
 {
-    if (m_dragging && (event->pos() - m_pressMousePos).manhattanLength() < 4) {
+    if (m_dragging && !m_moveDragging && (event->pos() - m_pressMousePos).manhattanLength() < 4) {
         const cad::core::EntityId hit = m_engine.hitTestEntity(static_cast<float>(event->position().x()), static_cast<float>(event->position().y()));
         if (hit.isValid()) {
             m_engine.selectEntity(hit);
@@ -443,6 +495,7 @@ void CadViewportWidget::mouseReleaseEvent(QMouseEvent* event)
         update();
     }
     m_dragging = false;
+    m_moveDragging = false;
     QWidget::mouseReleaseEvent(event);
 }
 
@@ -451,4 +504,33 @@ void CadViewportWidget::wheelEvent(QWheelEvent* event)
     m_engine.zoom(event->angleDelta().y() > 0 ? 0.08f : -0.08f);
     update();
     event->accept();
+}
+
+void CadViewportWidget::keyPressEvent(QKeyEvent* event)
+{
+    switch (event->key()) {
+    case Qt::Key_G:
+        m_gridSnapEnabled = !m_gridSnapEnabled;
+        event->accept();
+        return;
+    case Qt::Key_X:
+        m_moveAxis = MoveAxis::X;
+        event->accept();
+        return;
+    case Qt::Key_Y:
+        m_moveAxis = MoveAxis::Y;
+        event->accept();
+        return;
+    case Qt::Key_Z:
+        m_moveAxis = MoveAxis::Z;
+        event->accept();
+        return;
+    case Qt::Key_A:
+        m_moveAxis = MoveAxis::FreeXZ;
+        event->accept();
+        return;
+    default:
+        break;
+    }
+    QWidget::keyPressEvent(event);
 }

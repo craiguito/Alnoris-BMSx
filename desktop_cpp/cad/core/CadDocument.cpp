@@ -9,7 +9,7 @@ namespace {
 template <typename T>
 battery::EntitySummary summaryFromEntity(const T& entity)
 {
-    return {entity.id, entity.kind, entity.label, entity.visible};
+    return {entity.id, entity.kind, entity.label, entity.visible, entity.parent_id, entity.simulation_group_index};
 }
 
 template <typename T>
@@ -37,6 +37,8 @@ void CadDocument::clear()
 {
     m_selection.clear();
     m_entityIndex.clear();
+    m_packs.clear();
+    m_cellGroups.clear();
     m_cells.clear();
     m_busbars.clear();
     m_coolingPlates.clear();
@@ -47,6 +49,28 @@ void CadDocument::clear()
 EntityId CadDocument::allocateEntityId()
 {
     return EntityId{m_nextEntityId++};
+}
+
+battery::BatteryPackEntity& CadDocument::addPack(battery::BatteryPackEntity entity)
+{
+    if (!entity.id.isValid()) {
+        entity.id = allocateEntityId();
+    }
+    entity.kind = battery::EntityKind::BatteryPack;
+    m_packs.push_back(std::move(entity));
+    indexEntity(m_packs.back().id, battery::EntityKind::BatteryPack, m_packs.size() - 1);
+    return m_packs.back();
+}
+
+battery::CellGroupEntity& CadDocument::addCellGroup(battery::CellGroupEntity entity)
+{
+    if (!entity.id.isValid()) {
+        entity.id = allocateEntityId();
+    }
+    entity.kind = battery::EntityKind::CellGroup;
+    m_cellGroups.push_back(std::move(entity));
+    indexEntity(m_cellGroups.back().id, battery::EntityKind::CellGroup, m_cellGroups.size() - 1);
+    return m_cellGroups.back();
 }
 
 battery::CellEntity& CadDocument::addCell(battery::CellEntity entity)
@@ -106,12 +130,22 @@ battery::PackEnclosureEntity& CadDocument::addPackEnclosure(battery::PackEnclosu
 
 bool CadDocument::removeEntity(EntityId id)
 {
+    for (EntityId child_id : childIds(id)) {
+        removeEntity(child_id);
+    }
+
     const EntityLocator* locator = findLocator(id);
     if (locator == nullptr) {
         return false;
     }
 
     switch (locator->kind) {
+    case battery::EntityKind::BatteryPack:
+        m_packs.erase(m_packs.begin() + static_cast<std::ptrdiff_t>(locator->index));
+        break;
+    case battery::EntityKind::CellGroup:
+        m_cellGroups.erase(m_cellGroups.begin() + static_cast<std::ptrdiff_t>(locator->index));
+        break;
     case battery::EntityKind::Cell:
         m_cells.erase(m_cells.begin() + static_cast<std::ptrdiff_t>(locator->index));
         break;
@@ -138,6 +172,16 @@ bool CadDocument::removeEntity(EntityId id)
 
 bool CadDocument::moveEntity(EntityId id, const math::Vec3& delta)
 {
+    if (battery::BatteryPackEntity* pack = findPack(id)) {
+        pack->center = math::add(pack->center, delta);
+        pack->property_modes.position = battery::PropertyMode::UserOverride;
+        return true;
+    }
+    if (battery::CellGroupEntity* group = findCellGroup(id)) {
+        group->center = math::add(group->center, delta);
+        group->property_modes.position = battery::PropertyMode::UserOverride;
+        return true;
+    }
     if (battery::CellEntity* cell = findCell(id)) {
         cell->position = math::add(cell->position, delta);
         cell->property_modes.position = battery::PropertyMode::UserOverride;
@@ -168,6 +212,16 @@ bool CadDocument::moveEntity(EntityId id, const math::Vec3& delta)
 
 bool CadDocument::setEntityPosition(EntityId id, const math::Vec3& position)
 {
+    if (battery::BatteryPackEntity* pack = findPack(id)) {
+        pack->center = position;
+        pack->property_modes.position = battery::PropertyMode::UserOverride;
+        return true;
+    }
+    if (battery::CellGroupEntity* group = findCellGroup(id)) {
+        group->center = position;
+        group->property_modes.position = battery::PropertyMode::UserOverride;
+        return true;
+    }
     if (battery::CellEntity* cell = findCell(id)) {
         cell->position = position;
         cell->property_modes.position = battery::PropertyMode::UserOverride;
@@ -198,6 +252,16 @@ bool CadDocument::setEntityPosition(EntityId id, const math::Vec3& position)
 
 bool CadDocument::setEntityLabel(EntityId id, std::string label)
 {
+    if (battery::BatteryPackEntity* pack = findPack(id)) {
+        pack->label = std::move(label);
+        pack->property_modes.label = battery::PropertyMode::UserOverride;
+        return true;
+    }
+    if (battery::CellGroupEntity* group = findCellGroup(id)) {
+        group->label = std::move(label);
+        group->property_modes.label = battery::PropertyMode::UserOverride;
+        return true;
+    }
     if (battery::CellEntity* cell = findCell(id)) {
         cell->label = std::move(label);
         cell->property_modes.label = battery::PropertyMode::UserOverride;
@@ -228,6 +292,12 @@ bool CadDocument::setEntityLabel(EntityId id, std::string label)
 
 bool CadDocument::setEntityVisibility(EntityId id, bool visible)
 {
+    if (setVisibility(findPack(id), visible)) {
+        return true;
+    }
+    if (setVisibility(findCellGroup(id), visible)) {
+        return true;
+    }
     if (setVisibility(findCell(id), visible)) {
         return true;
     }
@@ -521,6 +591,14 @@ bool CadDocument::applyEnclosureProperties(EntityId id, const battery::PackEnclo
 
 bool CadDocument::resetEntityPositionToGenerated(EntityId id)
 {
+    if (battery::BatteryPackEntity* pack = findPack(id)) {
+        pack->property_modes.position = battery::PropertyMode::Generated;
+        return true;
+    }
+    if (battery::CellGroupEntity* group = findCellGroup(id)) {
+        group->property_modes.position = battery::PropertyMode::Generated;
+        return true;
+    }
     if (battery::CellEntity* cell = findCell(id)) {
         cell->property_modes.position = battery::PropertyMode::Generated;
         return true;
@@ -546,6 +624,14 @@ bool CadDocument::resetEntityPositionToGenerated(EntityId id)
 
 bool CadDocument::resetEntityGeometryToGenerated(EntityId id)
 {
+    if (battery::BatteryPackEntity* pack = findPack(id)) {
+        pack->property_modes.geometry = battery::PropertyMode::Generated;
+        return true;
+    }
+    if (battery::CellGroupEntity* group = findCellGroup(id)) {
+        group->property_modes.geometry = battery::PropertyMode::Generated;
+        return true;
+    }
     if (battery::CellEntity* cell = findCell(id)) {
         cell->property_modes.geometry = battery::PropertyMode::Generated;
         return true;
@@ -571,6 +657,14 @@ bool CadDocument::resetEntityGeometryToGenerated(EntityId id)
 
 bool CadDocument::resetEntityLabelToGenerated(EntityId id)
 {
+    if (battery::BatteryPackEntity* pack = findPack(id)) {
+        pack->property_modes.label = battery::PropertyMode::Generated;
+        return true;
+    }
+    if (battery::CellGroupEntity* group = findCellGroup(id)) {
+        group->property_modes.label = battery::PropertyMode::Generated;
+        return true;
+    }
     if (battery::CellEntity* cell = findCell(id)) {
         cell->property_modes.label = battery::PropertyMode::Generated;
         return true;
@@ -605,6 +699,42 @@ std::optional<battery::EntityKind> CadDocument::entityKind(EntityId id) const
         return locator->kind;
     }
     return std::nullopt;
+}
+
+battery::BatteryPackEntity* CadDocument::findPack(EntityId id)
+{
+    const EntityLocator* locator = findLocator(id);
+    if (locator == nullptr || locator->kind != battery::EntityKind::BatteryPack) {
+        return nullptr;
+    }
+    return &m_packs[locator->index];
+}
+
+const battery::BatteryPackEntity* CadDocument::findPack(EntityId id) const
+{
+    const EntityLocator* locator = findLocator(id);
+    if (locator == nullptr || locator->kind != battery::EntityKind::BatteryPack) {
+        return nullptr;
+    }
+    return &m_packs[locator->index];
+}
+
+battery::CellGroupEntity* CadDocument::findCellGroup(EntityId id)
+{
+    const EntityLocator* locator = findLocator(id);
+    if (locator == nullptr || locator->kind != battery::EntityKind::CellGroup) {
+        return nullptr;
+    }
+    return &m_cellGroups[locator->index];
+}
+
+const battery::CellGroupEntity* CadDocument::findCellGroup(EntityId id) const
+{
+    const EntityLocator* locator = findLocator(id);
+    if (locator == nullptr || locator->kind != battery::EntityKind::CellGroup) {
+        return nullptr;
+    }
+    return &m_cellGroups[locator->index];
 }
 
 battery::CellEntity* CadDocument::findCell(EntityId id)
@@ -699,6 +829,12 @@ const battery::PackEnclosureEntity* CadDocument::findEnclosure(EntityId id) cons
 
 std::optional<battery::EntityRecord> CadDocument::snapshotEntity(EntityId id) const
 {
+    if (const battery::BatteryPackEntity* pack = findPack(id)) {
+        return *pack;
+    }
+    if (const battery::CellGroupEntity* group = findCellGroup(id)) {
+        return *group;
+    }
     if (const battery::CellEntity* cell = findCell(id)) {
         return *cell;
     }
@@ -719,6 +855,12 @@ std::optional<battery::EntityRecord> CadDocument::snapshotEntity(EntityId id) co
 
 std::optional<battery::EntitySummary> CadDocument::getEntitySummary(EntityId id) const
 {
+    if (const battery::BatteryPackEntity* pack = findPack(id)) {
+        return summaryFromEntity(*pack);
+    }
+    if (const battery::CellGroupEntity* group = findCellGroup(id)) {
+        return summaryFromEntity(*group);
+    }
     if (const battery::CellEntity* cell = findCell(id)) {
         return summaryFromEntity(*cell);
     }
@@ -820,9 +962,111 @@ std::optional<battery::PackEnclosureProperties> CadDocument::getEnclosurePropert
     };
 }
 
+std::vector<EntityId> CadDocument::childIds(EntityId parent_id) const
+{
+    std::vector<EntityId> children;
+    auto collect = [&children, parent_id](const auto& entities) {
+        for (const auto& entity : entities) {
+            if (entity.parent_id == parent_id) {
+                children.push_back(entity.id);
+            }
+        }
+    };
+    collect(m_packs);
+    collect(m_moduleBoundaries);
+    collect(m_cellGroups);
+    collect(m_cells);
+    collect(m_busbars);
+    collect(m_coolingPlates);
+    collect(m_packEnclosures);
+    return children;
+}
+
+std::vector<EntityId> CadDocument::subtreeIds(EntityId root_id) const
+{
+    std::vector<EntityId> ids;
+    if (!hasEntity(root_id)) {
+        return ids;
+    }
+    ids.push_back(root_id);
+    for (EntityId child_id : childIds(root_id)) {
+        const std::vector<EntityId> child_subtree = subtreeIds(child_id);
+        ids.insert(ids.end(), child_subtree.begin(), child_subtree.end());
+    }
+    return ids;
+}
+
+math::Vec3 CadDocument::worldPosition(EntityId id) const
+{
+    auto accumulate = [this](const auto* entity, const math::Vec3& local) -> math::Vec3 {
+        if (entity == nullptr) {
+            return {};
+        }
+        if (!entity->parent_id.isValid()) {
+            return local;
+        }
+        return math::add(local, worldPosition(entity->parent_id));
+    };
+
+    if (const auto* pack = findPack(id)) {
+        return accumulate(pack, pack->center);
+    }
+    if (const auto* module = findModuleBoundary(id)) {
+        return accumulate(module, module->center);
+    }
+    if (const auto* group = findCellGroup(id)) {
+        return accumulate(group, group->center);
+    }
+    if (const auto* cell = findCell(id)) {
+        return accumulate(cell, cell->position);
+    }
+    if (const auto* busbar = findBusbar(id)) {
+        return accumulate(busbar, busbar->center);
+    }
+    if (const auto* plate = findCoolingPlate(id)) {
+        return accumulate(plate, plate->center);
+    }
+    if (const auto* enclosure = findEnclosure(id)) {
+        return accumulate(enclosure, enclosure->center);
+    }
+    return {};
+}
+
+battery::BoundingBox CadDocument::worldBounds(EntityId id) const
+{
+    if (const auto* pack = findPack(id)) {
+        return {worldPosition(id), pack->size};
+    }
+    if (const auto* module = findModuleBoundary(id)) {
+        return {worldPosition(id), module->size};
+    }
+    if (const auto* group = findCellGroup(id)) {
+        return {worldPosition(id), group->size};
+    }
+    if (const auto* cell = findCell(id)) {
+        return {worldPosition(id), {cell->radius * 2.0f, cell->height, cell->radius * 2.0f}};
+    }
+    if (const auto* busbar = findBusbar(id)) {
+        return {worldPosition(id), busbar->size};
+    }
+    if (const auto* plate = findCoolingPlate(id)) {
+        return {worldPosition(id), plate->size};
+    }
+    if (const auto* enclosure = findEnclosure(id)) {
+        return {worldPosition(id), enclosure->size};
+    }
+    return {};
+}
+
 void CadDocument::rebuildIndex()
 {
     m_entityIndex.clear();
+    for (std::size_t i = 0; i < m_packs.size(); ++i) {
+        indexEntity(m_packs[i].id, battery::EntityKind::BatteryPack, i);
+    }
+    for (std::size_t i = 0; i < m_cellGroups.size(); ++i) {
+        indexEntity(m_cellGroups[i].id, battery::EntityKind::CellGroup, i);
+    }
     for (std::size_t i = 0; i < m_cells.size(); ++i) {
         indexEntity(m_cells[i].id, battery::EntityKind::Cell, i);
     }
@@ -862,7 +1106,11 @@ bool CadDocument::restoreEntity(const battery::EntityRecord& entity)
     return std::visit([this](const auto& value) -> bool {
         using T = std::decay_t<decltype(value)>;
         if (hasEntity(value.id)) {
-            if constexpr (std::is_same_v<T, battery::CellEntity>) {
+            if constexpr (std::is_same_v<T, battery::BatteryPackEntity>) {
+                m_packs[findLocator(value.id)->index] = value;
+            } else if constexpr (std::is_same_v<T, battery::CellGroupEntity>) {
+                m_cellGroups[findLocator(value.id)->index] = value;
+            } else if constexpr (std::is_same_v<T, battery::CellEntity>) {
                 m_cells[findLocator(value.id)->index] = value;
             } else if constexpr (std::is_same_v<T, battery::BusbarEntity>) {
                 m_busbars[findLocator(value.id)->index] = value;
@@ -877,7 +1125,11 @@ bool CadDocument::restoreEntity(const battery::EntityRecord& entity)
             return true;
         }
 
-        if constexpr (std::is_same_v<T, battery::CellEntity>) {
+        if constexpr (std::is_same_v<T, battery::BatteryPackEntity>) {
+            addPack(value);
+        } else if constexpr (std::is_same_v<T, battery::CellGroupEntity>) {
+            addCellGroup(value);
+        } else if constexpr (std::is_same_v<T, battery::CellEntity>) {
             addCell(value);
         } else if constexpr (std::is_same_v<T, battery::BusbarEntity>) {
             addBusbar(value);

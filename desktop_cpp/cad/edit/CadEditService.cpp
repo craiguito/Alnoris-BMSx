@@ -19,12 +19,21 @@ float packDepth(const battery::PackLayoutConfig& config)
 
 math::Vec3 generatedCellPosition(const battery::PackLayoutConfig& config, int series_index, int parallel_index)
 {
-    const int series_count = std::max(1, config.cells_in_series);
     const int parallel_count = std::max(1, config.cells_in_parallel);
+    return {
+        0.0f,
+        0.0f,
+        (parallel_index - (parallel_count - 1) / 2.0f) * config.z_spacing
+    };
+}
+
+math::Vec3 generatedGroupPosition(const battery::PackLayoutConfig& config, int series_index)
+{
+    const int series_count = std::max(1, config.cells_in_series);
     return {
         (series_index - (series_count - 1) / 2.0f) * config.x_spacing,
         0.0f,
-        (parallel_index - (parallel_count - 1) / 2.0f) * config.z_spacing
+        0.0f
     };
 }
 
@@ -97,6 +106,16 @@ bool CadEditService::applyEnclosureProperties(core::CadDocument& document, core:
 
 bool CadEditService::resetEntityPositionToGenerated(core::CadDocument& document, const battery::PackLayoutConfig& layout, core::EntityId entity_id)
 {
+    if (battery::BatteryPackEntity* pack = document.findPack(entity_id)) {
+        pack->center = {0.0f, 0.0f, 0.0f};
+        pack->property_modes.position = battery::PropertyMode::Generated;
+        return true;
+    }
+    if (battery::CellGroupEntity* group = document.findCellGroup(entity_id)) {
+        group->center = generatedGroupPosition(layout, group->series_index);
+        group->property_modes.position = battery::PropertyMode::Generated;
+        return true;
+    }
     if (battery::CellEntity* cell = document.findCell(entity_id)) {
         cell->position = generatedCellPosition(layout, cell->series_index, cell->parallel_index);
         cell->property_modes.position = battery::PropertyMode::Generated;
@@ -128,6 +147,16 @@ bool CadEditService::resetEntityPositionToGenerated(core::CadDocument& document,
 
 bool CadEditService::resetEntityGeometryToGenerated(core::CadDocument& document, const battery::PackLayoutConfig& layout, core::EntityId entity_id)
 {
+    if (battery::BatteryPackEntity* pack = document.findPack(entity_id)) {
+        pack->size = {packWidth(layout) + 140.0f, layout.cell_height + 92.0f, packDepth(layout) + 136.0f};
+        pack->property_modes.geometry = battery::PropertyMode::Generated;
+        return true;
+    }
+    if (battery::CellGroupEntity* group = document.findCellGroup(entity_id)) {
+        group->size = {std::max(layout.x_spacing * 0.78f, layout.cell_radius * 2.8f), layout.cell_height + 24.0f, std::max(packDepth(layout) + 28.0f, layout.cell_radius * 2.8f)};
+        group->property_modes.geometry = battery::PropertyMode::Generated;
+        return true;
+    }
     if (battery::CellEntity* cell = document.findCell(entity_id)) {
         cell->radius = layout.cell_radius;
         cell->height = layout.cell_height;
@@ -160,8 +189,18 @@ bool CadEditService::resetEntityGeometryToGenerated(core::CadDocument& document,
 
 bool CadEditService::resetEntityLabelToGenerated(core::CadDocument& document, core::EntityId entity_id)
 {
+    if (battery::BatteryPackEntity* pack = document.findPack(entity_id)) {
+        pack->label = "Battery pack";
+        pack->property_modes.label = battery::PropertyMode::Generated;
+        return true;
+    }
+    if (battery::CellGroupEntity* group = document.findCellGroup(entity_id)) {
+        group->label = "Cell group";
+        group->property_modes.label = battery::PropertyMode::Generated;
+        return true;
+    }
     if (battery::CellEntity* cell = document.findCell(entity_id)) {
-        cell->label = "Cell";
+        cell->label = "Battery cell";
         cell->property_modes.label = battery::PropertyMode::Generated;
         return true;
     }
@@ -171,17 +210,17 @@ bool CadEditService::resetEntityLabelToGenerated(core::CadDocument& document, co
         return true;
     }
     if (battery::CoolingPlateEntity* plate = document.findCoolingPlate(entity_id)) {
-        plate->label = "Cooling plate";
+        plate->label = "Cooling channel";
         plate->property_modes.label = battery::PropertyMode::Generated;
         return true;
     }
     if (battery::ModuleBoundaryEntity* boundary = document.findModuleBoundary(entity_id)) {
-        boundary->label = "Module boundary";
+        boundary->label = "Battery module";
         boundary->property_modes.label = battery::PropertyMode::Generated;
         return true;
     }
     if (battery::PackEnclosureEntity* enclosure = document.findEnclosure(entity_id)) {
-        enclosure->label = "Pack enclosure";
+        enclosure->label = "Enclosure";
         enclosure->property_modes.label = battery::PropertyMode::Generated;
         return true;
     }

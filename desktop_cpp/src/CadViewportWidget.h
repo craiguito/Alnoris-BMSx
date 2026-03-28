@@ -10,6 +10,7 @@
 
 class QMouseEvent;
 class QPaintEvent;
+class QKeyEvent;
 class QWheelEvent;
 
 class CadViewportWidget : public QWidget
@@ -54,11 +55,24 @@ protected:
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
 
 private:
+    enum class MoveAxis
+    {
+        FreeXZ,
+        X,
+        Y,
+        Z
+    };
+
     cad::CadEngine m_engine;
     QColor m_backgroundColor;
     QPoint m_pressMousePos;
     QPoint m_lastMousePos;
     bool m_dragging = false;
+    bool m_moveDragging = false;
+    bool m_gridSnapEnabled = true;
+    float m_gridSnapStep = 14.0f;
+    MoveAxis m_moveAxis = MoveAxis::FreeXZ;
 };

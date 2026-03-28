@@ -30,6 +30,8 @@ public:
 
     [[nodiscard]] EntityId allocateEntityId();
 
+    battery::BatteryPackEntity& addPack(battery::BatteryPackEntity entity);
+    battery::CellGroupEntity& addCellGroup(battery::CellGroupEntity entity);
     battery::CellEntity& addCell(battery::CellEntity entity);
     battery::BusbarEntity& addBusbar(battery::BusbarEntity entity);
     battery::CoolingPlateEntity& addCoolingPlate(battery::CoolingPlateEntity entity);
@@ -67,6 +69,10 @@ public:
 
     [[nodiscard]] bool hasEntity(EntityId id) const;
     [[nodiscard]] std::optional<battery::EntityKind> entityKind(EntityId id) const;
+    [[nodiscard]] battery::BatteryPackEntity* findPack(EntityId id);
+    [[nodiscard]] const battery::BatteryPackEntity* findPack(EntityId id) const;
+    [[nodiscard]] battery::CellGroupEntity* findCellGroup(EntityId id);
+    [[nodiscard]] const battery::CellGroupEntity* findCellGroup(EntityId id) const;
     [[nodiscard]] battery::CellEntity* findCell(EntityId id);
     [[nodiscard]] const battery::CellEntity* findCell(EntityId id) const;
     [[nodiscard]] battery::BusbarEntity* findBusbar(EntityId id);
@@ -86,7 +92,16 @@ public:
     [[nodiscard]] std::optional<battery::CoolingPlateProperties> getCoolingPlateProperties(EntityId id) const;
     [[nodiscard]] std::optional<battery::ModuleBoundaryProperties> getModuleBoundaryProperties(EntityId id) const;
     [[nodiscard]] std::optional<battery::PackEnclosureProperties> getEnclosureProperties(EntityId id) const;
+    [[nodiscard]] std::vector<EntityId> childIds(EntityId parent_id) const;
+    [[nodiscard]] std::vector<EntityId> subtreeIds(EntityId root_id) const;
+    [[nodiscard]] battery::BoundingBox worldBounds(EntityId id) const;
+    [[nodiscard]] math::Vec3 worldPosition(EntityId id) const;
 
+    [[nodiscard]] const std::vector<battery::BatteryPackEntity>& packs() const { return m_packs; }
+    [[nodiscard]] const std::vector<battery::CellGroupEntity>& cellGroups() const { return m_cellGroups; }
+    [[nodiscard]] const std::vector<battery::ModuleBoundaryEntity>& modules() const { return m_moduleBoundaries; }
+    [[nodiscard]] const std::vector<battery::CoolingPlateEntity>& coolingChannels() const { return m_coolingPlates; }
+    [[nodiscard]] const std::vector<battery::PackEnclosureEntity>& enclosures() const { return m_packEnclosures; }
     [[nodiscard]] const std::vector<battery::CellEntity>& cells() const { return m_cells; }
     [[nodiscard]] const std::vector<battery::BusbarEntity>& busbars() const { return m_busbars; }
     [[nodiscard]] const std::vector<battery::CoolingPlateEntity>& coolingPlates() const { return m_coolingPlates; }
@@ -110,6 +125,8 @@ private:
     Metadata m_metadata;
     SelectionState m_selection;
     std::unordered_map<EntityId, EntityLocator, EntityIdHash> m_entityIndex;
+    std::vector<battery::BatteryPackEntity> m_packs;
+    std::vector<battery::CellGroupEntity> m_cellGroups;
     std::vector<battery::CellEntity> m_cells;
     std::vector<battery::BusbarEntity> m_busbars;
     std::vector<battery::CoolingPlateEntity> m_coolingPlates;

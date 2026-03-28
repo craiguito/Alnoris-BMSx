@@ -1257,6 +1257,18 @@ void MainWindow::refreshCadProperties()
     setRowVisible(m_cadThicknessLabel, m_cadThickness, false);
 
     switch (entity.kind) {
+    case cad::battery::EntityKind::BatteryPack:
+        m_cadSelectedType->setText("Battery Pack");
+        m_cadPosX->setValue(0.0);
+        m_cadPosY->setValue(0.0);
+        m_cadPosZ->setValue(0.0);
+        break;
+    case cad::battery::EntityKind::CellGroup:
+        m_cadSelectedType->setText("Cell Group");
+        m_cadPosX->setValue(0.0);
+        m_cadPosY->setValue(0.0);
+        m_cadPosZ->setValue(0.0);
+        break;
     case cad::battery::EntityKind::Cell: {
         m_cadSelectedType->setText("Cell");
         const auto properties = m_cadWorkspaceView->selectedCellProperties();
@@ -1290,7 +1302,7 @@ void MainWindow::refreshCadProperties()
         break;
     }
     case cad::battery::EntityKind::CoolingPlate: {
-        m_cadSelectedType->setText("Cooling Plate");
+        m_cadSelectedType->setText("Cooling Channel");
         const auto properties = m_cadWorkspaceView->selectedCoolingPlateProperties();
         if (!properties.has_value()) {
             break;
@@ -1307,7 +1319,7 @@ void MainWindow::refreshCadProperties()
         break;
     }
     case cad::battery::EntityKind::ModuleBoundary: {
-        m_cadSelectedType->setText("Module Boundary");
+        m_cadSelectedType->setText("Battery Module");
         const auto properties = m_cadWorkspaceView->selectedModuleBoundaryProperties();
         if (!properties.has_value()) {
             break;
@@ -1324,7 +1336,7 @@ void MainWindow::refreshCadProperties()
         break;
     }
     case cad::battery::EntityKind::PackEnclosure: {
-        m_cadSelectedType->setText("Pack Enclosure");
+        m_cadSelectedType->setText("Enclosure");
         const auto properties = m_cadWorkspaceView->selectedEnclosureProperties();
         if (!properties.has_value()) {
             break;
@@ -1360,6 +1372,16 @@ void MainWindow::applyCadPropertyChanges()
     m_isSyncingCadInspector = true;
 
     switch (summary->kind) {
+    case cad::battery::EntityKind::BatteryPack:
+    case cad::battery::EntityKind::CellGroup: {
+        if (QString::fromStdString(summary->label) != m_cadLabelEdit->text()) {
+            m_cadWorkspaceView->applyRenameToSelected(m_cadLabelEdit->text());
+        }
+        if (summary->visible != m_cadVisibleCheck->isChecked()) {
+            m_cadWorkspaceView->applySelectedVisibility(m_cadVisibleCheck->isChecked());
+        }
+        break;
+    }
     case cad::battery::EntityKind::Cell: {
         const auto properties = m_cadWorkspaceView->selectedCellProperties();
         if (!properties.has_value()) {
