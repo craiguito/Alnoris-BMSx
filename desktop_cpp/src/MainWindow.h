@@ -10,10 +10,13 @@
 #include <QVariantList>
 
 class QComboBox;
+class QCheckBox;
 class QDoubleSpinBox;
 class QFrame;
+class QGroupBox;
 class QPlainTextEdit;
 class QLabel;
+class QLineEdit;
 class QPushButton;
 class QTabWidget;
 
@@ -32,6 +35,13 @@ private slots:
     void loadProject();
     void applyReferencePreset(int index);
     void openCustomizationDialog();
+    void refreshCadProperties();
+    void applyCadPropertyChanges();
+    void undoCadEdit();
+    void redoCadEdit();
+    void resetCadPosition();
+    void resetCadGeometry();
+    void resetCadLabel();
 
 private:
     struct ThemeSettings
@@ -51,9 +61,11 @@ private:
     QString formatTraceLines(const QJsonObject& payload) const;
     ChartWidget* createGraphWidget();
     QFrame* createWorkspacePanel();
+    QGroupBox* createCadPropertiesPanel();
     void applyTheme();
     void applyChartTheme(ChartWidget* graphWidget);
     void updateCadWorkspace();
+    void setCadEditorEnabled(bool enabled);
     charts::Series toChartSeries(const QJsonArray& timeSeries, const QString& metricKey, const QString& name, const QColor& color, bool dashed = false) const;
     void populateChart(ChartWidget* graphWidget, const QJsonArray& timeSeries, const QString& metricKey, const QString& title, const QString& yTitle);
     void populateComparisonChart(
@@ -91,6 +103,34 @@ private:
     ChartWidget* m_socChartView = nullptr;
     ChartWidget* m_powerChartView = nullptr;
     CadViewportWidget* m_cadWorkspaceView = nullptr;
+    QLabel* m_cadSelectedType = nullptr;
+    QLabel* m_cadSelectedId = nullptr;
+    QLineEdit* m_cadLabelEdit = nullptr;
+    QCheckBox* m_cadVisibleCheck = nullptr;
+    QLabel* m_cadPosXLabel = nullptr;
+    QLabel* m_cadPosYLabel = nullptr;
+    QLabel* m_cadPosZLabel = nullptr;
+    QDoubleSpinBox* m_cadPosX = nullptr;
+    QDoubleSpinBox* m_cadPosY = nullptr;
+    QDoubleSpinBox* m_cadPosZ = nullptr;
+    QLabel* m_cadRadiusLabel = nullptr;
+    QLabel* m_cadHeightLabel = nullptr;
+    QDoubleSpinBox* m_cadRadius = nullptr;
+    QDoubleSpinBox* m_cadHeight = nullptr;
+    QLabel* m_cadSizeXLabel = nullptr;
+    QLabel* m_cadSizeYLabel = nullptr;
+    QLabel* m_cadSizeZLabel = nullptr;
+    QDoubleSpinBox* m_cadSizeX = nullptr;
+    QDoubleSpinBox* m_cadSizeY = nullptr;
+    QDoubleSpinBox* m_cadSizeZ = nullptr;
+    QLabel* m_cadThicknessLabel = nullptr;
+    QDoubleSpinBox* m_cadThickness = nullptr;
+    QPushButton* m_cadApplyButton = nullptr;
+    QPushButton* m_cadUndoButton = nullptr;
+    QPushButton* m_cadRedoButton = nullptr;
+    QPushButton* m_cadResetPositionButton = nullptr;
+    QPushButton* m_cadResetGeometryButton = nullptr;
+    QPushButton* m_cadResetLabelButton = nullptr;
     QPlainTextEdit* m_outputText = nullptr;
     QPushButton* m_runButton = nullptr;
     QPushButton* m_captureBaselineButton = nullptr;

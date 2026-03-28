@@ -7,6 +7,8 @@ namespace cad::picking {
 
 core::EntityId HitTester::hitTestEntity(const render::RenderPacket& packet, float x, float y) const
 {
+    const render::ScreenPickable* best_hit = nullptr;
+
     for (auto it = packet.pickables.rbegin(); it != packet.pickables.rend(); ++it) {
         const float dx = x - it->x;
         const float dy = y - it->y;
@@ -18,10 +20,14 @@ core::EntityId HitTester::hitTestEntity(const render::RenderPacket& packet, floa
             hit = (dx * dx) + (dy * dy) <= (radius * radius * 1.15f);
         }
         if (hit) {
-            return it->entity_id;
+            if (best_hit == nullptr
+                || it->selection_priority > best_hit->selection_priority
+                || (it->selection_priority == best_hit->selection_priority && it->depth > best_hit->depth)) {
+                best_hit = &(*it);
+            }
         }
     }
-    return {};
+    return best_hit != nullptr ? best_hit->entity_id : core::EntityId{};
 }
 
 } // namespace cad::picking

@@ -95,7 +95,158 @@ void CadViewportWidget::setBackgroundColor(const QColor& color)
 void CadViewportWidget::setPackConfig(const cad::battery::BatteryCadConfig& config)
 {
     m_engine.setBatteryConfig(config);
+    emit selectionChanged();
     update();
+}
+
+std::optional<cad::battery::EntitySummary> CadViewportWidget::selectedEntitySummary() const
+{
+    return m_engine.getSelectedEntitySummary();
+}
+
+std::optional<cad::battery::CellProperties> CadViewportWidget::selectedCellProperties() const
+{
+    return m_engine.getCellProperties(m_engine.selectedEntity());
+}
+
+std::optional<cad::battery::BusbarProperties> CadViewportWidget::selectedBusbarProperties() const
+{
+    return m_engine.getBusbarProperties(m_engine.selectedEntity());
+}
+
+std::optional<cad::battery::CoolingPlateProperties> CadViewportWidget::selectedCoolingPlateProperties() const
+{
+    return m_engine.getCoolingPlateProperties(m_engine.selectedEntity());
+}
+
+std::optional<cad::battery::ModuleBoundaryProperties> CadViewportWidget::selectedModuleBoundaryProperties() const
+{
+    return m_engine.getModuleBoundaryProperties(m_engine.selectedEntity());
+}
+
+std::optional<cad::battery::PackEnclosureProperties> CadViewportWidget::selectedEnclosureProperties() const
+{
+    return m_engine.getEnclosureProperties(m_engine.selectedEntity());
+}
+
+bool CadViewportWidget::applyRenameToSelected(const QString& label)
+{
+    const bool changed = m_engine.applyRenameEntity(m_engine.selectedEntity(), label.toStdString());
+    if (changed) {
+        emit selectionChanged();
+        update();
+    }
+    return changed;
+}
+
+bool CadViewportWidget::applySelectedVisibility(bool visible)
+{
+    const bool changed = m_engine.applySetEntityVisibility(m_engine.selectedEntity(), visible);
+    if (changed) {
+        emit selectionChanged();
+        update();
+    }
+    return changed;
+}
+
+bool CadViewportWidget::applySelectedCellUpdate(const cad::battery::CellPropertiesUpdate& updateData)
+{
+    const bool changed = m_engine.applyCellPropertiesUpdate(m_engine.selectedEntity(), updateData);
+    if (changed) {
+        emit selectionChanged();
+        update();
+    }
+    return changed;
+}
+
+bool CadViewportWidget::applySelectedBusbarUpdate(const cad::battery::BusbarPropertiesUpdate& updateData)
+{
+    const bool changed = m_engine.applyBusbarPropertiesUpdate(m_engine.selectedEntity(), updateData);
+    if (changed) {
+        emit selectionChanged();
+        update();
+    }
+    return changed;
+}
+
+bool CadViewportWidget::applySelectedCoolingPlateUpdate(const cad::battery::CoolingPlatePropertiesUpdate& updateData)
+{
+    const bool changed = m_engine.applyCoolingPlatePropertiesUpdate(m_engine.selectedEntity(), updateData);
+    if (changed) {
+        emit selectionChanged();
+        update();
+    }
+    return changed;
+}
+
+bool CadViewportWidget::applySelectedModuleBoundaryUpdate(const cad::battery::ModuleBoundaryPropertiesUpdate& updateData)
+{
+    const bool changed = m_engine.applyModuleBoundaryPropertiesUpdate(m_engine.selectedEntity(), updateData);
+    if (changed) {
+        emit selectionChanged();
+        update();
+    }
+    return changed;
+}
+
+bool CadViewportWidget::applySelectedEnclosureUpdate(const cad::battery::PackEnclosurePropertiesUpdate& updateData)
+{
+    const bool changed = m_engine.applyEnclosurePropertiesUpdate(m_engine.selectedEntity(), updateData);
+    if (changed) {
+        emit selectionChanged();
+        update();
+    }
+    return changed;
+}
+
+bool CadViewportWidget::undoLastEdit()
+{
+    const bool changed = m_engine.undo();
+    if (changed) {
+        emit selectionChanged();
+        update();
+    }
+    return changed;
+}
+
+bool CadViewportWidget::redoLastEdit()
+{
+    const bool changed = m_engine.redo();
+    if (changed) {
+        emit selectionChanged();
+        update();
+    }
+    return changed;
+}
+
+bool CadViewportWidget::resetSelectedPositionToGenerated()
+{
+    const bool changed = m_engine.applyResetEntityPositionToGenerated(m_engine.selectedEntity());
+    if (changed) {
+        emit selectionChanged();
+        update();
+    }
+    return changed;
+}
+
+bool CadViewportWidget::resetSelectedGeometryToGenerated()
+{
+    const bool changed = m_engine.applyResetEntityGeometryToGenerated(m_engine.selectedEntity());
+    if (changed) {
+        emit selectionChanged();
+        update();
+    }
+    return changed;
+}
+
+bool CadViewportWidget::resetSelectedLabelToGenerated()
+{
+    const bool changed = m_engine.applyResetEntityLabelToGenerated(m_engine.selectedEntity());
+    if (changed) {
+        emit selectionChanged();
+        update();
+    }
+    return changed;
 }
 
 void CadViewportWidget::paintEvent(QPaintEvent* event)
@@ -200,6 +351,7 @@ void CadViewportWidget::mouseReleaseEvent(QMouseEvent* event)
         const cad::core::EntityId hit = m_engine.hitTestEntity(static_cast<float>(event->position().x()), static_cast<float>(event->position().y()));
         if (hit.isValid()) {
             m_engine.selectEntity(hit);
+            emit selectionChanged();
             update();
         }
     }

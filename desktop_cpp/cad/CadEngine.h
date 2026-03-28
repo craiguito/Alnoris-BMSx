@@ -59,8 +59,15 @@ public:
     bool applyMoveEntity(core::EntityId entity_id, const math::Vec3& delta);
     bool applyRemoveEntity(core::EntityId entity_id);
     bool applyRenameEntity(core::EntityId entity_id, std::string label);
+    bool applySetEntityVisibility(core::EntityId entity_id, bool visible);
     bool applyCellPropertiesUpdate(core::EntityId entity_id, const battery::CellPropertiesUpdate& update);
     bool applyBusbarPropertiesUpdate(core::EntityId entity_id, const battery::BusbarPropertiesUpdate& update);
+    bool applyCoolingPlatePropertiesUpdate(core::EntityId entity_id, const battery::CoolingPlatePropertiesUpdate& update);
+    bool applyModuleBoundaryPropertiesUpdate(core::EntityId entity_id, const battery::ModuleBoundaryPropertiesUpdate& update);
+    bool applyEnclosurePropertiesUpdate(core::EntityId entity_id, const battery::PackEnclosurePropertiesUpdate& update);
+    bool applyResetEntityPositionToGenerated(core::EntityId entity_id);
+    bool applyResetEntityGeometryToGenerated(core::EntityId entity_id);
+    bool applyResetEntityLabelToGenerated(core::EntityId entity_id);
 
     [[nodiscard]] core::EntityId hitTestEntity(float x, float y) const;
 

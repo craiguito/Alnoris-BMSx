@@ -203,3 +203,82 @@ This pass makes compatible layout regeneration preserve manual user edits instea
 - TODO: bind simulation overlays more directly by entity identity
 - TODO: add dirty-flag optimization to avoid rebuilding visualization/render packets more often than necessary
 - TODO: add constraints/dimensions if a future pass needs engineering-style editing workflows
+
+## Command-Driven Property Editing Pass
+
+This pass makes command-backed editing the default user-facing path for the main supported CAD edits and adds the first real end-to-end property editing workflow in the Qt host.
+
+### Editing responsibilities moved out of `CadEngine`
+
+- A focused `cad/edit/CadEditService` now owns the document mutation helpers used by the engine for:
+  - typed property updates
+  - label and visibility changes
+  - reset-to-generated operations
+- `CadEngine` remains the main facade used by the host, but it now delegates more of the document-edit behavior instead of continuing to absorb every mutation path directly.
+
+### Command-backed editing is now the default user path
+
+- User-facing engine entry points now go through commands for the main supported operations:
+  - move entity
+  - rename entity
+  - set visibility
+  - update cell properties
+  - update busbar properties
+  - update cooling plate properties
+  - update module boundary properties
+  - update enclosure properties
+  - reset position to generated
+  - reset geometry to generated
+  - reset label to generated
+- Low-level direct mutation methods still exist underneath as internal building blocks for command execution and document plumbing.
+
+### Smarter reset-to-generated behavior
+
+- Reset operations no longer rely on a blunt rebuild-only path for the supported entity types.
+- Position, geometry, and label resets now use targeted edit-service helpers that restore generated defaults for:
+  - cells
+  - busbars
+  - cooling plates
+  - module boundaries
+  - pack enclosures
+- After those targeted resets, the engine refreshes visualization/render state instead of forcing a broader topology rebuild.
+- Future work may still deepen this with finer dirty-flag routing and explicit topology-vs-geometry refresh distinctions.
+
+### First real property-editing UI workflow
+
+- The Qt host now includes a minimal CAD properties panel.
+- A selected entity can now be:
+  - inspected
+  - renamed
+  - hidden/shown
+  - edited through typed fields
+  - reset back to generated defaults
+  - undone/redone through the command stack
+- The current workflow supports practical editing for:
+  - cells
+  - busbars
+  - cooling plates
+  - module boundaries
+  - pack enclosures
+
+### Improved selection prioritization
+
+- Pickable render data now carries a selection priority.
+- Hit testing now prefers smaller, more directly editable entities over large wrapper entities when candidates overlap.
+- Current priority order is roughly:
+  - cell
+  - busbar
+  - cooling plate
+  - module boundary
+  - pack enclosure
+
+### Remaining gaps after this pass
+
+- TODO: save/load overridden/generated property state in future JSON IO
+- TODO: add snapping, alignment tools, and object snap
+- TODO: add richer picking such as ray/AABB or GPU-based picking
+- TODO: add dirty-flag optimization for targeted document/overlay/render refresh
+- TODO: add OpenGL backend integration behind the existing render packet seam
+- TODO: add simulation overlay editing/binding by entity identity
+- TODO: add more advanced editing tools and gizmos
+- TODO: add multi-select and marquee selection

@@ -21,6 +21,7 @@ public:
 private:
     core::EntityId m_entityId{};
     math::Vec3 m_delta{};
+    std::optional<battery::EntityRecord> m_previousState;
 };
 
 class RemoveEntityCommand : public ICommand
@@ -52,6 +53,7 @@ private:
     float m_oldRadius = 0.0f;
     float m_oldHeight = 0.0f;
     bool m_capturedInitialState = false;
+    std::optional<battery::EntityRecord> m_previousState;
 };
 
 class RenameEntityCommand : public ICommand
@@ -67,6 +69,7 @@ private:
     std::string m_newLabel;
     std::string m_oldLabel;
     bool m_capturedInitialState = false;
+    std::optional<battery::EntityRecord> m_previousState;
 };
 
 class UpdateCellPropertiesCommand : public ICommand
@@ -95,6 +98,101 @@ private:
     core::EntityId m_entityId{};
     battery::BusbarPropertiesUpdate m_update;
     std::optional<battery::BusbarProperties> m_previousProperties;
+};
+
+class UpdateCoolingPlatePropertiesCommand : public ICommand
+{
+public:
+    UpdateCoolingPlatePropertiesCommand(core::EntityId entity_id, battery::CoolingPlatePropertiesUpdate update);
+
+    bool redo(CadEngine& engine) override;
+    void undo(CadEngine& engine) override;
+
+private:
+    core::EntityId m_entityId{};
+    battery::CoolingPlatePropertiesUpdate m_update;
+    std::optional<battery::CoolingPlateProperties> m_previousProperties;
+};
+
+class UpdateModuleBoundaryPropertiesCommand : public ICommand
+{
+public:
+    UpdateModuleBoundaryPropertiesCommand(core::EntityId entity_id, battery::ModuleBoundaryPropertiesUpdate update);
+
+    bool redo(CadEngine& engine) override;
+    void undo(CadEngine& engine) override;
+
+private:
+    core::EntityId m_entityId{};
+    battery::ModuleBoundaryPropertiesUpdate m_update;
+    std::optional<battery::ModuleBoundaryProperties> m_previousProperties;
+};
+
+class UpdateEnclosurePropertiesCommand : public ICommand
+{
+public:
+    UpdateEnclosurePropertiesCommand(core::EntityId entity_id, battery::PackEnclosurePropertiesUpdate update);
+
+    bool redo(CadEngine& engine) override;
+    void undo(CadEngine& engine) override;
+
+private:
+    core::EntityId m_entityId{};
+    battery::PackEnclosurePropertiesUpdate m_update;
+    std::optional<battery::PackEnclosureProperties> m_previousProperties;
+};
+
+class SetEntityVisibilityCommand : public ICommand
+{
+public:
+    SetEntityVisibilityCommand(core::EntityId entity_id, bool visible);
+
+    bool redo(CadEngine& engine) override;
+    void undo(CadEngine& engine) override;
+
+private:
+    core::EntityId m_entityId{};
+    bool m_visible = true;
+    std::optional<battery::EntityRecord> m_previousState;
+};
+
+class ResetEntityPositionToGeneratedCommand : public ICommand
+{
+public:
+    explicit ResetEntityPositionToGeneratedCommand(core::EntityId entity_id);
+
+    bool redo(CadEngine& engine) override;
+    void undo(CadEngine& engine) override;
+
+private:
+    core::EntityId m_entityId{};
+    std::optional<battery::EntityRecord> m_previousState;
+};
+
+class ResetEntityGeometryToGeneratedCommand : public ICommand
+{
+public:
+    explicit ResetEntityGeometryToGeneratedCommand(core::EntityId entity_id);
+
+    bool redo(CadEngine& engine) override;
+    void undo(CadEngine& engine) override;
+
+private:
+    core::EntityId m_entityId{};
+    std::optional<battery::EntityRecord> m_previousState;
+};
+
+class ResetEntityLabelToGeneratedCommand : public ICommand
+{
+public:
+    explicit ResetEntityLabelToGeneratedCommand(core::EntityId entity_id);
+
+    bool redo(CadEngine& engine) override;
+    void undo(CadEngine& engine) override;
+
+private:
+    core::EntityId m_entityId{};
+    std::optional<battery::EntityRecord> m_previousState;
 };
 
 } // namespace cad::commands

@@ -103,6 +103,7 @@ ProjectionResult projectPoint(const Mat4& mvp, const Vec3& p, int width, int hei
 void appendBoxPickable(
     std::vector<ScreenPickable>& pickables,
     core::EntityId entity_id,
+    int selection_priority,
     const Mat4& mvp,
     const Vec3& center,
     const Vec3& size,
@@ -149,6 +150,7 @@ void appendBoxPickable(
     pickables.push_back({
         entity_id,
         ScreenPickable::Shape::Rectangle,
+        selection_priority,
         (min_x + max_x) * 0.5f,
         (min_y + max_y) * 0.5f,
         std::max(5.0f, (max_x - min_x) * 0.5f),
@@ -213,19 +215,19 @@ RenderPacket RenderComposer::compose(
 
     for (const battery::CoolingPlateEntity& plate : document.coolingPlates()) {
         appendBox(packet.triangles, plate.center, plate.size, {0.08f, 0.16f, 0.24f});
-        appendBoxPickable(packet.pickables, plate.id, mvp, plate.center, plate.size, viewport_width, viewport_height);
+        appendBoxPickable(packet.pickables, plate.id, 300, mvp, plate.center, plate.size, viewport_width, viewport_height);
     }
     for (const battery::BusbarEntity& busbar : document.busbars()) {
         appendBox(packet.triangles, busbar.center, busbar.size, {0.86f, 0.68f, 0.30f});
-        appendBoxPickable(packet.pickables, busbar.id, mvp, busbar.center, busbar.size, viewport_width, viewport_height);
+        appendBoxPickable(packet.pickables, busbar.id, 400, mvp, busbar.center, busbar.size, viewport_width, viewport_height);
     }
     for (const battery::ModuleBoundaryEntity& boundary : document.moduleBoundaries()) {
         appendWireBox(packet.lines, boundary.center, boundary.size, {0.25f, 0.45f, 0.86f});
-        appendBoxPickable(packet.pickables, boundary.id, mvp, boundary.center, boundary.size, viewport_width, viewport_height);
+        appendBoxPickable(packet.pickables, boundary.id, 200, mvp, boundary.center, boundary.size, viewport_width, viewport_height);
     }
     for (const battery::PackEnclosureEntity& enclosure : document.packEnclosures()) {
         appendWireBox(packet.lines, enclosure.center, enclosure.size, {0.42f, 0.48f, 0.54f});
-        appendBoxPickable(packet.pickables, enclosure.id, mvp, enclosure.center, enclosure.size, viewport_width, viewport_height);
+        appendBoxPickable(packet.pickables, enclosure.id, 100, mvp, enclosure.center, enclosure.size, viewport_width, viewport_height);
     }
 
     for (const battery::CellEntity& cell : document.cells()) {
@@ -263,6 +265,7 @@ RenderPacket RenderComposer::compose(
             packet.pickables.push_back({
                 cell.id,
                 ScreenPickable::Shape::Circle,
+                500,
                 center.x,
                 center.y,
                 std::max(6.0f, std::abs(edge.x - center.x)),

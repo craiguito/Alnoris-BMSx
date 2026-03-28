@@ -26,6 +26,8 @@ qt_add_executable(alnoris_desktop WIN32
     cad/commands/CommandStack.cpp
     cad/commands/CommandStack.h
     cad/commands/ICommand.h
+    cad/edit/CadEditService.cpp
+    cad/edit/CadEditService.h
     cad/core/CadDocument.cpp
     cad/core/CadDocument.h
     cad/core/EntityId.h

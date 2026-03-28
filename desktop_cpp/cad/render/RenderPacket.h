@@ -24,6 +24,7 @@ struct ScreenPickable
 
     core::EntityId entity_id{};
     Shape shape = Shape::Circle;
+    int selection_priority = 0;
     float x = 0.0f;
     float y = 0.0f;
     float half_width = 0.0f;

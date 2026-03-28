@@ -6,6 +6,8 @@
 #include <QPoint>
 #include <QWidget>
 
+#include <optional>
+
 class QMouseEvent;
 class QPaintEvent;
 class QWheelEvent;
@@ -20,6 +22,27 @@ public:
     bool setCellMeshPath(const QString& path);
     void setBackgroundColor(const QColor& color);
     void setPackConfig(const cad::battery::BatteryCadConfig& config);
+    [[nodiscard]] std::optional<cad::battery::EntitySummary> selectedEntitySummary() const;
+    [[nodiscard]] std::optional<cad::battery::CellProperties> selectedCellProperties() const;
+    [[nodiscard]] std::optional<cad::battery::BusbarProperties> selectedBusbarProperties() const;
+    [[nodiscard]] std::optional<cad::battery::CoolingPlateProperties> selectedCoolingPlateProperties() const;
+    [[nodiscard]] std::optional<cad::battery::ModuleBoundaryProperties> selectedModuleBoundaryProperties() const;
+    [[nodiscard]] std::optional<cad::battery::PackEnclosureProperties> selectedEnclosureProperties() const;
+    bool applyRenameToSelected(const QString& label);
+    bool applySelectedVisibility(bool visible);
+    bool applySelectedCellUpdate(const cad::battery::CellPropertiesUpdate& update);
+    bool applySelectedBusbarUpdate(const cad::battery::BusbarPropertiesUpdate& update);
+    bool applySelectedCoolingPlateUpdate(const cad::battery::CoolingPlatePropertiesUpdate& update);
+    bool applySelectedModuleBoundaryUpdate(const cad::battery::ModuleBoundaryPropertiesUpdate& update);
+    bool applySelectedEnclosureUpdate(const cad::battery::PackEnclosurePropertiesUpdate& update);
+    bool undoLastEdit();
+    bool redoLastEdit();
+    bool resetSelectedPositionToGenerated();
+    bool resetSelectedGeometryToGenerated();
+    bool resetSelectedLabelToGenerated();
+
+signals:
+    void selectionChanged();
 
 protected:
     void paintEvent(QPaintEvent* event) override;

@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 
 #include <QComboBox>
+#include <QCheckBox>
 #include <QColorDialog>
 #include <QDialog>
 #include <QDialogButtonBox>
@@ -13,6 +14,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLabel>
+#include <QLineEdit>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QPlainTextEdit>
@@ -25,6 +27,7 @@
 #include <QSplitter>
 #include <QVBoxLayout>
 #include <QWidget>
+#include <functional>
 #include <string>
 
 MainWindow::MainWindow(QString projectRoot, QWidget* parent)
@@ -183,6 +186,8 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
     auto* workspacePanel = createWorkspacePanel();
     workspaceLayout->addWidget(workspacePanel);
 
+    auto* cadPropertiesGroup = createCadPropertiesPanel();
+
     auto* outputGroup = new QGroupBox("", centerSplitter);
     auto* outputLayout = new QVBoxLayout(outputGroup);
     outputLayout->setContentsMargins(12, 14, 12, 12);
@@ -198,9 +203,11 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
     outputLayout->addWidget(m_outputText, 1);
 
     centerSplitter->addWidget(workspaceGroup);
+    centerSplitter->addWidget(cadPropertiesGroup);
     centerSplitter->addWidget(outputGroup);
     centerSplitter->setStretchFactor(0, 4);
-    centerSplitter->setStretchFactor(1, 1);
+    centerSplitter->setStretchFactor(1, 2);
+    centerSplitter->setStretchFactor(2, 1);
 
     auto* chartsGroup = new QGroupBox("", centerRightSplitter);
     chartsGroup->setMinimumWidth(360);
@@ -233,6 +240,7 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
     setCentralWidget(central);
     applyTheme();
     updateCadWorkspace();
+    refreshCadProperties();
 }
 
 void MainWindow::runSimulation()
@@ -592,9 +600,105 @@ QFrame* MainWindow::createWorkspacePanel()
     m_cadWorkspaceView = new CadViewportWidget(frame);
     m_cadWorkspaceView->setCellMeshPath(QStringLiteral(ALNORIS_DEFAULT_CELL_STL));
     m_cadWorkspaceView->setBackgroundColor(m_theme.cadBackground);
+    connect(m_cadWorkspaceView, &CadViewportWidget::selectionChanged, this, &MainWindow::refreshCadProperties);
     layout->addWidget(m_cadWorkspaceView, 1);
 
     return frame;
+}
+
+QGroupBox* MainWindow::createCadPropertiesPanel()
+{
+    auto* group = new QGroupBox("", this);
+    auto* layout = new QVBoxLayout(group);
+    layout->setContentsMargins(12, 14, 12, 12);
+    auto* header = new QLabel("CAD Properties", group);
+    header->setStyleSheet("font-size:15px; font-weight:700; color:#f3f7fb;");
+    layout->addWidget(header);
+
+    auto* form = new QGridLayout();
+    form->setHorizontalSpacing(10);
+    form->setVerticalSpacing(8);
+
+    m_cadSelectedType = new QLabel("No selection", group);
+    m_cadSelectedId = new QLabel("-", group);
+    m_cadLabelEdit = new QLineEdit(group);
+    m_cadVisibleCheck = new QCheckBox("Visible", group);
+
+    m_cadPosXLabel = new QLabel("Pos X", group);
+    m_cadPosYLabel = new QLabel("Pos Y", group);
+    m_cadPosZLabel = new QLabel("Pos Z", group);
+    m_cadPosX = createDoubleSpin(0.0, -10000.0, 10000.0, 2);
+    m_cadPosY = createDoubleSpin(0.0, -10000.0, 10000.0, 2);
+    m_cadPosZ = createDoubleSpin(0.0, -10000.0, 10000.0, 2);
+
+    m_cadRadiusLabel = new QLabel("Radius", group);
+    m_cadHeightLabel = new QLabel("Height", group);
+    m_cadRadius = createDoubleSpin(0.0, 0.0, 10000.0, 2);
+    m_cadHeight = createDoubleSpin(0.0, 0.0, 10000.0, 2);
+
+    m_cadSizeXLabel = new QLabel("Size X", group);
+    m_cadSizeYLabel = new QLabel("Size Y", group);
+    m_cadSizeZLabel = new QLabel("Size Z", group);
+    m_cadSizeX = createDoubleSpin(0.0, 0.0, 10000.0, 2);
+    m_cadSizeY = createDoubleSpin(0.0, 0.0, 10000.0, 2);
+    m_cadSizeZ = createDoubleSpin(0.0, 0.0, 10000.0, 2);
+    m_cadThicknessLabel = new QLabel("Wall Thickness", group);
+    m_cadThickness = createDoubleSpin(0.0, 0.0, 10000.0, 2);
+
+    form->addWidget(new QLabel("Type", group), 0, 0);
+    form->addWidget(m_cadSelectedType, 0, 1);
+    form->addWidget(new QLabel("Entity ID", group), 1, 0);
+    form->addWidget(m_cadSelectedId, 1, 1);
+    form->addWidget(new QLabel("Label", group), 2, 0);
+    form->addWidget(m_cadLabelEdit, 2, 1);
+    form->addWidget(m_cadVisibleCheck, 3, 1);
+
+    form->addWidget(m_cadPosXLabel, 4, 0);
+    form->addWidget(m_cadPosX, 4, 1);
+    form->addWidget(m_cadPosYLabel, 5, 0);
+    form->addWidget(m_cadPosY, 5, 1);
+    form->addWidget(m_cadPosZLabel, 6, 0);
+    form->addWidget(m_cadPosZ, 6, 1);
+
+    form->addWidget(m_cadRadiusLabel, 7, 0);
+    form->addWidget(m_cadRadius, 7, 1);
+    form->addWidget(m_cadHeightLabel, 8, 0);
+    form->addWidget(m_cadHeight, 8, 1);
+
+    form->addWidget(m_cadSizeXLabel, 9, 0);
+    form->addWidget(m_cadSizeX, 9, 1);
+    form->addWidget(m_cadSizeYLabel, 10, 0);
+    form->addWidget(m_cadSizeY, 10, 1);
+    form->addWidget(m_cadSizeZLabel, 11, 0);
+    form->addWidget(m_cadSizeZ, 11, 1);
+    form->addWidget(m_cadThicknessLabel, 12, 0);
+    form->addWidget(m_cadThickness, 12, 1);
+
+    layout->addLayout(form);
+
+    auto* buttonLayout = new QGridLayout();
+    m_cadApplyButton = new QPushButton("Apply", group);
+    m_cadUndoButton = new QPushButton("Undo", group);
+    m_cadRedoButton = new QPushButton("Redo", group);
+    m_cadResetPositionButton = new QPushButton("Reset Position", group);
+    m_cadResetGeometryButton = new QPushButton("Reset Geometry", group);
+    m_cadResetLabelButton = new QPushButton("Reset Label", group);
+    connect(m_cadApplyButton, &QPushButton::clicked, this, &MainWindow::applyCadPropertyChanges);
+    connect(m_cadUndoButton, &QPushButton::clicked, this, &MainWindow::undoCadEdit);
+    connect(m_cadRedoButton, &QPushButton::clicked, this, &MainWindow::redoCadEdit);
+    connect(m_cadResetPositionButton, &QPushButton::clicked, this, &MainWindow::resetCadPosition);
+    connect(m_cadResetGeometryButton, &QPushButton::clicked, this, &MainWindow::resetCadGeometry);
+    connect(m_cadResetLabelButton, &QPushButton::clicked, this, &MainWindow::resetCadLabel);
+    buttonLayout->addWidget(m_cadApplyButton, 0, 0, 1, 2);
+    buttonLayout->addWidget(m_cadUndoButton, 1, 0);
+    buttonLayout->addWidget(m_cadRedoButton, 1, 1);
+    buttonLayout->addWidget(m_cadResetPositionButton, 2, 0);
+    buttonLayout->addWidget(m_cadResetGeometryButton, 2, 1);
+    buttonLayout->addWidget(m_cadResetLabelButton, 3, 0, 1, 2);
+    layout->addLayout(buttonLayout);
+    layout->addStretch(1);
+
+    return group;
 }
 
 void MainWindow::applyTheme()
@@ -709,6 +813,290 @@ void MainWindow::updateCadWorkspace()
         ? m_cellCapacity->value() * m_cellsInParallel->value()
         : 0.0;
     m_cadWorkspaceView->setPackConfig(cadConfig);
+}
+
+void MainWindow::setCadEditorEnabled(bool enabled)
+{
+    QWidget* widgets[] = {
+        m_cadLabelEdit,
+        m_cadVisibleCheck,
+        m_cadPosX,
+        m_cadPosY,
+        m_cadPosZ,
+        m_cadRadius,
+        m_cadHeight,
+        m_cadSizeX,
+        m_cadSizeY,
+        m_cadSizeZ,
+        m_cadThickness,
+        m_cadApplyButton,
+        m_cadUndoButton,
+        m_cadRedoButton,
+        m_cadResetPositionButton,
+        m_cadResetGeometryButton,
+        m_cadResetLabelButton
+    };
+    for (QWidget* widget : widgets) {
+        if (widget != nullptr) {
+            widget->setEnabled(enabled);
+        }
+    }
+}
+
+void MainWindow::refreshCadProperties()
+{
+    if (m_cadWorkspaceView == nullptr) {
+        return;
+    }
+
+    const auto summary = m_cadWorkspaceView->selectedEntitySummary();
+    const bool hasSelection = summary.has_value();
+    setCadEditorEnabled(hasSelection);
+
+    if (!hasSelection) {
+        m_cadSelectedType->setText("No selection");
+        m_cadSelectedId->setText("-");
+        m_cadLabelEdit->setText(QString());
+        m_cadVisibleCheck->setChecked(false);
+        return;
+    }
+
+    const cad::battery::EntitySummary& entity = *summary;
+    m_cadSelectedId->setText(QString::number(static_cast<qulonglong>(entity.id.value)));
+    m_cadLabelEdit->setText(QString::fromStdString(entity.label));
+    m_cadVisibleCheck->setChecked(entity.visible);
+
+    const auto setRowVisible = [](QWidget* label, QWidget* editor, bool visible) {
+        if (label != nullptr) {
+            label->setVisible(visible);
+        }
+        if (editor != nullptr) {
+            editor->setVisible(visible);
+        }
+    };
+
+    setRowVisible(m_cadRadiusLabel, m_cadRadius, false);
+    setRowVisible(m_cadHeightLabel, m_cadHeight, false);
+    setRowVisible(m_cadSizeXLabel, m_cadSizeX, false);
+    setRowVisible(m_cadSizeYLabel, m_cadSizeY, false);
+    setRowVisible(m_cadSizeZLabel, m_cadSizeZ, false);
+    setRowVisible(m_cadThicknessLabel, m_cadThickness, false);
+
+    switch (entity.kind) {
+    case cad::battery::EntityKind::Cell: {
+        m_cadSelectedType->setText("Cell");
+        const auto properties = m_cadWorkspaceView->selectedCellProperties();
+        if (!properties.has_value()) {
+            break;
+        }
+        m_cadPosX->setValue(properties->position.x);
+        m_cadPosY->setValue(properties->position.y);
+        m_cadPosZ->setValue(properties->position.z);
+        m_cadRadius->setValue(properties->radius);
+        m_cadHeight->setValue(properties->height);
+        setRowVisible(m_cadRadiusLabel, m_cadRadius, true);
+        setRowVisible(m_cadHeightLabel, m_cadHeight, true);
+        break;
+    }
+    case cad::battery::EntityKind::Busbar: {
+        m_cadSelectedType->setText("Busbar");
+        const auto properties = m_cadWorkspaceView->selectedBusbarProperties();
+        if (!properties.has_value()) {
+            break;
+        }
+        m_cadPosX->setValue(properties->center.x);
+        m_cadPosY->setValue(properties->center.y);
+        m_cadPosZ->setValue(properties->center.z);
+        m_cadSizeX->setValue(properties->size.x);
+        m_cadSizeY->setValue(properties->size.y);
+        m_cadSizeZ->setValue(properties->size.z);
+        setRowVisible(m_cadSizeXLabel, m_cadSizeX, true);
+        setRowVisible(m_cadSizeYLabel, m_cadSizeY, true);
+        setRowVisible(m_cadSizeZLabel, m_cadSizeZ, true);
+        break;
+    }
+    case cad::battery::EntityKind::CoolingPlate: {
+        m_cadSelectedType->setText("Cooling Plate");
+        const auto properties = m_cadWorkspaceView->selectedCoolingPlateProperties();
+        if (!properties.has_value()) {
+            break;
+        }
+        m_cadPosX->setValue(properties->center.x);
+        m_cadPosY->setValue(properties->center.y);
+        m_cadPosZ->setValue(properties->center.z);
+        m_cadSizeX->setValue(properties->size.x);
+        m_cadSizeY->setValue(properties->size.y);
+        m_cadSizeZ->setValue(properties->size.z);
+        setRowVisible(m_cadSizeXLabel, m_cadSizeX, true);
+        setRowVisible(m_cadSizeYLabel, m_cadSizeY, true);
+        setRowVisible(m_cadSizeZLabel, m_cadSizeZ, true);
+        break;
+    }
+    case cad::battery::EntityKind::ModuleBoundary: {
+        m_cadSelectedType->setText("Module Boundary");
+        const auto properties = m_cadWorkspaceView->selectedModuleBoundaryProperties();
+        if (!properties.has_value()) {
+            break;
+        }
+        m_cadPosX->setValue(properties->center.x);
+        m_cadPosY->setValue(properties->center.y);
+        m_cadPosZ->setValue(properties->center.z);
+        m_cadSizeX->setValue(properties->size.x);
+        m_cadSizeY->setValue(properties->size.y);
+        m_cadSizeZ->setValue(properties->size.z);
+        setRowVisible(m_cadSizeXLabel, m_cadSizeX, true);
+        setRowVisible(m_cadSizeYLabel, m_cadSizeY, true);
+        setRowVisible(m_cadSizeZLabel, m_cadSizeZ, true);
+        break;
+    }
+    case cad::battery::EntityKind::PackEnclosure: {
+        m_cadSelectedType->setText("Pack Enclosure");
+        const auto properties = m_cadWorkspaceView->selectedEnclosureProperties();
+        if (!properties.has_value()) {
+            break;
+        }
+        m_cadPosX->setValue(properties->center.x);
+        m_cadPosY->setValue(properties->center.y);
+        m_cadPosZ->setValue(properties->center.z);
+        m_cadSizeX->setValue(properties->size.x);
+        m_cadSizeY->setValue(properties->size.y);
+        m_cadSizeZ->setValue(properties->size.z);
+        m_cadThickness->setValue(properties->wall_thickness);
+        setRowVisible(m_cadSizeXLabel, m_cadSizeX, true);
+        setRowVisible(m_cadSizeYLabel, m_cadSizeY, true);
+        setRowVisible(m_cadSizeZLabel, m_cadSizeZ, true);
+        setRowVisible(m_cadThicknessLabel, m_cadThickness, true);
+        break;
+    }
+    }
+}
+
+void MainWindow::applyCadPropertyChanges()
+{
+    if (m_cadWorkspaceView == nullptr) {
+        return;
+    }
+
+    const auto summary = m_cadWorkspaceView->selectedEntitySummary();
+    if (!summary.has_value()) {
+        return;
+    }
+
+    m_cadWorkspaceView->applyRenameToSelected(m_cadLabelEdit->text());
+    m_cadWorkspaceView->applySelectedVisibility(m_cadVisibleCheck->isChecked());
+
+    switch (summary->kind) {
+    case cad::battery::EntityKind::Cell: {
+        cad::battery::CellPropertiesUpdate update;
+        update.position = cad::math::Vec3{
+            static_cast<float>(m_cadPosX->value()),
+            static_cast<float>(m_cadPosY->value()),
+            static_cast<float>(m_cadPosZ->value())
+        };
+        update.radius = static_cast<float>(m_cadRadius->value());
+        update.height = static_cast<float>(m_cadHeight->value());
+        m_cadWorkspaceView->applySelectedCellUpdate(update);
+        break;
+    }
+    case cad::battery::EntityKind::Busbar: {
+        cad::battery::BusbarPropertiesUpdate update;
+        update.center = cad::math::Vec3{
+            static_cast<float>(m_cadPosX->value()),
+            static_cast<float>(m_cadPosY->value()),
+            static_cast<float>(m_cadPosZ->value())
+        };
+        update.size = cad::math::Vec3{
+            static_cast<float>(m_cadSizeX->value()),
+            static_cast<float>(m_cadSizeY->value()),
+            static_cast<float>(m_cadSizeZ->value())
+        };
+        m_cadWorkspaceView->applySelectedBusbarUpdate(update);
+        break;
+    }
+    case cad::battery::EntityKind::CoolingPlate: {
+        cad::battery::CoolingPlatePropertiesUpdate update;
+        update.center = cad::math::Vec3{
+            static_cast<float>(m_cadPosX->value()),
+            static_cast<float>(m_cadPosY->value()),
+            static_cast<float>(m_cadPosZ->value())
+        };
+        update.size = cad::math::Vec3{
+            static_cast<float>(m_cadSizeX->value()),
+            static_cast<float>(m_cadSizeY->value()),
+            static_cast<float>(m_cadSizeZ->value())
+        };
+        m_cadWorkspaceView->applySelectedCoolingPlateUpdate(update);
+        break;
+    }
+    case cad::battery::EntityKind::ModuleBoundary: {
+        cad::battery::ModuleBoundaryPropertiesUpdate update;
+        update.center = cad::math::Vec3{
+            static_cast<float>(m_cadPosX->value()),
+            static_cast<float>(m_cadPosY->value()),
+            static_cast<float>(m_cadPosZ->value())
+        };
+        update.size = cad::math::Vec3{
+            static_cast<float>(m_cadSizeX->value()),
+            static_cast<float>(m_cadSizeY->value()),
+            static_cast<float>(m_cadSizeZ->value())
+        };
+        m_cadWorkspaceView->applySelectedModuleBoundaryUpdate(update);
+        break;
+    }
+    case cad::battery::EntityKind::PackEnclosure: {
+        cad::battery::PackEnclosurePropertiesUpdate update;
+        update.center = cad::math::Vec3{
+            static_cast<float>(m_cadPosX->value()),
+            static_cast<float>(m_cadPosY->value()),
+            static_cast<float>(m_cadPosZ->value())
+        };
+        update.size = cad::math::Vec3{
+            static_cast<float>(m_cadSizeX->value()),
+            static_cast<float>(m_cadSizeY->value()),
+            static_cast<float>(m_cadSizeZ->value())
+        };
+        update.wall_thickness = static_cast<float>(m_cadThickness->value());
+        m_cadWorkspaceView->applySelectedEnclosureUpdate(update);
+        break;
+    }
+    }
+
+    refreshCadProperties();
+}
+
+void MainWindow::undoCadEdit()
+{
+    if (m_cadWorkspaceView != nullptr && m_cadWorkspaceView->undoLastEdit()) {
+        refreshCadProperties();
+    }
+}
+
+void MainWindow::redoCadEdit()
+{
+    if (m_cadWorkspaceView != nullptr && m_cadWorkspaceView->redoLastEdit()) {
+        refreshCadProperties();
+    }
+}
+
+void MainWindow::resetCadPosition()
+{
+    if (m_cadWorkspaceView != nullptr && m_cadWorkspaceView->resetSelectedPositionToGenerated()) {
+        refreshCadProperties();
+    }
+}
+
+void MainWindow::resetCadGeometry()
+{
+    if (m_cadWorkspaceView != nullptr && m_cadWorkspaceView->resetSelectedGeometryToGenerated()) {
+        refreshCadProperties();
+    }
+}
+
+void MainWindow::resetCadLabel()
+{
+    if (m_cadWorkspaceView != nullptr && m_cadWorkspaceView->resetSelectedLabelToGenerated()) {
+        refreshCadProperties();
+    }
 }
 
 charts::Series MainWindow::toChartSeries(const QJsonArray& timeSeries, const QString& metricKey, const QString& name, const QColor& color, bool dashed) const
