@@ -9,6 +9,8 @@ using cad::math::Mat4;
 using cad::math::Vec3;
 using cad::math::Vec4;
 
+void appendWireBox(std::vector<RenderVertex>& lines, const Vec3& center, const Vec3& size, const Vec3& color);
+
 Vec3 temperatureColor(double temp_c)
 {
     const float normalized = cad::math::clamp(static_cast<float>((temp_c - 20.0) / 28.0), 0.0f, 1.0f);
@@ -72,6 +74,36 @@ void appendMesh(std::vector<RenderVertex>& vertices, const io::TriangleMesh& mes
     for (const Vec3& point : mesh.vertices) {
         vertices.push_back({cad::math::add(point, offset), color});
     }
+}
+
+void appendMeshBoundsWireframe(std::vector<RenderVertex>& lines, const io::TriangleMesh& mesh, const Vec3& offset, const Vec3& color)
+{
+    if (mesh.vertices.empty()) {
+        return;
+    }
+
+    Vec3 min_point = mesh.vertices.front();
+    Vec3 max_point = mesh.vertices.front();
+    for (const Vec3& point : mesh.vertices) {
+        min_point.x = std::min(min_point.x, point.x);
+        min_point.y = std::min(min_point.y, point.y);
+        min_point.z = std::min(min_point.z, point.z);
+        max_point.x = std::max(max_point.x, point.x);
+        max_point.y = std::max(max_point.y, point.y);
+        max_point.z = std::max(max_point.z, point.z);
+    }
+
+    const Vec3 center{
+        (min_point.x + max_point.x) * 0.5f + offset.x,
+        (min_point.y + max_point.y) * 0.5f + offset.y,
+        (min_point.z + max_point.z) * 0.5f + offset.z
+    };
+    const Vec3 size{
+        (max_point.x - min_point.x),
+        (max_point.y - min_point.y),
+        (max_point.z - min_point.z)
+    };
+    appendWireBox(lines, center, size, color);
 }
 
 struct ProjectionResult
@@ -184,6 +216,29 @@ void appendWireBox(std::vector<RenderVertex>& lines, const Vec3& center, const V
     }
 }
 
+void appendWireCylinder(std::vector<RenderVertex>& lines, const Vec3& center, float radius, float height, int segments, const Vec3& color)
+{
+    const float half_height = height * 0.5f;
+    for (int i = 0; i < segments; ++i) {
+        const float a0 = (static_cast<float>(i) / segments) * 2.0f * cad::math::kPi;
+        const float a1 = (static_cast<float>(i + 1) / segments) * 2.0f * cad::math::kPi;
+        const Vec3 top0{center.x + radius * std::cos(a0), center.y + half_height, center.z + radius * std::sin(a0)};
+        const Vec3 top1{center.x + radius * std::cos(a1), center.y + half_height, center.z + radius * std::sin(a1)};
+        const Vec3 bottom0{center.x + radius * std::cos(a0), center.y - half_height, center.z + radius * std::sin(a0)};
+        const Vec3 bottom1{center.x + radius * std::cos(a1), center.y - half_height, center.z + radius * std::sin(a1)};
+
+        lines.push_back({top0, color});
+        lines.push_back({top1, color});
+        lines.push_back({bottom0, color});
+        lines.push_back({bottom1, color});
+
+        if ((i % std::max(1, segments / 6)) == 0) {
+            lines.push_back({top0, color});
+            lines.push_back({bottom0, color});
+        }
+    }
+}
+
 } // namespace
 
 RenderPacket RenderComposer::compose(
@@ -203,6 +258,7 @@ RenderPacket RenderComposer::compose(
     packet.mvp = mvp.m;
 
     const Vec3 grid_color{0.16f, 0.23f, 0.30f};
+    const Vec3 selected_overlay_color{0.12f, 0.47f, 1.0f};
     const int grid_extent = 14;
     const float grid_step = 70.0f;
     for (int i = -grid_extent; i <= grid_extent; ++i) {
@@ -216,18 +272,30 @@ RenderPacket RenderComposer::compose(
     for (const battery::CoolingPlateEntity& plate : document.coolingPlates()) {
         appendBox(packet.triangles, plate.center, plate.size, {0.08f, 0.16f, 0.24f});
         appendBoxPickable(packet.pickables, plate.id, 300, mvp, plate.center, plate.size, viewport_width, viewport_height);
+        if (document.selection().primary == plate.id) {
+            appendWireBox(packet.selection_overlay_lines, plate.center, plate.size, selected_overlay_color);
+        }
     }
     for (const battery::BusbarEntity& busbar : document.busbars()) {
         appendBox(packet.triangles, busbar.center, busbar.size, {0.86f, 0.68f, 0.30f});
         appendBoxPickable(packet.pickables, busbar.id, 400, mvp, busbar.center, busbar.size, viewport_width, viewport_height);
+        if (document.selection().primary == busbar.id) {
+            appendWireBox(packet.selection_overlay_lines, busbar.center, busbar.size, selected_overlay_color);
+        }
     }
     for (const battery::ModuleBoundaryEntity& boundary : document.moduleBoundaries()) {
         appendWireBox(packet.lines, boundary.center, boundary.size, {0.25f, 0.45f, 0.86f});
         appendBoxPickable(packet.pickables, boundary.id, 200, mvp, boundary.center, boundary.size, viewport_width, viewport_height);
+        if (document.selection().primary == boundary.id) {
+            appendWireBox(packet.selection_overlay_lines, boundary.center, boundary.size, selected_overlay_color);
+        }
     }
     for (const battery::PackEnclosureEntity& enclosure : document.packEnclosures()) {
         appendWireBox(packet.lines, enclosure.center, enclosure.size, {0.42f, 0.48f, 0.54f});
         appendBoxPickable(packet.pickables, enclosure.id, 100, mvp, enclosure.center, enclosure.size, viewport_width, viewport_height);
+        if (document.selection().primary == enclosure.id) {
+            appendWireBox(packet.selection_overlay_lines, enclosure.center, enclosure.size, selected_overlay_color);
+        }
     }
 
     for (const battery::CellEntity& cell : document.cells()) {
@@ -236,12 +304,11 @@ RenderPacket RenderComposer::compose(
         if (temp_it != overlay.cell_temperature_c.end()) {
             color = temperatureColor(temp_it->second);
         }
-        if (document.selection().primary == cell.id) {
-            color = cad::math::mix(color, {1.0f, 1.0f, 1.0f}, 0.32f);
-        }
-
         if (cell_mesh != nullptr && !cell_mesh->vertices.empty()) {
             appendMesh(packet.triangles, *cell_mesh, cell.position, color);
+            if (document.selection().primary == cell.id) {
+                appendMeshBoundsWireframe(packet.selection_overlay_lines, *cell_mesh, cell.position, selected_overlay_color);
+            }
         } else {
             appendCylinder(packet.triangles, cell.position, cell.radius, cell.height, 28, color);
             appendCylinder(
@@ -250,8 +317,11 @@ RenderPacket RenderComposer::compose(
                 cell.radius * 0.34f,
                 10.0f,
                 24,
-                document.selection().primary == cell.id ? Vec3{0.96f, 0.99f, 1.0f} : Vec3{0.84f, 0.90f, 0.96f}
+                Vec3{0.84f, 0.90f, 0.96f}
             );
+            if (document.selection().primary == cell.id) {
+                appendWireCylinder(packet.selection_overlay_lines, cell.position, cell.radius + 2.5f, cell.height + 6.0f, 32, selected_overlay_color);
+            }
         }
 
         const ProjectionResult center = projectPoint(mvp, cell.position, viewport_width, viewport_height);

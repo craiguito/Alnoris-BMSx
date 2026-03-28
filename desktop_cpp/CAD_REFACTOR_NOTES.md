@@ -331,8 +331,8 @@ This pass focuses on the Qt desktop shell around the CAD engine so the viewport 
 
 ### Stronger selected-entity feedback
 
-- The viewport now draws a strong blue selection overlay using the projected pickable shape of the selected entity.
-- The current software-rendered path uses a layered blue glow + outline treatment so the selected object is much more obvious.
+- The viewport now draws a strong blue selection overlay using projected wireframe geometry for the selected entity.
+- The current software-rendered path uses a blue wireframe/outline overlay first, with the screen-space halo only as secondary reinforcement.
 - This works across the currently supported selectable entity types through the shared pickable data path.
 
 ### Remaining UI polish ideas

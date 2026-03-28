@@ -36,6 +36,7 @@ struct RenderPacket
 {
     std::vector<RenderVertex> triangles;
     std::vector<RenderVertex> lines;
+    std::vector<RenderVertex> selection_overlay_lines;
     std::vector<ScreenPickable> pickables;
     std::array<float, 16> mvp{};
 };

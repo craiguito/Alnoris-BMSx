@@ -353,6 +353,23 @@ void CadViewportWidget::paintEvent(QPaintEvent* event)
         painter.drawLine(a.point, b.point);
     }
 
+    if (!frame.selection_overlay_lines.empty()) {
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        for (int pass = 0; pass < 2; ++pass) {
+            const QColor lineColor = pass == 0 ? QColor(46, 126, 255, 85) : QColor(32, 120, 255);
+            const qreal lineWidth = pass == 0 ? 6.0 : 2.4;
+            painter.setPen(QPen(lineColor, lineWidth, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+            for (std::size_t i = 0; i + 1 < frame.selection_overlay_lines.size(); i += 2) {
+                const ProjectedVertex a = projectPoint(frame.mvp, frame.selection_overlay_lines[i].position, width(), height());
+                const ProjectedVertex b = projectPoint(frame.mvp, frame.selection_overlay_lines[i + 1].position, width(), height());
+                if (!a.valid || !b.valid) {
+                    continue;
+                }
+                painter.drawLine(a.point, b.point);
+            }
+        }
+    }
+
     const cad::core::EntityId selectedId = m_engine.selectedEntity();
     if (selectedId.isValid()) {
         const auto selectedPickable = std::find_if(
