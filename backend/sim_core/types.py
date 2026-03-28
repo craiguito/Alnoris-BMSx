@@ -116,6 +116,12 @@ class ThermalZoneConfig:
 
 
 @dataclass(frozen=True)
+class SocLookupPoint:
+    soc: float
+    multiplier: float
+
+
+@dataclass(frozen=True)
 class PhysicsConfig:
     """Lightweight engineering physics extensions for ECM-based pack studies."""
 
@@ -130,6 +136,37 @@ class PhysicsConfig:
     interconnect_resistance_ohm_per_group: float = 0.0
     pack_interconnect_resistance_ohm: float = 0.0
     neighbor_thermal_coupling_w_per_k: float = 0.0
+    resistance_vs_soc_enabled: bool = False
+    resistance_soc_curve: tuple[SocLookupPoint, ...] = (
+        SocLookupPoint(0.0, 1.18),
+        SocLookupPoint(0.2, 1.08),
+        SocLookupPoint(0.5, 1.0),
+        SocLookupPoint(0.8, 1.03),
+        SocLookupPoint(1.0, 1.08),
+    )
+    hysteresis_enabled: bool = False
+    hysteresis_max_voltage_v: float = 0.0
+    hysteresis_response_rate_per_s: float = 0.15
+    hysteresis_relaxation_tau_s: float = 180.0
+    hysteresis_current_scale_a: float = 5.0
+    rc_state_dependence_enabled: bool = False
+    rc_low_soc_multiplier: float = 1.2
+    rc_high_temp_multiplier_per_c: float = 0.0
+    diffusion_stress_enabled: bool = False
+    diffusion_stress_max_v: float = 0.0
+    diffusion_stress_build_rate_per_s: float = 0.10
+    diffusion_stress_decay_tau_s: float = 90.0
+    diffusion_stress_current_scale_a: float = 8.0
+    two_node_thermal_enabled: bool = False
+    core_surface_thermal_coupling_w_per_k: float = 1.8
+    surface_thermal_mass_fraction: float = 0.35
+    nonlinear_cooling_enabled: bool = False
+    nonlinear_cooling_delta_threshold_c: float = 12.0
+    nonlinear_cooling_gain_per_c: float = 0.02
+    reversible_heat_enabled: bool = False
+    reversible_heat_coeff_v_per_k: float = 0.0
+    charge_resistance_multiplier: float = 1.0
+    discharge_resistance_multiplier: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -203,6 +240,8 @@ class DegradationState:
 @dataclass(frozen=True)
 class GroupElectricalState:
     rc_branch_voltages_v: tuple[float, ...] = ()
+    hysteresis_voltage_v: float = 0.0
+    diffusion_stress_v: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -210,6 +249,8 @@ class CellGroupState:
     index: int
     soc: float
     temp_c: float
+    core_temp_c: float = 25.0
+    surface_temp_c: float = 25.0
     resistance_scale: float = 1.0
     capacity_scale: float = 1.0
     electrical_state: GroupElectricalState = field(default_factory=GroupElectricalState)
@@ -221,9 +262,13 @@ class GroupStepResult:
     terminal_voltage_v: float
     open_circuit_voltage_v: float
     heat_w: float
+    reversible_heat_w: float
+    effective_resistance_ohm: float
     balance_current_a: float
     fault_flags: list[str]
     next_state: CellGroupState
+    hysteresis_voltage_v: float = 0.0
+    diffusion_stress_v: float = 0.0
     degradation_rate_indicator: float = 0.0
 
 
@@ -253,6 +298,12 @@ class SimulationPoint:
     group_soc: list[float]
     group_voltage: list[float]
     group_temp: list[float]
+    group_core_temp: list[float]
+    group_surface_temp: list[float]
+    group_hysteresis_v: list[float]
+    group_diffusion_stress: list[float]
+    group_effective_resistance_ohm: list[float]
+    group_heat_w: list[float]
     balancing_active_groups: list[int]
     fault_active_groups: list[int]
     group_balance_current_a: list[float]
@@ -304,6 +355,11 @@ class SimulationSummary:
     degradation_model_version: str
     group_capacity_retention: list[float]
     group_resistance_growth: list[float]
+    max_core_temp_c: float
+    max_surface_temp_c: float
+    temp_gradient_max_c: float
+    max_diffusion_stress: float
+    nonlinear_features_enabled: list[str]
 
 
 @dataclass(frozen=True)

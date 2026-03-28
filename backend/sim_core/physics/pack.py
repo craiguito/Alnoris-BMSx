@@ -69,6 +69,8 @@ def build_group_states(config: SimulationConfig, pack: PackProperties) -> list[C
                 index=index,
                 soc=min(max(initial_soc + initial_faults.soc_offset, 0.0), 1.0),
                 temp_c=config.ambient_temp_c,
+                core_temp_c=config.ambient_temp_c,
+                surface_temp_c=config.ambient_temp_c,
                 resistance_scale=resistance_scale,
                 capacity_scale=capacity_scale,
                 electrical_state=init_rc_state(config.electrical_model),

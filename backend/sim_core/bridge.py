@@ -19,6 +19,7 @@ from .types import (
     GroupVariationConfig,
     PhysicsConfig,
     RcBranchParams,
+    SocLookupPoint,
     SimulationConfig,
     SimulationResult,
     ThermalZoneConfig,
@@ -247,6 +248,16 @@ def _parse_thermal_zones(payload: dict[str, Any]) -> tuple[ThermalZoneConfig, ..
 def _parse_physics(payload: dict[str, Any]) -> PhysicsConfig:
     physics_payload = payload.get("physics", {})
     defaults = PhysicsConfig()
+    curve_payload = physics_payload.get("resistance_soc_curve", defaults.resistance_soc_curve)
+    curve_items: list[SocLookupPoint] = []
+    for item in curve_payload or ():
+        if isinstance(item, SocLookupPoint):
+            curve_items.append(item)
+        else:
+            curve_items.append(
+                SocLookupPoint(soc=float(item["soc"]), multiplier=float(item["multiplier"]))
+            )
+    curve = tuple(curve_items)
     return PhysicsConfig(
         discharge_efficiency=float(physics_payload.get("discharge_efficiency", defaults.discharge_efficiency)),
         charge_efficiency=float(physics_payload.get("charge_efficiency", defaults.charge_efficiency)),
@@ -276,6 +287,79 @@ def _parse_physics(payload: dict[str, Any]) -> PhysicsConfig:
         ),
         neighbor_thermal_coupling_w_per_k=float(
             physics_payload.get("neighbor_thermal_coupling_w_per_k", defaults.neighbor_thermal_coupling_w_per_k)
+        ),
+        resistance_vs_soc_enabled=bool(
+            physics_payload.get("resistance_vs_soc_enabled", defaults.resistance_vs_soc_enabled)
+        ),
+        resistance_soc_curve=curve if curve else defaults.resistance_soc_curve,
+        hysteresis_enabled=bool(
+            physics_payload.get("hysteresis_enabled", defaults.hysteresis_enabled)
+        ),
+        hysteresis_max_voltage_v=float(
+            physics_payload.get("hysteresis_max_voltage_v", defaults.hysteresis_max_voltage_v)
+        ),
+        hysteresis_response_rate_per_s=float(
+            physics_payload.get("hysteresis_response_rate_per_s", defaults.hysteresis_response_rate_per_s)
+        ),
+        hysteresis_relaxation_tau_s=float(
+            physics_payload.get("hysteresis_relaxation_tau_s", defaults.hysteresis_relaxation_tau_s)
+        ),
+        hysteresis_current_scale_a=float(
+            physics_payload.get("hysteresis_current_scale_a", defaults.hysteresis_current_scale_a)
+        ),
+        rc_state_dependence_enabled=bool(
+            physics_payload.get("rc_state_dependence_enabled", defaults.rc_state_dependence_enabled)
+        ),
+        rc_low_soc_multiplier=float(
+            physics_payload.get("rc_low_soc_multiplier", defaults.rc_low_soc_multiplier)
+        ),
+        rc_high_temp_multiplier_per_c=float(
+            physics_payload.get("rc_high_temp_multiplier_per_c", defaults.rc_high_temp_multiplier_per_c)
+        ),
+        diffusion_stress_enabled=bool(
+            physics_payload.get("diffusion_stress_enabled", defaults.diffusion_stress_enabled)
+        ),
+        diffusion_stress_max_v=float(
+            physics_payload.get("diffusion_stress_max_v", defaults.diffusion_stress_max_v)
+        ),
+        diffusion_stress_build_rate_per_s=float(
+            physics_payload.get("diffusion_stress_build_rate_per_s", defaults.diffusion_stress_build_rate_per_s)
+        ),
+        diffusion_stress_decay_tau_s=float(
+            physics_payload.get("diffusion_stress_decay_tau_s", defaults.diffusion_stress_decay_tau_s)
+        ),
+        diffusion_stress_current_scale_a=float(
+            physics_payload.get("diffusion_stress_current_scale_a", defaults.diffusion_stress_current_scale_a)
+        ),
+        two_node_thermal_enabled=bool(
+            physics_payload.get("two_node_thermal_enabled", defaults.two_node_thermal_enabled)
+        ),
+        core_surface_thermal_coupling_w_per_k=float(
+            physics_payload.get("core_surface_thermal_coupling_w_per_k", defaults.core_surface_thermal_coupling_w_per_k)
+        ),
+        surface_thermal_mass_fraction=float(
+            physics_payload.get("surface_thermal_mass_fraction", defaults.surface_thermal_mass_fraction)
+        ),
+        nonlinear_cooling_enabled=bool(
+            physics_payload.get("nonlinear_cooling_enabled", defaults.nonlinear_cooling_enabled)
+        ),
+        nonlinear_cooling_delta_threshold_c=float(
+            physics_payload.get("nonlinear_cooling_delta_threshold_c", defaults.nonlinear_cooling_delta_threshold_c)
+        ),
+        nonlinear_cooling_gain_per_c=float(
+            physics_payload.get("nonlinear_cooling_gain_per_c", defaults.nonlinear_cooling_gain_per_c)
+        ),
+        reversible_heat_enabled=bool(
+            physics_payload.get("reversible_heat_enabled", defaults.reversible_heat_enabled)
+        ),
+        reversible_heat_coeff_v_per_k=float(
+            physics_payload.get("reversible_heat_coeff_v_per_k", defaults.reversible_heat_coeff_v_per_k)
+        ),
+        charge_resistance_multiplier=float(
+            physics_payload.get("charge_resistance_multiplier", defaults.charge_resistance_multiplier)
+        ),
+        discharge_resistance_multiplier=float(
+            physics_payload.get("discharge_resistance_multiplier", defaults.discharge_resistance_multiplier)
         ),
     )
 

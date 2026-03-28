@@ -119,6 +119,16 @@ class ValidationAndSafetyTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             run_simulation(config)
 
+    def test_invalid_soc_resistance_curve_raises(self) -> None:
+        config = make_config(
+            physics=PhysicsConfig(
+                resistance_vs_soc_enabled=True,
+                resistance_soc_curve=(),
+            ),
+        )
+        with self.assertRaises(ValueError):
+            run_simulation(config)
+
 
 if __name__ == "__main__":
     unittest.main()

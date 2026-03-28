@@ -7,6 +7,7 @@ from ..types import (
     GroupElectricalState,
     PackProperties,
     RcBranchParams,
+    SocLookupPoint,
     SimulationConfig,
 )
 
@@ -41,6 +42,36 @@ def effective_r0_ohm(config: SimulationConfig, base_resistance_ohm: float) -> fl
     group_count = max(1, config.group_count or config.cells_in_series)
     series_factor = config.cells_in_series // group_count
     return config.electrical_model.r0_ohm_per_cell * series_factor / max(config.cells_in_parallel, 1)
+
+
+def interpolate_soc_curve(points: tuple[SocLookupPoint, ...], soc: float) -> float:
+    clamped_soc = min(max(soc, 0.0), 1.0)
+    if not points:
+        return 1.0
+    if clamped_soc <= points[0].soc:
+        return points[0].multiplier
+    if clamped_soc >= points[-1].soc:
+        return points[-1].multiplier
+    for low, high in zip(points[:-1], points[1:]):
+        if low.soc <= clamped_soc <= high.soc:
+            span = max(high.soc - low.soc, 1e-9)
+            fraction = (clamped_soc - low.soc) / span
+            return low.multiplier + fraction * (high.multiplier - low.multiplier)
+    return points[-1].multiplier
+
+
+def soc_resistance_multiplier(config: SimulationConfig, soc: float) -> float:
+    if not config.physics.resistance_vs_soc_enabled:
+        return 1.0
+    return max(interpolate_soc_curve(config.physics.resistance_soc_curve, soc), 0.05)
+
+
+def current_direction_resistance_multiplier(current_a: float, config: SimulationConfig) -> float:
+    if current_a < 0.0:
+        return config.physics.charge_resistance_multiplier
+    if current_a > 0.0:
+        return config.physics.discharge_resistance_multiplier
+    return 1.0
 
 
 def temperature_adjusted_resistance_ohm(
@@ -78,6 +109,30 @@ def effective_rc_branch(branch: RcBranchParams, series_factor: float, parallel_c
     )
 
 
+def state_adjusted_rc_branch(
+    branch: RcBranchParams,
+    series_factor: float,
+    parallel_count: int,
+    soc: float,
+    temp_c: float,
+    config: SimulationConfig,
+) -> RcBranchParams:
+    effective_branch = effective_rc_branch(branch, series_factor, parallel_count)
+    if not config.physics.rc_state_dependence_enabled:
+        return effective_branch
+
+    low_soc_intensity = max(0.0, 0.5 - soc) / 0.5
+    resistance_multiplier = 1.0 + low_soc_intensity * (config.physics.rc_low_soc_multiplier - 1.0)
+    if temp_c > config.physics.resistance_reference_temp_c:
+        resistance_multiplier *= (
+            1.0 + (temp_c - config.physics.resistance_reference_temp_c) * config.physics.rc_high_temp_multiplier_per_c
+        )
+    return RcBranchParams(
+        resistance_ohm=max(effective_branch.resistance_ohm * resistance_multiplier, 1e-9),
+        capacitance_f=effective_branch.capacitance_f,
+    )
+
+
 def step_rc_branch_voltage(voltage_v: float, current_a: float, branch: RcBranchParams, dt_s: int) -> float:
     tau_s = max(branch.resistance_ohm * branch.capacitance_f, 1e-9)
     alpha = math.exp(-dt_s / tau_s)
@@ -91,22 +146,52 @@ def step_electrical_state(
     state: GroupElectricalState,
     series_factor: float,
     parallel_count: int,
+    soc: float,
+    temp_c: float,
+    config: SimulationConfig,
 ) -> GroupElectricalState:
-    if model.model_type == "rint" or not model.rc_branches:
-        return GroupElectricalState(rc_branch_voltages_v=())
-
     branch_voltages: list[float] = []
-    for branch_voltage_v, branch in zip(state.rc_branch_voltages_v, model.rc_branches):
-        effective_branch = effective_rc_branch(branch, series_factor, parallel_count)
-        branch_voltages.append(
-            step_rc_branch_voltage(
-                voltage_v=branch_voltage_v,
-                current_a=current_a,
-                branch=effective_branch,
-                dt_s=dt_s,
+    if model.model_type != "rint" and model.rc_branches:
+        for branch_voltage_v, branch in zip(state.rc_branch_voltages_v, model.rc_branches):
+            adjusted_branch = state_adjusted_rc_branch(branch, series_factor, parallel_count, soc, temp_c, config)
+            branch_voltages.append(
+                step_rc_branch_voltage(
+                    voltage_v=branch_voltage_v,
+                    current_a=current_a,
+                    branch=adjusted_branch,
+                    dt_s=dt_s,
+                )
             )
+
+    hysteresis_voltage_v = state.hysteresis_voltage_v
+    if config.physics.hysteresis_enabled and config.physics.hysteresis_max_voltage_v > 0.0:
+        drive = min(abs(current_a) / max(config.physics.hysteresis_current_scale_a, 1e-9), 1.0)
+        target = 0.0 if abs(current_a) < 1e-9 else math.copysign(config.physics.hysteresis_max_voltage_v, current_a)
+        drive_alpha = 1.0 - math.exp(-dt_s * config.physics.hysteresis_response_rate_per_s * drive)
+        relax_alpha = 1.0 - math.exp(-dt_s / max(config.physics.hysteresis_relaxation_tau_s, 1e-9))
+        if abs(current_a) < 1e-9:
+            hysteresis_voltage_v *= (1.0 - relax_alpha)
+        else:
+            hysteresis_voltage_v = hysteresis_voltage_v + drive_alpha * (target - hysteresis_voltage_v)
+
+    diffusion_stress_v = state.diffusion_stress_v
+    if config.physics.diffusion_stress_enabled and config.physics.diffusion_stress_max_v > 0.0:
+        target = min(
+            config.physics.diffusion_stress_max_v,
+            config.physics.diffusion_stress_max_v * abs(current_a) / max(config.physics.diffusion_stress_current_scale_a, 1e-9),
         )
-    return GroupElectricalState(rc_branch_voltages_v=tuple(branch_voltages))
+        if abs(current_a) < 1e-9:
+            decay_alpha = 1.0 - math.exp(-dt_s / max(config.physics.diffusion_stress_decay_tau_s, 1e-9))
+            diffusion_stress_v *= (1.0 - decay_alpha)
+        else:
+            build_alpha = 1.0 - math.exp(-dt_s * config.physics.diffusion_stress_build_rate_per_s)
+            diffusion_stress_v = diffusion_stress_v + build_alpha * (target - diffusion_stress_v)
+
+    return GroupElectricalState(
+        rc_branch_voltages_v=tuple(branch_voltages),
+        hysteresis_voltage_v=hysteresis_voltage_v,
+        diffusion_stress_v=diffusion_stress_v,
+    )
 
 
 def compute_terminal_voltage(
@@ -115,7 +200,14 @@ def compute_terminal_voltage(
     r0_ohm: float,
     state: GroupElectricalState,
 ) -> float:
-    return max(open_circuit_voltage_v - current_a * r0_ohm - sum(state.rc_branch_voltages_v), 0.0)
+    return max(
+        open_circuit_voltage_v
+        - current_a * r0_ohm
+        - sum(state.rc_branch_voltages_v)
+        - state.diffusion_stress_v
+        - state.hysteresis_voltage_v,
+        0.0,
+    )
 
 
 def compute_power_w(terminal_voltage_v: float, current_a: float) -> float:
@@ -127,6 +219,13 @@ def compute_heat_w(
     r0_ohm: float,
 ) -> float:
     return (current_a**2) * r0_ohm
+
+
+def compute_reversible_heat_w(current_a: float, temp_c: float, soc: float, config: SimulationConfig) -> float:
+    if not config.physics.reversible_heat_enabled or config.physics.reversible_heat_coeff_v_per_k == 0.0:
+        return 0.0
+    entropy_coeff_v_per_k = config.physics.reversible_heat_coeff_v_per_k * (2.0 * soc - 1.0)
+    return -current_a * (temp_c + 273.15) * entropy_coeff_v_per_k
 
 
 def compute_next_soc(current_soc: float, current_a: float, dt_s: int, capacity_as: float, config: SimulationConfig) -> float:

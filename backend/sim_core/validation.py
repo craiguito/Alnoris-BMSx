@@ -153,6 +153,52 @@ def validate_physics(config: PhysicsConfig) -> PhysicsConfig:
         raise ValueError("physics.pack_interconnect_resistance_ohm must be >= 0.")
     if config.neighbor_thermal_coupling_w_per_k < 0.0:
         raise ValueError("physics.neighbor_thermal_coupling_w_per_k must be >= 0.")
+    if config.resistance_vs_soc_enabled:
+        if len(config.resistance_soc_curve) < 2:
+            raise ValueError("physics.resistance_soc_curve must contain at least two points when enabled.")
+        previous_soc = -1.0
+        for point in config.resistance_soc_curve:
+            if not 0.0 <= point.soc <= 1.0:
+                raise ValueError("physics.resistance_soc_curve SOC values must be within [0, 1].")
+            if point.multiplier <= 0.0:
+                raise ValueError("physics.resistance_soc_curve multipliers must be > 0.")
+            if point.soc <= previous_soc:
+                raise ValueError("physics.resistance_soc_curve SOC values must be strictly increasing.")
+            previous_soc = point.soc
+    if config.hysteresis_max_voltage_v < 0.0:
+        raise ValueError("physics.hysteresis_max_voltage_v must be >= 0.")
+    if config.hysteresis_response_rate_per_s < 0.0:
+        raise ValueError("physics.hysteresis_response_rate_per_s must be >= 0.")
+    if config.hysteresis_relaxation_tau_s <= 0.0:
+        raise ValueError("physics.hysteresis_relaxation_tau_s must be > 0.")
+    if config.hysteresis_current_scale_a <= 0.0:
+        raise ValueError("physics.hysteresis_current_scale_a must be > 0.")
+    if config.rc_low_soc_multiplier < 0.0:
+        raise ValueError("physics.rc_low_soc_multiplier must be >= 0.")
+    if config.rc_high_temp_multiplier_per_c < 0.0:
+        raise ValueError("physics.rc_high_temp_multiplier_per_c must be >= 0.")
+    if config.diffusion_stress_max_v < 0.0:
+        raise ValueError("physics.diffusion_stress_max_v must be >= 0.")
+    if config.diffusion_stress_build_rate_per_s < 0.0:
+        raise ValueError("physics.diffusion_stress_build_rate_per_s must be >= 0.")
+    if config.diffusion_stress_decay_tau_s <= 0.0:
+        raise ValueError("physics.diffusion_stress_decay_tau_s must be > 0.")
+    if config.diffusion_stress_current_scale_a <= 0.0:
+        raise ValueError("physics.diffusion_stress_current_scale_a must be > 0.")
+    if config.core_surface_thermal_coupling_w_per_k < 0.0:
+        raise ValueError("physics.core_surface_thermal_coupling_w_per_k must be >= 0.")
+    if not 0.0 < config.surface_thermal_mass_fraction < 1.0:
+        raise ValueError("physics.surface_thermal_mass_fraction must be within (0, 1).")
+    if config.nonlinear_cooling_delta_threshold_c < 0.0:
+        raise ValueError("physics.nonlinear_cooling_delta_threshold_c must be >= 0.")
+    if config.nonlinear_cooling_gain_per_c < 0.0:
+        raise ValueError("physics.nonlinear_cooling_gain_per_c must be >= 0.")
+    if config.reversible_heat_coeff_v_per_k < 0.0:
+        raise ValueError("physics.reversible_heat_coeff_v_per_k must be >= 0.")
+    if config.charge_resistance_multiplier <= 0.0:
+        raise ValueError("physics.charge_resistance_multiplier must be > 0.")
+    if config.discharge_resistance_multiplier <= 0.0:
+        raise ValueError("physics.discharge_resistance_multiplier must be > 0.")
     return config
 
 
