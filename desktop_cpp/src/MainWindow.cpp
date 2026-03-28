@@ -1138,13 +1138,6 @@ void MainWindow::applyCadPropertyChanges()
 
     m_isSyncingCadInspector = true;
 
-    if (QString::fromStdString(summary->label) != m_cadLabelEdit->text()) {
-        m_cadWorkspaceView->applyRenameToSelected(m_cadLabelEdit->text());
-    }
-    if (summary->visible != m_cadVisibleCheck->isChecked()) {
-        m_cadWorkspaceView->applySelectedVisibility(m_cadVisibleCheck->isChecked());
-    }
-
     switch (summary->kind) {
     case cad::battery::EntityKind::Cell: {
         const auto properties = m_cadWorkspaceView->selectedCellProperties();
@@ -1152,6 +1145,12 @@ void MainWindow::applyCadPropertyChanges()
             break;
         }
         cad::battery::CellPropertiesUpdate update;
+        if (QString::fromStdString(summary->label) != m_cadLabelEdit->text()) {
+            update.label = m_cadLabelEdit->text().toStdString();
+        }
+        if (summary->visible != m_cadVisibleCheck->isChecked()) {
+            update.visible = m_cadVisibleCheck->isChecked();
+        }
         const cad::math::Vec3 position{
             static_cast<float>(m_cadPosX->value()),
             static_cast<float>(m_cadPosY->value()),
@@ -1168,7 +1167,8 @@ void MainWindow::applyCadPropertyChanges()
         if (height != properties->height) {
             update.height = height;
         }
-        if (update.position.has_value() || update.radius.has_value() || update.height.has_value()) {
+        if (update.position.has_value() || update.radius.has_value() || update.height.has_value()
+            || update.label.has_value() || update.visible.has_value()) {
             m_cadWorkspaceView->applySelectedCellUpdate(update);
         }
         break;
@@ -1179,6 +1179,12 @@ void MainWindow::applyCadPropertyChanges()
             break;
         }
         cad::battery::BusbarPropertiesUpdate update;
+        if (QString::fromStdString(summary->label) != m_cadLabelEdit->text()) {
+            update.label = m_cadLabelEdit->text().toStdString();
+        }
+        if (summary->visible != m_cadVisibleCheck->isChecked()) {
+            update.visible = m_cadVisibleCheck->isChecked();
+        }
         const cad::math::Vec3 center{
             static_cast<float>(m_cadPosX->value()),
             static_cast<float>(m_cadPosY->value()),
@@ -1195,7 +1201,8 @@ void MainWindow::applyCadPropertyChanges()
         if (size.x != properties->size.x || size.y != properties->size.y || size.z != properties->size.z) {
             update.size = size;
         }
-        if (update.center.has_value() || update.size.has_value()) {
+        if (update.center.has_value() || update.size.has_value()
+            || update.label.has_value() || update.visible.has_value()) {
             m_cadWorkspaceView->applySelectedBusbarUpdate(update);
         }
         break;
@@ -1206,6 +1213,12 @@ void MainWindow::applyCadPropertyChanges()
             break;
         }
         cad::battery::CoolingPlatePropertiesUpdate update;
+        if (QString::fromStdString(summary->label) != m_cadLabelEdit->text()) {
+            update.label = m_cadLabelEdit->text().toStdString();
+        }
+        if (summary->visible != m_cadVisibleCheck->isChecked()) {
+            update.visible = m_cadVisibleCheck->isChecked();
+        }
         const cad::math::Vec3 center{
             static_cast<float>(m_cadPosX->value()),
             static_cast<float>(m_cadPosY->value()),
@@ -1222,7 +1235,8 @@ void MainWindow::applyCadPropertyChanges()
         if (size.x != properties->size.x || size.y != properties->size.y || size.z != properties->size.z) {
             update.size = size;
         }
-        if (update.center.has_value() || update.size.has_value()) {
+        if (update.center.has_value() || update.size.has_value()
+            || update.label.has_value() || update.visible.has_value()) {
             m_cadWorkspaceView->applySelectedCoolingPlateUpdate(update);
         }
         break;
@@ -1233,6 +1247,12 @@ void MainWindow::applyCadPropertyChanges()
             break;
         }
         cad::battery::ModuleBoundaryPropertiesUpdate update;
+        if (QString::fromStdString(summary->label) != m_cadLabelEdit->text()) {
+            update.label = m_cadLabelEdit->text().toStdString();
+        }
+        if (summary->visible != m_cadVisibleCheck->isChecked()) {
+            update.visible = m_cadVisibleCheck->isChecked();
+        }
         const cad::math::Vec3 center{
             static_cast<float>(m_cadPosX->value()),
             static_cast<float>(m_cadPosY->value()),
@@ -1249,7 +1269,8 @@ void MainWindow::applyCadPropertyChanges()
         if (size.x != properties->size.x || size.y != properties->size.y || size.z != properties->size.z) {
             update.size = size;
         }
-        if (update.center.has_value() || update.size.has_value()) {
+        if (update.center.has_value() || update.size.has_value()
+            || update.label.has_value() || update.visible.has_value()) {
             m_cadWorkspaceView->applySelectedModuleBoundaryUpdate(update);
         }
         break;
@@ -1260,6 +1281,12 @@ void MainWindow::applyCadPropertyChanges()
             break;
         }
         cad::battery::PackEnclosurePropertiesUpdate update;
+        if (QString::fromStdString(summary->label) != m_cadLabelEdit->text()) {
+            update.label = m_cadLabelEdit->text().toStdString();
+        }
+        if (summary->visible != m_cadVisibleCheck->isChecked()) {
+            update.visible = m_cadVisibleCheck->isChecked();
+        }
         const cad::math::Vec3 center{
             static_cast<float>(m_cadPosX->value()),
             static_cast<float>(m_cadPosY->value()),
@@ -1280,7 +1307,8 @@ void MainWindow::applyCadPropertyChanges()
         if (wallThickness != properties->wall_thickness) {
             update.wall_thickness = wallThickness;
         }
-        if (update.center.has_value() || update.size.has_value() || update.wall_thickness.has_value()) {
+        if (update.center.has_value() || update.size.has_value() || update.wall_thickness.has_value()
+            || update.label.has_value() || update.visible.has_value()) {
             m_cadWorkspaceView->applySelectedEnclosureUpdate(update);
         }
         break;

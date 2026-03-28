@@ -325,6 +325,7 @@ This pass focuses on the Qt desktop shell around the CAD engine so the viewport 
 
 - The property panel now suppresses stale mid-apply refresh churn while commands are executing.
 - Apply now avoids firing redundant edits when values have not actually changed.
+- Apply also now routes a given entity edit through a single typed update command instead of splitting one user action into separate rename / visibility / geometry commands.
 - Undo, redo, and reset actions now refresh the inspector more predictably after the command stack updates the document.
 - Clicking empty space in the viewport now clears the current selection instead of leaving stale inspector state behind.
 
