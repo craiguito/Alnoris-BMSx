@@ -92,7 +92,7 @@ def _step_group(
         thermal_mass_j_per_k=thermal_mass_j_per_k,
         dt_s=config.time_step_s,
     )
-    next_degradation = step_degradation(
+    degradation_result = step_degradation(
         state=group.degradation,
         config=config.degradation,
         current_a=current_a,
@@ -120,8 +120,9 @@ def _step_group(
             resistance_scale=group.resistance_scale,
             capacity_scale=group.capacity_scale,
             electrical_state=next_electrical_state,
-            degradation=next_degradation,
+            degradation=degradation_result.next_state,
         ),
+        degradation_rate_indicator=degradation_result.capacity_loss_increment / max(config.time_step_s / 3600.0, 1e-9),
     )
 
 
@@ -140,6 +141,7 @@ def _build_time_point(
     group_zone_ids = list(config.group_zone_assignments) if config.group_zone_assignments else [0 for _ in group_step_results]
     group_labels = list(config.group_labels) if config.group_labels else [f"Group {index}" for index in range(len(group_step_results))]
     group_entity_ids = list(config.group_entity_ids) if config.group_entity_ids else [f"group-{index}" for index in range(len(group_step_results))]
+    degradation_rate_indicator = mean([result.degradation_rate_indicator for result in group_step_results])
     weakest_group_index = min(
         range(len(group_voltages_v)),
         key=lambda index: group_voltages_v[index],
@@ -194,6 +196,15 @@ def _build_time_point(
         group_labels=group_labels,
         group_entity_ids=group_entity_ids,
         zone_temp_max_c=zone_temp_max_c,
+        estimated_capacity_retention=mean(
+            max(1.0 - result.next_state.degradation.capacity_loss_fraction, 0.0)
+            for result in group_step_results
+        ),
+        estimated_resistance_multiplier=mean(
+            1.0 + result.next_state.degradation.resistance_growth_fraction
+            for result in group_step_results
+        ),
+        degradation_rate_indicator=degradation_rate_indicator,
     )
 
 
@@ -319,6 +330,13 @@ def build_summary(
             first_faulted_group_index=None,
             hottest_zone_id=0,
             max_zone_temp_c=config.ambient_temp_c,
+            cumulative_charge_throughput_ah=0.0,
+            cumulative_discharge_throughput_ah=0.0,
+            cumulative_high_soc_time_h=0.0,
+            estimated_cycle_stress=0.0,
+            degradation_model_version="v2-pragmatic",
+            group_capacity_retention=[],
+            group_resistance_growth=[],
         )
 
     runtime_s = time_series[-1].time_s
@@ -349,6 +367,18 @@ def build_summary(
         max(1.0 - group.degradation.capacity_loss_fraction, 0.0) for group in groups
     )
     estimated_resistance_growth = mean(group.degradation.resistance_growth_fraction for group in groups)
+    cumulative_charge_throughput_ah = sum(group.degradation.cumulative_charge_throughput_ah for group in groups)
+    cumulative_discharge_throughput_ah = sum(group.degradation.cumulative_discharge_throughput_ah for group in groups)
+    cumulative_high_soc_time_h = sum(group.degradation.cumulative_high_soc_time_s for group in groups) / 3600.0
+    estimated_cycle_stress = mean(group.degradation.cumulative_cycle_stress for group in groups)
+    group_capacity_retention = [
+        max(1.0 - group.degradation.capacity_loss_fraction, 0.0)
+        for group in groups
+    ]
+    group_resistance_growth = [
+        group.degradation.resistance_growth_fraction
+        for group in groups
+    ]
     first_faulted_group_index = next(
         (
             point.fault_active_groups[0]
@@ -449,4 +479,11 @@ def build_summary(
         first_faulted_group_index=first_faulted_group_index,
         hottest_zone_id=hottest_zone_id,
         max_zone_temp_c=max_zone_temp_c,
+        cumulative_charge_throughput_ah=cumulative_charge_throughput_ah,
+        cumulative_discharge_throughput_ah=cumulative_discharge_throughput_ah,
+        cumulative_high_soc_time_h=cumulative_high_soc_time_h,
+        estimated_cycle_stress=estimated_cycle_stress,
+        degradation_model_version="v2-pragmatic",
+        group_capacity_retention=group_capacity_retention,
+        group_resistance_growth=group_resistance_growth,
     )

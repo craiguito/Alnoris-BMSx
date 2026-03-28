@@ -25,6 +25,30 @@ def validate_current_profile(profile: CurrentProfile | None) -> CurrentProfile |
 
 
 def validate_degradation(config: DegradationConfig) -> DegradationConfig:
+    if config.throughput_capacity_fade_per_ah is not None and config.throughput_capacity_fade_per_ah < 0.0:
+        raise ValueError("throughput_capacity_fade_per_ah must be >= 0.")
+    if config.throughput_resistance_growth_per_ah is not None and config.throughput_resistance_growth_per_ah < 0.0:
+        raise ValueError("throughput_resistance_growth_per_ah must be >= 0.")
+    if config.calendar_capacity_fade_per_hour < 0.0:
+        raise ValueError("calendar_capacity_fade_per_hour must be >= 0.")
+    if config.calendar_resistance_growth_per_hour < 0.0:
+        raise ValueError("calendar_resistance_growth_per_hour must be >= 0.")
+    if config.high_soc_capacity_accel < 0.0:
+        raise ValueError("high_soc_capacity_accel must be >= 0.")
+    if config.high_soc_resistance_accel < 0.0:
+        raise ValueError("high_soc_resistance_accel must be >= 0.")
+    if config.dod_stress_factor < 0.0:
+        raise ValueError("dod_stress_factor must be >= 0.")
+    if config.charge_stress_factor < 0.0:
+        raise ValueError("charge_stress_factor must be >= 0.")
+    if config.reference_temp_c is not None and config.reference_temp_c < -273.15:
+        raise ValueError("reference_temp_c must be above absolute zero.")
+    if config.temperature_accel_per_c is not None and config.temperature_accel_per_c < 0.0:
+        raise ValueError("temperature_accel_per_c must be >= 0.")
+    if not 0.0 <= config.high_soc_threshold <= 1.0:
+        raise ValueError("high_soc_threshold must be within [0, 1].")
+    if config.charge_current_stress_threshold_a is not None and config.charge_current_stress_threshold_a < 0.0:
+        raise ValueError("charge_current_stress_threshold_a must be >= 0.")
     if config.capacity_fade_per_throughput_ah < 0.0:
         raise ValueError("capacity_fade_per_throughput_ah must be >= 0.")
     if config.resistance_growth_per_throughput_ah < 0.0:

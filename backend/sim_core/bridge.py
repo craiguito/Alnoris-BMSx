@@ -100,21 +100,84 @@ def _parse_group_variation(payload: dict[str, Any]) -> GroupVariationConfig:
 
 def _parse_degradation(payload: dict[str, Any]) -> DegradationConfig:
     degradation_payload = payload.get("degradation", {})
+    defaults = DegradationConfig()
     return DegradationConfig(
+        throughput_capacity_fade_per_ah=(
+            float(degradation_payload["throughput_capacity_fade_per_ah"])
+            if degradation_payload.get("throughput_capacity_fade_per_ah") is not None
+            else (
+                float(degradation_payload["capacity_fade_per_throughput_ah"])
+                if degradation_payload.get("capacity_fade_per_throughput_ah") is not None
+                else defaults.throughput_capacity_fade_per_ah
+            )
+        ),
+        throughput_resistance_growth_per_ah=(
+            float(degradation_payload["throughput_resistance_growth_per_ah"])
+            if degradation_payload.get("throughput_resistance_growth_per_ah") is not None
+            else (
+                float(degradation_payload["resistance_growth_per_throughput_ah"])
+                if degradation_payload.get("resistance_growth_per_throughput_ah") is not None
+                else defaults.throughput_resistance_growth_per_ah
+            )
+        ),
+        calendar_capacity_fade_per_hour=float(
+            degradation_payload.get("calendar_capacity_fade_per_hour", defaults.calendar_capacity_fade_per_hour)
+        ),
+        calendar_resistance_growth_per_hour=float(
+            degradation_payload.get("calendar_resistance_growth_per_hour", defaults.calendar_resistance_growth_per_hour)
+        ),
+        high_soc_capacity_accel=float(
+            degradation_payload.get("high_soc_capacity_accel", defaults.high_soc_capacity_accel)
+        ),
+        high_soc_resistance_accel=float(
+            degradation_payload.get("high_soc_resistance_accel", defaults.high_soc_resistance_accel)
+        ),
+        dod_stress_factor=float(
+            degradation_payload.get("dod_stress_factor", defaults.dod_stress_factor)
+        ),
+        charge_stress_factor=float(
+            degradation_payload.get("charge_stress_factor", defaults.charge_stress_factor)
+        ),
+        reference_temp_c=(
+            float(degradation_payload["reference_temp_c"])
+            if degradation_payload.get("reference_temp_c") is not None
+            else (
+                float(degradation_payload["temperature_reference_c"])
+                if degradation_payload.get("temperature_reference_c") is not None
+                else defaults.reference_temp_c
+            )
+        ),
+        temperature_accel_per_c=(
+            float(degradation_payload["temperature_accel_per_c"])
+            if degradation_payload.get("temperature_accel_per_c") is not None
+            else (
+                float(degradation_payload["temperature_acceleration_per_c"])
+                if degradation_payload.get("temperature_acceleration_per_c") is not None
+                else defaults.temperature_accel_per_c
+            )
+        ),
+        high_soc_threshold=float(
+            degradation_payload.get("high_soc_threshold", defaults.high_soc_threshold)
+        ),
+        charge_current_stress_threshold_a=(
+            float(degradation_payload["charge_current_stress_threshold_a"])
+            if degradation_payload.get("charge_current_stress_threshold_a") is not None
+            else defaults.charge_current_stress_threshold_a
+        ),
         capacity_fade_per_throughput_ah=float(
-            degradation_payload.get("capacity_fade_per_throughput_ah", DegradationConfig().capacity_fade_per_throughput_ah)
+            degradation_payload.get("capacity_fade_per_throughput_ah", defaults.capacity_fade_per_throughput_ah)
         ),
         resistance_growth_per_throughput_ah=float(
-            degradation_payload.get("resistance_growth_per_throughput_ah", DegradationConfig().resistance_growth_per_throughput_ah)
+            degradation_payload.get("resistance_growth_per_throughput_ah", defaults.resistance_growth_per_throughput_ah)
         ),
         temperature_reference_c=float(
-            degradation_payload.get("temperature_reference_c", DegradationConfig().temperature_reference_c)
+            degradation_payload.get("temperature_reference_c", defaults.temperature_reference_c)
         ),
         temperature_acceleration_per_c=float(
-            degradation_payload.get("temperature_acceleration_per_c", DegradationConfig().temperature_acceleration_per_c)
+            degradation_payload.get("temperature_acceleration_per_c", defaults.temperature_acceleration_per_c)
         ),
         depth_of_discharge_weight=float(
-            degradation_payload.get("depth_of_discharge_weight", DegradationConfig().depth_of_discharge_weight)
+            degradation_payload.get("depth_of_discharge_weight", defaults.depth_of_discharge_weight)
         ),
     )
 

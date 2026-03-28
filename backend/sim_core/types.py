@@ -56,6 +56,20 @@ class GroupVariationConfig:
 
 @dataclass(frozen=True)
 class DegradationConfig:
+    """Engineering degradation approximation using throughput, calendar, SOC, and DoD stress."""
+
+    throughput_capacity_fade_per_ah: float | None = None
+    throughput_resistance_growth_per_ah: float | None = None
+    calendar_capacity_fade_per_hour: float = 2.0e-7
+    calendar_resistance_growth_per_hour: float = 8.0e-8
+    high_soc_capacity_accel: float = 0.45
+    high_soc_resistance_accel: float = 0.25
+    dod_stress_factor: float = 0.20
+    charge_stress_factor: float = 0.18
+    reference_temp_c: float | None = None
+    temperature_accel_per_c: float | None = None
+    high_soc_threshold: float = 0.8
+    charge_current_stress_threshold_a: float | None = None
     capacity_fade_per_throughput_ah: float = 2.5e-5
     resistance_growth_per_throughput_ah: float = 1.2e-5
     temperature_reference_c: float = 25.0
@@ -157,8 +171,15 @@ class PackProperties:
 @dataclass(frozen=True)
 class DegradationState:
     cumulative_throughput_ah: float = 0.0
+    cumulative_time_s: float = 0.0
+    cumulative_charge_throughput_ah: float = 0.0
+    cumulative_discharge_throughput_ah: float = 0.0
+    cumulative_high_soc_time_s: float = 0.0
+    cumulative_cycle_stress: float = 0.0
     capacity_loss_fraction: float = 0.0
     resistance_growth_fraction: float = 0.0
+    soc_window_min: float = 1.0
+    soc_window_max: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -185,6 +206,7 @@ class GroupStepResult:
     balance_current_a: float
     fault_flags: list[str]
     next_state: CellGroupState
+    degradation_rate_indicator: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -221,6 +243,9 @@ class SimulationPoint:
     group_labels: list[str]
     group_entity_ids: list[str]
     zone_temp_max_c: dict[int, float]
+    estimated_capacity_retention: float
+    estimated_resistance_multiplier: float
+    degradation_rate_indicator: float
 
 
 @dataclass(frozen=True)
@@ -254,6 +279,13 @@ class SimulationSummary:
     first_faulted_group_index: int | None
     hottest_zone_id: int
     max_zone_temp_c: float
+    cumulative_charge_throughput_ah: float
+    cumulative_discharge_throughput_ah: float
+    cumulative_high_soc_time_h: float
+    estimated_cycle_stress: float
+    degradation_model_version: str
+    group_capacity_retention: list[float]
+    group_resistance_growth: list[float]
 
 
 @dataclass(frozen=True)
