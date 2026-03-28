@@ -23,6 +23,8 @@ public:
     bool setCellMeshPath(const std::string& path);
     void setViewportSize(int width, int height);
     void setBatteryConfig(const battery::BatteryCadConfig& config);
+    void setVisualizationOverlay(const battery::BatteryVisualizationOverlay& overlay);
+    void clearVisualizationOverlay();
     void orbit(float delta_yaw_deg, float delta_pitch_deg);
     void zoom(float delta);
     void selectEntity(core::EntityId entity_id);
@@ -92,6 +94,7 @@ private:
     battery::BatteryCadConfig m_config;
     core::CadDocument m_document;
     battery::BatteryVisualizationOverlay m_visualizationOverlay;
+    std::optional<battery::BatteryVisualizationOverlay> m_overrideVisualizationOverlay;
     camera::Camera m_camera;
     render::RenderComposer m_renderComposer;
     picking::HitTester m_hitTester;

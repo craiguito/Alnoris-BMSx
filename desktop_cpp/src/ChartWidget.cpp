@@ -55,6 +55,12 @@ void ChartWidget::showComparison(const QString& title, const QString& yAxisTitle
     update();
 }
 
+void ChartWidget::setMarkerTime(std::optional<double> time_s)
+{
+    m_module.set_marker(time_s);
+    update();
+}
+
 void ChartWidget::paintEvent(QPaintEvent* event)
 {
     Q_UNUSED(event);
@@ -179,6 +185,13 @@ void ChartWidget::paintEvent(QPaintEvent* event)
 
     drawSeries(vm.secondary, false);
     drawSeries(vm.primary, true);
+
+    if (vm.marker_enabled) {
+        const double xNorm = (vm.marker_x - bounds.minX) / std::max(1e-9, bounds.maxX - bounds.minX);
+        const qreal x = plotRect.left() + (xNorm * plotRect.width());
+        painter.setPen(QPen(QColor(28, 116, 255, 180), 2.0, Qt::DashLine));
+        painter.drawLine(QPointF(x, plotRect.top()), QPointF(x, plotRect.bottom()));
+    }
 
     if (m_hoveredPoint >= 0 && m_hoveredPoint < static_cast<int>(vm.primary.points.size())) {
         const charts::Point& point = vm.primary.points[m_hoveredPoint];

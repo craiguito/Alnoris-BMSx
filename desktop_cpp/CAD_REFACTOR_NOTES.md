@@ -390,3 +390,76 @@ This pass adds the first practical bridge from the battery CAD document into the
 - TODO: bind backend per-group thermal results back onto CAD cells and modules
 - TODO: persist thermal-zone metadata in CAD document save/load
 - TODO: add richer geometric mapping beyond simple proximity/containment rules
+
+## Desktop Simulation Visualization Pass
+
+This pass makes simulation results visible and inspectable directly inside the Qt desktop application instead of only surfacing a few raw charts from JSON.
+
+### Typed desktop result model
+
+- The desktop host now parses backend payloads into a dedicated typed result model before updating the UI.
+- The typed model keeps:
+  - pack-level time series
+  - per-group SOC / temperature / voltage arrays
+  - summary metrics
+  - group labels and entity IDs when available
+- Parsing remains defensive so older or partially populated payloads fail gracefully instead of crashing the UI.
+
+### Results-driven desktop workflow
+
+- A successful run now updates one shared results state inside the main window.
+- That state drives:
+  - summary text
+  - charts
+  - group inspection table
+  - CAD overlay coloring
+  - time scrub playback
+- The goal is to keep the charts, table, and viewport synchronized around the same selected timestep.
+
+### Chart coverage
+
+- The desktop results area now includes chart views for:
+  - pack voltage
+  - current
+  - pack power
+  - average SOC
+  - SOC envelope
+  - average / maximum temperature
+- Selected-group detail charts were also added for:
+  - voltage
+  - temperature
+  - SOC
+- A lightweight vertical scrub marker now shows the active timestep across the charts.
+
+### Group inspection
+
+- The results panel now includes a compact per-group table showing the latest timestep values for:
+  - group label
+  - SOC
+  - voltage
+  - temperature
+- The weakest and hottest groups are visually marked to help users spot limiting groups quickly.
+
+### CAD overlay mapping
+
+- The CAD viewport can now receive a disposable simulation overlay without mutating the underlying CAD document.
+- Supported overlay metrics are:
+  - temperature
+  - SOC
+  - voltage
+- Current v1 mapping assumes backend group index corresponds to CAD cell `series_index`, and applies the group metric to every CAD cell in that series group.
+- This is intentionally simple and deterministic so it can be replaced later by stronger traceability through stable entity IDs.
+
+### Current limitations
+
+- The overlay uses group-to-cell series-index mapping rather than a richer entity-ID overlay binding.
+- The charts and group table are intentionally compact and not yet a full simulation dashboard.
+- Comparison mode is still chart-focused; it does not yet provide a full side-by-side group overlay workflow.
+
+### Future work
+
+- TODO: add legends for simulation overlay scales
+- TODO: drive overlays directly from backend `group_entity_ids` when available
+- TODO: add playback controls beyond manual scrubbing
+- TODO: add richer comparison views for per-group behavior
+- TODO: add export / copy support for the group inspection table

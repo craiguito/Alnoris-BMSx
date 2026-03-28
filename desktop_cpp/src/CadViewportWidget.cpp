@@ -138,6 +138,18 @@ void CadViewportWidget::setPackConfig(const cad::battery::BatteryCadConfig& conf
     update();
 }
 
+void CadViewportWidget::setSimulationOverlay(const cad::battery::BatteryVisualizationOverlay& overlay)
+{
+    m_engine.setVisualizationOverlay(overlay);
+    update();
+}
+
+void CadViewportWidget::clearSimulationOverlay()
+{
+    m_engine.clearVisualizationOverlay();
+    update();
+}
+
 const cad::core::CadDocument& CadViewportWidget::document() const
 {
     return m_engine.document();

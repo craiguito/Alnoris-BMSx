@@ -11,6 +11,7 @@ BatteryVisualizationOverlay BatteryVisualizationBuilder::build(
 )
 {
     BatteryVisualizationOverlay overlay;
+    overlay.active_metric = BatteryVisualizationOverlay::Metric::Temperature;
     const int parallel_count = std::max(1, document.metadata().layout_config.cells_in_parallel);
     const double branch_current = electrical.discharge_current_a / static_cast<double>(parallel_count);
     const double ohmic_heat = branch_current * branch_current * electrical.internal_resistance_ohm;

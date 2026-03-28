@@ -47,6 +47,8 @@ struct ViewModel
     Series primary;
     Series secondary;
     bool comparison_mode = false;
+    bool marker_enabled = false;
+    double marker_x = 0.0;
     Theme theme;
 };
 

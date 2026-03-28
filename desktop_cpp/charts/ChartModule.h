@@ -2,6 +2,8 @@
 
 #include "ChartTypes.h"
 
+#include <optional>
+
 namespace charts {
 
 class Module
@@ -17,6 +19,7 @@ public:
         const Series& baseline,
         const Series& candidate
     );
+    void set_marker(std::optional<double> marker_x);
 
     const ViewModel& view_model() const;
     int nearest_primary_point(double x, double y, double x_scale, double y_scale, double plot_left, double plot_top, double plot_width, double plot_height) const;

@@ -188,7 +188,17 @@ struct PackEnclosurePropertiesUpdate
 
 struct BatteryVisualizationOverlay
 {
+    enum class Metric
+    {
+        Temperature,
+        Soc,
+        Voltage
+    };
+
+    Metric active_metric = Metric::Temperature;
     std::unordered_map<core::EntityId, double, core::EntityIdHash> cell_temperature_c;
+    std::unordered_map<core::EntityId, double, core::EntityIdHash> cell_soc;
+    std::unordered_map<core::EntityId, double, core::EntityIdHash> cell_voltage_v;
 };
 
 } // namespace cad::battery

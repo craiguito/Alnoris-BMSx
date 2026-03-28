@@ -22,6 +22,8 @@ public:
     bool setCellMeshPath(const QString& path);
     void setBackgroundColor(const QColor& color);
     void setPackConfig(const cad::battery::BatteryCadConfig& config);
+    void setSimulationOverlay(const cad::battery::BatteryVisualizationOverlay& overlay);
+    void clearSimulationOverlay();
     [[nodiscard]] const cad::core::CadDocument& document() const;
     [[nodiscard]] std::optional<cad::battery::EntitySummary> selectedEntitySummary() const;
     [[nodiscard]] std::optional<cad::battery::CellProperties> selectedCellProperties() const;

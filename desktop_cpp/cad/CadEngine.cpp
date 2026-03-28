@@ -40,7 +40,22 @@ void CadEngine::setViewportSize(int width, int height)
 void CadEngine::setBatteryConfig(const battery::BatteryCadConfig& config)
 {
     m_config = config;
+    m_overrideVisualizationOverlay.reset();
     rebuildDocument();
+    rebuildVisualization();
+    rebuildRenderPacket();
+}
+
+void CadEngine::setVisualizationOverlay(const battery::BatteryVisualizationOverlay& overlay)
+{
+    m_overrideVisualizationOverlay = overlay;
+    m_visualizationOverlay = overlay;
+    rebuildRenderPacket();
+}
+
+void CadEngine::clearVisualizationOverlay()
+{
+    m_overrideVisualizationOverlay.reset();
     rebuildVisualization();
     rebuildRenderPacket();
 }
@@ -438,6 +453,11 @@ void CadEngine::rebuildDocument()
 
 void CadEngine::rebuildVisualization()
 {
+    if (m_overrideVisualizationOverlay.has_value()) {
+        m_visualizationOverlay = *m_overrideVisualizationOverlay;
+        return;
+    }
+
     m_visualizationOverlay = battery::BatteryVisualizationBuilder::build(
         m_document,
         m_config.electrical,

@@ -3,11 +3,15 @@
 #include "CadViewportWidget.h"
 #include "ChartWidget.h"
 #include "SimulationClient.h"
+#include "SimulationResultModel.h"
 
 #include <QColor>
 #include <QMainWindow>
 #include <QJsonObject>
 #include <QVariantList>
+
+#include <optional>
+#include <vector>
 
 class QComboBox;
 class QCheckBox;
@@ -18,6 +22,8 @@ class QPlainTextEdit;
 class QLabel;
 class QLineEdit;
 class QPushButton;
+class QSlider;
+class QTableWidget;
 class QTabWidget;
 class QToolBar;
 class QWidget;
@@ -44,6 +50,9 @@ private slots:
     void resetCadPosition();
     void resetCadGeometry();
     void resetCadLabel();
+    void handleResultScrubChanged(int value);
+    void handleOverlayMetricChanged(int index);
+    void handleGroupSelectionChanged();
 
 private:
     struct ThemeSettings
@@ -59,8 +68,8 @@ private:
     void renderResult(const QJsonObject& payload);
     void renderComparison(const QJsonObject& baselinePayload, const QJsonObject& candidatePayload);
     void applySimulationConfig(const QJsonObject& config);
-    QString formatSummaryLines(const QJsonObject& payload) const;
-    QString formatTraceLines(const QJsonObject& payload) const;
+    QString formatSummaryLines(const desktop::SimulationResultModel& result) const;
+    QString formatTraceLines(const desktop::SimulationResultModel& result) const;
     void createMainToolbar();
     ChartWidget* createGraphWidget();
     QWidget* createInputsSidebar();
@@ -72,16 +81,16 @@ private:
     void applyChartTheme(ChartWidget* graphWidget);
     void updateCadWorkspace();
     void setCadEditorEnabled(bool enabled);
-    charts::Series toChartSeries(const QJsonArray& timeSeries, const QString& metricKey, const QString& name, const QColor& color, bool dashed = false) const;
-    void populateChart(ChartWidget* graphWidget, const QJsonArray& timeSeries, const QString& metricKey, const QString& title, const QString& yTitle);
-    void populateComparisonChart(
-        ChartWidget* graphWidget,
-        const QJsonArray& baselineSeries,
-        const QJsonArray& candidateSeries,
-        const QString& metricKey,
-        const QString& title,
-        const QString& yTitle
-    );
+    charts::Series makeSeries(const std::vector<charts::Point>& points, const QString& name, const QColor& color, bool dashed = false) const;
+    void refreshSimulationViews();
+    void refreshCharts();
+    void refreshGroupTable();
+    void refreshCadOverlay();
+    void refreshResultScrubber();
+    void refreshSelectedGroupCharts();
+    std::vector<charts::Point> pointSeriesForMetric(const desktop::SimulationResultModel& result, const QString& metricKey) const;
+    std::vector<charts::Point> pointSeriesForGroupMetric(const desktop::SimulationResultModel& result, int groupIndex, const QString& metricKey) const;
+    void clearSimulationVisualization();
 
     SimulationClient m_client;
     QComboBox* m_referencePreset = nullptr;
@@ -105,9 +114,19 @@ private:
     QTabWidget* m_topChartTabs = nullptr;
     QTabWidget* m_bottomChartTabs = nullptr;
     ChartWidget* m_voltageChartView = nullptr;
+    ChartWidget* m_currentChartView = nullptr;
     ChartWidget* m_temperatureChartView = nullptr;
     ChartWidget* m_socChartView = nullptr;
+    ChartWidget* m_socEnvelopeChartView = nullptr;
     ChartWidget* m_powerChartView = nullptr;
+    ChartWidget* m_groupVoltageChartView = nullptr;
+    ChartWidget* m_groupTemperatureChartView = nullptr;
+    ChartWidget* m_groupSocChartView = nullptr;
+    QComboBox* m_overlayMetricCombo = nullptr;
+    QSlider* m_resultTimeSlider = nullptr;
+    QLabel* m_resultTimeLabel = nullptr;
+    QLabel* m_resultSelectionLabel = nullptr;
+    QTableWidget* m_groupTable = nullptr;
     CadViewportWidget* m_cadWorkspaceView = nullptr;
     QLabel* m_cadSelectedType = nullptr;
     QLabel* m_cadSelectedId = nullptr;
@@ -146,5 +165,9 @@ private:
     ThemeSettings m_theme;
     QJsonObject m_baselineConfig;
     QJsonObject m_baselineResult;
+    std::optional<desktop::SimulationResultModel> m_activeResult;
+    int m_activeResultPointIndex = -1;
+    int m_selectedResultGroupIndex = -1;
     bool m_isSyncingCadInspector = false;
+    bool m_isSyncingGroupPanel = false;
 };

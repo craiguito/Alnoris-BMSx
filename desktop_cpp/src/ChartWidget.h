@@ -5,6 +5,8 @@
 #include <QColor>
 #include <QWidget>
 
+#include <optional>
+
 class QMouseEvent;
 class QPaintEvent;
 
@@ -18,6 +20,7 @@ public:
     void setThemeColors(const QColor& background, const QColor& text);
     void showSingleSeries(const QString& title, const QString& yAxisTitle, const charts::Series& series);
     void showComparison(const QString& title, const QString& yAxisTitle, const charts::Series& baseline, const charts::Series& candidate);
+    void setMarkerTime(std::optional<double> time_s);
 
 protected:
     void paintEvent(QPaintEvent* event) override;

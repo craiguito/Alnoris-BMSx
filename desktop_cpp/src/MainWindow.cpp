@@ -11,6 +11,7 @@
 #include <QFormLayout>
 #include <QGridLayout>
 #include <QGroupBox>
+#include <QHeaderView>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -23,7 +24,11 @@
 #include <QFrame>
 #include <QFile>
 #include <QScrollArea>
+#include <QSignalBlocker>
+#include <QSlider>
 #include <QStringList>
+#include <QTableWidget>
+#include <QTableWidgetItem>
 #include <QTabWidget>
 #include <QToolBar>
 #include <QHBoxLayout>
@@ -32,7 +37,69 @@
 #include <QWidget>
 #include <algorithm>
 #include <functional>
+#include <limits>
 #include <string>
+
+namespace {
+
+charts::Point makePoint(double x, double y)
+{
+    return charts::Point{x, y};
+}
+
+QColor overlayMetricAccent(int index)
+{
+    switch (index) {
+    case 1:
+        return QColor(34, 197, 94);
+    case 2:
+        return QColor(59, 130, 246);
+    case 0:
+    default:
+        return QColor(245, 113, 61);
+    }
+}
+
+QString formatMaybeNumber(double value, int decimals = 3)
+{
+    return QString::number(value, 'f', decimals);
+}
+
+cad::battery::BatteryVisualizationOverlay buildSimulationOverlay(
+    const cad::core::CadDocument& document,
+    const desktop::SimulationResultModel& result,
+    int point_index,
+    cad::battery::BatteryVisualizationOverlay::Metric metric
+)
+{
+    cad::battery::BatteryVisualizationOverlay overlay;
+    overlay.active_metric = metric;
+
+    const desktop::SimulationTracePoint* point = result.pointAt(point_index);
+    if (point == nullptr) {
+        return overlay;
+    }
+
+    for (const cad::battery::CellEntity& cell : document.cells()) {
+        const int group_index = cell.series_index;
+        if (group_index < 0) {
+            continue;
+        }
+        if (group_index < static_cast<int>(point->group_temp_c.size())) {
+            overlay.cell_temperature_c[cell.id] = point->group_temp_c[static_cast<std::size_t>(group_index)];
+        }
+        if (group_index < static_cast<int>(point->group_soc.size())) {
+            overlay.cell_soc[cell.id] = point->group_soc[static_cast<std::size_t>(group_index)];
+        }
+        if (group_index < static_cast<int>(point->group_voltage_v.size())) {
+            overlay.cell_voltage_v[cell.id] = point->group_voltage_v[static_cast<std::size_t>(group_index)];
+        }
+    }
+
+    return overlay;
+}
+
+} // namespace
 
 MainWindow::MainWindow(QString projectRoot, QWidget* parent)
     : QMainWindow(parent)
@@ -172,6 +239,7 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
     applyTheme();
     updateCadWorkspace();
     refreshCadProperties();
+    clearSimulationVisualization();
 }
 
 void MainWindow::runSimulation()
@@ -196,12 +264,10 @@ void MainWindow::captureBaseline()
 
     m_baselineResult = result.payload;
     m_summaryLabel->setText("Baseline captured. You can now tweak parameters and use Compare to Baseline.");
-    const QJsonArray timeSeries = m_baselineResult.value("time_series").toArray();
-    populateChart(m_voltageChartView, timeSeries, "terminal_voltage_v", "Voltage vs Time", "Voltage (V)");
-    populateChart(m_temperatureChartView, timeSeries, "temp_c", "Temperature vs Time", "Temperature (C)");
-    populateChart(m_socChartView, timeSeries, "soc", "SOC vs Time", "SOC");
-    populateChart(m_powerChartView, timeSeries, "power_w", "Power vs Time", "Power (W)");
-    m_outputText->setPlainText(formatSummaryLines(m_baselineResult) + "\n\n" + formatTraceLines(m_baselineResult));
+    const desktop::SimulationResultModel baseline = desktop::parseSimulationResultPayload(m_baselineResult);
+    if (baseline.valid) {
+        m_outputText->setPlainText(formatSummaryLines(baseline) + "\n\n" + formatTraceLines(baseline));
+    }
 }
 
 void MainWindow::compareAgainstBaseline()
@@ -280,7 +346,10 @@ void MainWindow::loadProject()
 
     if (!m_baselineResult.isEmpty()) {
         m_summaryLabel->setText(QString("Loaded project from %1 with a saved baseline.").arg(path));
-        m_outputText->setPlainText(formatSummaryLines(m_baselineResult) + "\n\n" + formatTraceLines(m_baselineResult));
+        const desktop::SimulationResultModel baseline = desktop::parseSimulationResultPayload(m_baselineResult);
+        if (baseline.valid) {
+            m_outputText->setPlainText(formatSummaryLines(baseline) + "\n\n" + formatTraceLines(baseline));
+        }
     } else {
         m_summaryLabel->setText(QString("Loaded project from %1.").arg(path));
     }
@@ -491,74 +560,103 @@ QJsonObject MainWindow::buildSimulationConfig() const
 
 void MainWindow::renderResult(const QJsonObject& payload)
 {
-    m_summaryLabel->setText("Single scenario results from the desktop shell. Capture a baseline to compare how design changes shift performance.");
-    const QJsonArray timeSeries = payload.value("time_series").toArray();
-    populateChart(m_voltageChartView, timeSeries, "terminal_voltage_v", "Voltage vs Time", "Voltage (V)");
-    populateChart(m_temperatureChartView, timeSeries, "temp_c", "Temperature vs Time", "Temperature (C)");
-    populateChart(m_socChartView, timeSeries, "soc", "SOC vs Time", "SOC");
-    populateChart(m_powerChartView, timeSeries, "power_w", "Power vs Time", "Power (W)");
-    m_outputText->setPlainText(formatSummaryLines(payload) + "\n\n" + formatTraceLines(payload));
+    m_activeResult = desktop::parseSimulationResultPayload(payload);
+    if (!m_activeResult->valid) {
+        QMessageBox::warning(this, "Simulation Result Error", m_activeResult->error);
+        clearSimulationVisualization();
+        return;
+    }
+
+    m_activeResultPointIndex = m_activeResult->pointCount() - 1;
+    m_selectedResultGroupIndex = m_activeResult->summary.weakest_group_index >= 0
+        ? m_activeResult->summary.weakest_group_index
+        : (m_activeResult->summary.hottest_group_index >= 0 ? m_activeResult->summary.hottest_group_index : 0);
+    refreshSimulationViews();
 }
 
 void MainWindow::renderComparison(const QJsonObject& baselinePayload, const QJsonObject& candidatePayload)
 {
-    const QJsonObject baseSummary = baselinePayload.value("summary").toObject();
-    const QJsonObject candidateSummary = candidatePayload.value("summary").toObject();
+    const desktop::SimulationResultModel baseline = desktop::parseSimulationResultPayload(baselinePayload);
+    const desktop::SimulationResultModel candidate = desktop::parseSimulationResultPayload(candidatePayload);
+    if (!baseline.valid || !candidate.valid) {
+        QMessageBox::warning(this, "Comparison Error", "One of the simulation payloads could not be parsed.");
+        return;
+    }
 
-    const double runtimeDelta = candidateSummary.value("runtime_s").toDouble() - baseSummary.value("runtime_s").toDouble();
-    const double energyDelta = candidateSummary.value("delivered_energy_wh").toDouble() - baseSummary.value("delivered_energy_wh").toDouble();
-    const double tempDelta = candidateSummary.value("peak_temp_c").toDouble() - baseSummary.value("peak_temp_c").toDouble();
-    const double voltageDelta = candidateSummary.value("min_terminal_voltage_v").toDouble() - baseSummary.value("min_terminal_voltage_v").toDouble();
+    m_activeResult = candidate;
+    m_activeResultPointIndex = candidate.pointCount() - 1;
+    if (m_selectedResultGroupIndex < 0) {
+        m_selectedResultGroupIndex = candidate.summary.weakest_group_index >= 0 ? candidate.summary.weakest_group_index : 0;
+    }
+    refreshSimulationViews();
+
+    const double runtimeDelta = candidate.summary.runtime_s - baseline.summary.runtime_s;
+    const double energyDelta = candidate.summary.delivered_energy_wh - baseline.summary.delivered_energy_wh;
+    const double tempDelta = candidate.summary.max_group_temp_c - baseline.summary.max_group_temp_c;
+    const double voltageDelta = candidate.summary.min_group_voltage_v - baseline.summary.min_group_voltage_v;
+
+    m_summaryLabel->setText("Scenario comparison view. Charts overlay candidate against baseline while the CAD viewport stays synced to the candidate run.");
+    m_voltageChartView->showComparison(
+        "Pack Voltage Comparison",
+        "Voltage (V)",
+        makeSeries(pointSeriesForMetric(baseline, "pack_voltage_v"), "Baseline", QColor(123, 135, 148), true),
+        makeSeries(pointSeriesForMetric(candidate, "pack_voltage_v"), "Candidate", QColor(14, 165, 233))
+    );
+    m_currentChartView->showComparison(
+        "Pack Current Comparison",
+        "Current (A)",
+        makeSeries(pointSeriesForMetric(baseline, "current_a"), "Baseline", QColor(123, 135, 148), true),
+        makeSeries(pointSeriesForMetric(candidate, "current_a"), "Candidate", QColor(14, 165, 233))
+    );
+    m_powerChartView->showComparison(
+        "Pack Power Comparison",
+        "Power (W)",
+        makeSeries(pointSeriesForMetric(baseline, "pack_power_w"), "Baseline", QColor(123, 135, 148), true),
+        makeSeries(pointSeriesForMetric(candidate, "pack_power_w"), "Candidate", QColor(14, 165, 233))
+    );
+    m_temperatureChartView->showComparison(
+        "Max Temperature Comparison",
+        "Temperature (C)",
+        makeSeries(pointSeriesForMetric(baseline, "temp_max_c"), "Baseline", QColor(123, 135, 148), true),
+        makeSeries(pointSeriesForMetric(candidate, "temp_max_c"), "Candidate", QColor(14, 165, 233))
+    );
+    m_socChartView->showComparison(
+        "Average SOC Comparison",
+        "SOC",
+        makeSeries(pointSeriesForMetric(baseline, "soc_avg"), "Baseline", QColor(123, 135, 148), true),
+        makeSeries(pointSeriesForMetric(candidate, "soc_avg"), "Candidate", QColor(14, 165, 233))
+    );
+    m_socEnvelopeChartView->showComparison(
+        "Minimum SOC Comparison",
+        "SOC",
+        makeSeries(pointSeriesForMetric(baseline, "soc_min"), "Baseline", QColor(123, 135, 148), true),
+        makeSeries(pointSeriesForMetric(candidate, "soc_min"), "Candidate", QColor(14, 165, 233))
+    );
+
+    const std::optional<double> markerTime = candidate.pointAt(m_activeResultPointIndex) != nullptr
+        ? std::optional<double>(candidate.pointAt(m_activeResultPointIndex)->time_s)
+        : std::nullopt;
+    for (ChartWidget* chart : {m_voltageChartView, m_currentChartView, m_powerChartView, m_temperatureChartView, m_socChartView, m_socEnvelopeChartView}) {
+        if (chart != nullptr) {
+            chart->setMarkerTime(markerTime);
+        }
+    }
 
     QStringList lines;
     lines << "Baseline Summary";
-    lines << formatSummaryLines(baselinePayload);
+    lines << formatSummaryLines(baseline);
     lines << "";
     lines << "Candidate Summary";
-    lines << formatSummaryLines(candidatePayload);
+    lines << formatSummaryLines(candidate);
     lines << "";
     lines << "Comparison Deltas";
     lines << QString("Runtime delta: %1 s").arg(runtimeDelta, 0, 'f', 1);
     lines << QString("Delivered energy delta: %1 Wh").arg(energyDelta, 0, 'f', 2);
-    lines << QString("Peak temperature delta: %1 C").arg(tempDelta, 0, 'f', 2);
-    lines << QString("Minimum voltage delta: %1 V").arg(voltageDelta, 0, 'f', 2);
+    lines << QString("Max group temperature delta: %1 C").arg(tempDelta, 0, 'f', 2);
+    lines << QString("Minimum group voltage delta: %1 V").arg(voltageDelta, 0, 'f', 2);
     lines << "";
     lines << "Candidate Trace";
-    lines << formatTraceLines(candidatePayload);
-
-    m_summaryLabel->setText("Scenario comparison view. Positive energy/runtime deltas are usually good; negative peak-temperature deltas are usually good.");
-    populateComparisonChart(
-        m_voltageChartView,
-        baselinePayload.value("time_series").toArray(),
-        candidatePayload.value("time_series").toArray(),
-        "terminal_voltage_v",
-        "Voltage Comparison",
-        "Voltage (V)"
-    );
-    populateComparisonChart(
-        m_temperatureChartView,
-        baselinePayload.value("time_series").toArray(),
-        candidatePayload.value("time_series").toArray(),
-        "temp_c",
-        "Temperature Comparison",
-        "Temperature (C)"
-    );
-    populateComparisonChart(
-        m_socChartView,
-        baselinePayload.value("time_series").toArray(),
-        candidatePayload.value("time_series").toArray(),
-        "soc",
-        "SOC Comparison",
-        "SOC"
-    );
-    populateComparisonChart(
-        m_powerChartView,
-        baselinePayload.value("time_series").toArray(),
-        candidatePayload.value("time_series").toArray(),
-        "power_w",
-        "Power Comparison",
-        "Power (W)"
-    );
+    lines << formatTraceLines(candidate);
     m_outputText->setPlainText(lines.join('\n'));
 }
 
@@ -586,48 +684,36 @@ void MainWindow::applySimulationConfig(const QJsonObject& config)
     m_coolingCoeff->setValue(config.value("cooling_coeff_w_per_k").toDouble(m_coolingCoeff->value()));
 }
 
-QString MainWindow::formatSummaryLines(const QJsonObject& payload) const
+QString MainWindow::formatSummaryLines(const desktop::SimulationResultModel& result) const
 {
-    const QJsonObject summary = payload.value("summary").toObject();
-    const QJsonArray warnings = summary.value("warnings").toArray();
-
     QStringList lines;
-    lines << QString("Pack nominal voltage: %1 V").arg(payload.value("pack_nominal_voltage_v").toDouble(), 0, 'f', 2);
-    lines << QString("Pack capacity: %1 Ah").arg(payload.value("pack_capacity_ah").toDouble(), 0, 'f', 2);
-    lines << QString("Theoretical energy: %1 Wh").arg(payload.value("theoretical_energy_wh").toDouble(), 0, 'f', 2);
-    lines << QString("Delivered energy: %1 Wh").arg(summary.value("delivered_energy_wh").toDouble(), 0, 'f', 2);
-    lines << QString("Delivered capacity: %1 Ah").arg(summary.value("delivered_capacity_ah").toDouble(), 0, 'f', 3);
-    lines << QString("Peak temperature: %1 C").arg(summary.value("peak_temp_c").toDouble(), 0, 'f', 2);
-    lines << QString("Minimum voltage: %1 V").arg(summary.value("min_terminal_voltage_v").toDouble(), 0, 'f', 2);
-    lines << QString("Final SOC: %1").arg(summary.value("final_soc").toDouble(), 0, 'f', 3);
-    lines << QString("Runtime: %1 s").arg(summary.value("runtime_s").toInt());
-    lines << QString("Termination: %1").arg(summary.value("termination_reason").toString());
-
-    if (!warnings.isEmpty()) {
-        lines << "Warnings:";
-        for (const QJsonValue& warningValue : warnings) {
-            const QJsonObject warning = warningValue.toObject();
-            lines << QString("[%1] %2")
-                         .arg(warning.value("severity").toString().toUpper())
-                         .arg(warning.value("message").toString());
-        }
-    }
-
+    lines << QString("Pack nominal voltage: %1 V").arg(result.pack_nominal_voltage_v, 0, 'f', 2);
+    lines << QString("Pack capacity: %1 Ah").arg(result.pack_capacity_ah, 0, 'f', 2);
+    lines << QString("Theoretical energy: %1 Wh").arg(result.theoretical_energy_wh, 0, 'f', 2);
+    lines << QString("Delivered energy: %1 Wh").arg(result.summary.delivered_energy_wh, 0, 'f', 2);
+    lines << QString("Delivered capacity: %1 Ah").arg(result.summary.delivered_capacity_ah, 0, 'f', 3);
+    lines << QString("Max group temperature: %1 C").arg(result.summary.max_group_temp_c, 0, 'f', 2);
+    lines << QString("Minimum group voltage: %1 V").arg(result.summary.min_group_voltage_v, 0, 'f', 3);
+    lines << QString("Final average SOC: %1").arg(result.summary.final_soc_avg, 0, 'f', 3);
+    lines << QString("SOC spread: %1").arg(result.summary.soc_spread, 0, 'f', 4);
+    lines << QString("Capacity retention: %1").arg(result.summary.capacity_retention, 0, 'f', 5);
+    lines << QString("Resistance growth: %1").arg(result.summary.resistance_growth, 0, 'f', 5);
+    lines << QString("Runtime: %1 s").arg(result.summary.runtime_s, 0, 'f', 0);
+    lines << QString("Termination: %1").arg(result.summary.termination_reason);
     return lines.join('\n');
 }
 
-QString MainWindow::formatTraceLines(const QJsonObject& payload) const
+QString MainWindow::formatTraceLines(const desktop::SimulationResultModel& result) const
 {
-    const QJsonArray timeSeries = payload.value("time_series").toArray();
     QStringList lines;
-    for (const QJsonValue& pointValue : timeSeries) {
-        const QJsonObject point = pointValue.toObject();
-        lines << QString("t=%1s  soc=%2  V=%3  P=%4W  T=%5C")
-                     .arg(point.value("time_s").toInt(), 5)
-                     .arg(point.value("soc").toDouble(), 0, 'f', 3)
-                     .arg(point.value("terminal_voltage_v").toDouble(), 0, 'f', 3)
-                     .arg(point.value("power_w").toDouble(), 0, 'f', 3)
-                     .arg(point.value("temp_c").toDouble(), 0, 'f', 3);
+    for (const desktop::SimulationTracePoint& point : result.points) {
+        lines << QString("t=%1s  I=%2A  soc_avg=%3  V=%4  P=%5W  Tmax=%6C")
+                     .arg(point.time_s, 5, 'f', 0)
+                     .arg(point.current_a, 0, 'f', 3)
+                     .arg(point.soc_avg, 0, 'f', 3)
+                     .arg(point.pack_voltage_v, 0, 'f', 3)
+                     .arg(point.pack_power_w, 0, 'f', 3)
+                     .arg(point.temp_max_c, 0, 'f', 3);
     }
     return lines.join('\n');
 }
@@ -793,6 +879,28 @@ QGroupBox* MainWindow::createResultsPanel()
     summaryLayout->addWidget(m_summaryLabel);
     layout->addWidget(summaryGroup);
 
+    auto* playbackGroup = new QGroupBox("Playback & Overlay", group);
+    auto* playbackLayout = new QGridLayout(playbackGroup);
+    playbackLayout->setContentsMargins(14, 16, 14, 14);
+    playbackLayout->setHorizontalSpacing(10);
+    playbackLayout->setVerticalSpacing(8);
+    m_overlayMetricCombo = new QComboBox(playbackGroup);
+    m_overlayMetricCombo->addItems({"Temperature Overlay", "SOC Overlay", "Voltage Overlay"});
+    connect(m_overlayMetricCombo, &QComboBox::currentIndexChanged, this, &MainWindow::handleOverlayMetricChanged);
+    m_resultTimeSlider = new QSlider(Qt::Horizontal, playbackGroup);
+    m_resultTimeSlider->setEnabled(false);
+    connect(m_resultTimeSlider, &QSlider::valueChanged, this, &MainWindow::handleResultScrubChanged);
+    m_resultTimeLabel = new QLabel("Time: --", playbackGroup);
+    m_resultSelectionLabel = new QLabel("Selected group: --", playbackGroup);
+    m_resultSelectionLabel->setStyleSheet("color:#93a6ba;");
+    playbackLayout->addWidget(new QLabel("Overlay metric", playbackGroup), 0, 0);
+    playbackLayout->addWidget(m_overlayMetricCombo, 0, 1);
+    playbackLayout->addWidget(new QLabel("Scrub timestep", playbackGroup), 1, 0);
+    playbackLayout->addWidget(m_resultTimeSlider, 1, 1);
+    playbackLayout->addWidget(m_resultTimeLabel, 2, 0);
+    playbackLayout->addWidget(m_resultSelectionLabel, 2, 1);
+    layout->addWidget(playbackGroup);
+
     auto* chartTabs = new QTabWidget(group);
     auto* electricalTab = new QWidget(chartTabs);
     auto* electricalLayout = new QVBoxLayout(electricalTab);
@@ -800,8 +908,10 @@ QGroupBox* MainWindow::createResultsPanel()
     electricalLayout->setSpacing(10);
     m_topChartTabs = new QTabWidget(electricalTab);
     m_voltageChartView = createGraphWidget();
+    m_currentChartView = createGraphWidget();
     m_powerChartView = createGraphWidget();
     m_topChartTabs->addTab(m_voltageChartView, "Voltage");
+    m_topChartTabs->addTab(m_currentChartView, "Current");
     m_topChartTabs->addTab(m_powerChartView, "Power");
     electricalLayout->addWidget(m_topChartTabs, 1);
 
@@ -812,13 +922,40 @@ QGroupBox* MainWindow::createResultsPanel()
     m_bottomChartTabs = new QTabWidget(thermalTab);
     m_temperatureChartView = createGraphWidget();
     m_socChartView = createGraphWidget();
+    m_socEnvelopeChartView = createGraphWidget();
     m_bottomChartTabs->addTab(m_temperatureChartView, "Temperature");
-    m_bottomChartTabs->addTab(m_socChartView, "SOC");
+    m_bottomChartTabs->addTab(m_socChartView, "Avg SOC");
+    m_bottomChartTabs->addTab(m_socEnvelopeChartView, "SOC Envelope");
     thermalLayout->addWidget(m_bottomChartTabs, 1);
 
     chartTabs->addTab(electricalTab, "Electrical");
     chartTabs->addTab(thermalTab, "Thermal / State");
     layout->addWidget(chartTabs, 1);
+
+    auto* groupInfoGroup = new QGroupBox("Group Inspection", group);
+    auto* groupInfoLayout = new QVBoxLayout(groupInfoGroup);
+    groupInfoLayout->setContentsMargins(14, 16, 14, 14);
+    groupInfoLayout->setSpacing(10);
+    m_groupTable = new QTableWidget(0, 4, groupInfoGroup);
+    m_groupTable->setHorizontalHeaderLabels({"Group", "SOC", "Voltage (V)", "Temp (C)"});
+    m_groupTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    m_groupTable->setSelectionMode(QAbstractItemView::SingleSelection);
+    m_groupTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_groupTable->verticalHeader()->setVisible(false);
+    m_groupTable->horizontalHeader()->setStretchLastSection(true);
+    m_groupTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    connect(m_groupTable, &QTableWidget::itemSelectionChanged, this, &MainWindow::handleGroupSelectionChanged);
+    groupInfoLayout->addWidget(m_groupTable);
+
+    auto* groupChartTabs = new QTabWidget(groupInfoGroup);
+    m_groupVoltageChartView = createGraphWidget();
+    m_groupTemperatureChartView = createGraphWidget();
+    m_groupSocChartView = createGraphWidget();
+    groupChartTabs->addTab(m_groupVoltageChartView, "Selected Voltage");
+    groupChartTabs->addTab(m_groupTemperatureChartView, "Selected Temp");
+    groupChartTabs->addTab(m_groupSocChartView, "Selected SOC");
+    groupInfoLayout->addWidget(groupChartTabs, 1);
+    layout->addWidget(groupInfoGroup, 1);
 
     return group;
 }
@@ -878,9 +1015,14 @@ void MainWindow::applyTheme()
     }
 
     applyChartTheme(m_voltageChartView);
+    applyChartTheme(m_currentChartView);
     applyChartTheme(m_temperatureChartView);
     applyChartTheme(m_socChartView);
+    applyChartTheme(m_socEnvelopeChartView);
     applyChartTheme(m_powerChartView);
+    applyChartTheme(m_groupVoltageChartView);
+    applyChartTheme(m_groupTemperatureChartView);
+    applyChartTheme(m_groupSocChartView);
 }
 
 void MainWindow::applyChartTheme(ChartWidget* graphWidget)
@@ -963,6 +1105,7 @@ void MainWindow::updateCadWorkspace()
         ? m_cellCapacity->value() * m_cellsInParallel->value()
         : 0.0;
     m_cadWorkspaceView->setPackConfig(cadConfig);
+    refreshCadOverlay();
 }
 
 void MainWindow::setCadEditorEnabled(bool enabled)
@@ -1389,55 +1532,379 @@ void MainWindow::resetCadLabel()
     refreshCadProperties();
 }
 
-charts::Series MainWindow::toChartSeries(const QJsonArray& timeSeries, const QString& metricKey, const QString& name, const QColor& color, bool dashed) const
+charts::Series MainWindow::makeSeries(const std::vector<charts::Point>& points, const QString& name, const QColor& color, bool dashed) const
 {
     charts::Series series;
     series.name = name.toStdString();
+    series.points = points;
     series.red = color.red();
     series.green = color.green();
     series.blue = color.blue();
     series.dashed = dashed;
-    for (const QJsonValue& pointValue : timeSeries) {
-        const QJsonObject point = pointValue.toObject();
-        series.points.push_back({point.value("time_s").toDouble(), point.value(metricKey).toDouble()});
-    }
     return series;
 }
 
-void MainWindow::populateChart(
-    ChartWidget* graphWidget,
-    const QJsonArray& timeSeries,
-    const QString& metricKey,
-    const QString& title,
-    const QString& yTitle
-)
+std::vector<charts::Point> MainWindow::pointSeriesForMetric(const desktop::SimulationResultModel& result, const QString& metricKey) const
 {
-    if (graphWidget == nullptr) {
+    std::vector<charts::Point> points;
+    points.reserve(result.points.size());
+    for (const desktop::SimulationTracePoint& point : result.points) {
+        double value = 0.0;
+        if (metricKey == "pack_voltage_v") {
+            value = point.pack_voltage_v;
+        } else if (metricKey == "current_a") {
+            value = point.current_a;
+        } else if (metricKey == "pack_power_w") {
+            value = point.pack_power_w;
+        } else if (metricKey == "soc_avg") {
+            value = point.soc_avg;
+        } else if (metricKey == "soc_min") {
+            value = point.soc_min;
+        } else if (metricKey == "soc_max") {
+            value = point.soc_max;
+        } else if (metricKey == "temp_avg_c") {
+            value = point.temp_avg_c;
+        } else if (metricKey == "temp_max_c") {
+            value = point.temp_max_c;
+        } else if (metricKey == "pack_heat_w") {
+            value = point.pack_heat_w;
+        }
+        points.push_back(makePoint(point.time_s, value));
+    }
+    return points;
+}
+
+std::vector<charts::Point> MainWindow::pointSeriesForGroupMetric(const desktop::SimulationResultModel& result, int groupIndex, const QString& metricKey) const
+{
+    std::vector<charts::Point> points;
+    if (groupIndex < 0) {
+        return points;
+    }
+    points.reserve(result.points.size());
+    for (const desktop::SimulationTracePoint& point : result.points) {
+        double value = 0.0;
+        if (metricKey == "group_soc" && groupIndex < static_cast<int>(point.group_soc.size())) {
+            value = point.group_soc[static_cast<std::size_t>(groupIndex)];
+        } else if (metricKey == "group_temp" && groupIndex < static_cast<int>(point.group_temp_c.size())) {
+            value = point.group_temp_c[static_cast<std::size_t>(groupIndex)];
+        } else if (metricKey == "group_voltage" && groupIndex < static_cast<int>(point.group_voltage_v.size())) {
+            value = point.group_voltage_v[static_cast<std::size_t>(groupIndex)];
+        }
+        points.push_back(makePoint(point.time_s, value));
+    }
+    return points;
+}
+
+void MainWindow::refreshSimulationViews()
+{
+    if (!m_activeResult.has_value() || !m_activeResult->valid) {
+        clearSimulationVisualization();
         return;
     }
-    graphWidget->showSingleSeries(
-        title,
-        yTitle,
-        toChartSeries(timeSeries, metricKey, "Current Scenario", QColor(14, 165, 233))
+
+    m_summaryLabel->setText("Simulation results are live in charts, group inspection, and the CAD workspace. Scrub time or change overlay metric to inspect behavior.");
+    refreshResultScrubber();
+    refreshCharts();
+    refreshGroupTable();
+    refreshSelectedGroupCharts();
+    refreshCadOverlay();
+    m_outputText->setPlainText(formatSummaryLines(*m_activeResult) + "\n\n" + formatTraceLines(*m_activeResult));
+}
+
+void MainWindow::refreshCharts()
+{
+    if (!m_activeResult.has_value() || !m_activeResult->valid) {
+        return;
+    }
+
+    const auto markerTime = m_activeResult->pointAt(m_activeResultPointIndex) != nullptr
+        ? std::optional<double>(m_activeResult->pointAt(m_activeResultPointIndex)->time_s)
+        : std::nullopt;
+
+    m_voltageChartView->showSingleSeries(
+        "Pack Voltage vs Time",
+        "Voltage (V)",
+        makeSeries(pointSeriesForMetric(*m_activeResult, "pack_voltage_v"), "Current Scenario", QColor(14, 165, 233))
+    );
+    m_currentChartView->showSingleSeries(
+        "Current vs Time",
+        "Current (A)",
+        makeSeries(pointSeriesForMetric(*m_activeResult, "current_a"), "Current Scenario", QColor(59, 130, 246))
+    );
+    m_powerChartView->showSingleSeries(
+        "Pack Power vs Time",
+        "Power (W)",
+        makeSeries(pointSeriesForMetric(*m_activeResult, "pack_power_w"), "Current Scenario", QColor(245, 158, 11))
+    );
+    m_socChartView->showSingleSeries(
+        "Average SOC vs Time",
+        "SOC",
+        makeSeries(pointSeriesForMetric(*m_activeResult, "soc_avg"), "Current Scenario", QColor(34, 197, 94))
+    );
+    m_socEnvelopeChartView->showComparison(
+        "SOC Envelope",
+        "SOC",
+        makeSeries(pointSeriesForMetric(*m_activeResult, "soc_min"), "Minimum", QColor(239, 68, 68), true),
+        makeSeries(pointSeriesForMetric(*m_activeResult, "soc_max"), "Maximum", QColor(34, 197, 94))
+    );
+    m_temperatureChartView->showComparison(
+        "Temperature vs Time",
+        "Temperature (C)",
+        makeSeries(pointSeriesForMetric(*m_activeResult, "temp_avg_c"), "Average", QColor(56, 189, 248), true),
+        makeSeries(pointSeriesForMetric(*m_activeResult, "temp_max_c"), "Maximum", QColor(245, 113, 61))
+    );
+
+    for (ChartWidget* chart : {m_voltageChartView, m_currentChartView, m_powerChartView, m_socChartView, m_socEnvelopeChartView, m_temperatureChartView}) {
+        if (chart != nullptr) {
+            chart->setMarkerTime(markerTime);
+        }
+    }
+}
+
+void MainWindow::refreshGroupTable()
+{
+    if (m_groupTable == nullptr) {
+        return;
+    }
+
+    m_isSyncingGroupPanel = true;
+    m_groupTable->clearContents();
+
+    if (!m_activeResult.has_value() || !m_activeResult->valid) {
+        m_groupTable->setRowCount(0);
+        m_isSyncingGroupPanel = false;
+        return;
+    }
+
+    const desktop::SimulationTracePoint* point = m_activeResult->pointAt(m_activeResultPointIndex);
+    if (point == nullptr) {
+        m_groupTable->setRowCount(0);
+        m_isSyncingGroupPanel = false;
+        return;
+    }
+
+    const int groupCount = m_activeResult->groupCount();
+    m_groupTable->setRowCount(groupCount);
+    for (int row = 0; row < groupCount; ++row) {
+        QString label = m_activeResult->groupLabel(row);
+        if (row == m_activeResult->summary.weakest_group_index) {
+            label += "  [weakest]";
+        }
+        if (row == m_activeResult->summary.hottest_group_index) {
+            label += "  [hottest]";
+        }
+
+        auto* groupItem = new QTableWidgetItem(label);
+        auto* socItem = new QTableWidgetItem(row < static_cast<int>(point->group_soc.size()) ? formatMaybeNumber(point->group_soc[static_cast<std::size_t>(row)], 3) : "--");
+        auto* voltageItem = new QTableWidgetItem(row < static_cast<int>(point->group_voltage_v.size()) ? formatMaybeNumber(point->group_voltage_v[static_cast<std::size_t>(row)], 3) : "--");
+        auto* tempItem = new QTableWidgetItem(row < static_cast<int>(point->group_temp_c.size()) ? formatMaybeNumber(point->group_temp_c[static_cast<std::size_t>(row)], 2) : "--");
+
+        if (row == m_activeResult->summary.weakest_group_index) {
+            const QColor highlight(116, 52, 52, 110);
+            groupItem->setBackground(highlight);
+            socItem->setBackground(highlight);
+            voltageItem->setBackground(highlight);
+            tempItem->setBackground(highlight);
+        } else if (row == m_activeResult->summary.hottest_group_index) {
+            const QColor highlight(92, 65, 28, 110);
+            groupItem->setBackground(highlight);
+            socItem->setBackground(highlight);
+            voltageItem->setBackground(highlight);
+            tempItem->setBackground(highlight);
+        }
+
+        m_groupTable->setItem(row, 0, groupItem);
+        m_groupTable->setItem(row, 1, socItem);
+        m_groupTable->setItem(row, 2, voltageItem);
+        m_groupTable->setItem(row, 3, tempItem);
+    }
+
+    const int clampedGroup = std::clamp(m_selectedResultGroupIndex, 0, std::max(0, groupCount - 1));
+    m_selectedResultGroupIndex = clampedGroup;
+    if (groupCount > 0) {
+        m_groupTable->selectRow(clampedGroup);
+        m_resultSelectionLabel->setText(QString("Selected group: %1").arg(m_activeResult->groupLabel(clampedGroup)));
+    } else {
+        m_resultSelectionLabel->setText("Selected group: --");
+    }
+    m_isSyncingGroupPanel = false;
+}
+
+void MainWindow::refreshCadOverlay()
+{
+    if (m_cadWorkspaceView == nullptr) {
+        return;
+    }
+
+    if (!m_activeResult.has_value() || !m_activeResult->valid) {
+        m_cadWorkspaceView->clearSimulationOverlay();
+        return;
+    }
+
+    cad::battery::BatteryVisualizationOverlay::Metric metric = cad::battery::BatteryVisualizationOverlay::Metric::Temperature;
+    if (m_overlayMetricCombo != nullptr) {
+        switch (m_overlayMetricCombo->currentIndex()) {
+        case 1:
+            metric = cad::battery::BatteryVisualizationOverlay::Metric::Soc;
+            break;
+        case 2:
+            metric = cad::battery::BatteryVisualizationOverlay::Metric::Voltage;
+            break;
+        case 0:
+        default:
+            metric = cad::battery::BatteryVisualizationOverlay::Metric::Temperature;
+            break;
+        }
+    }
+
+    m_cadWorkspaceView->setSimulationOverlay(
+        buildSimulationOverlay(m_cadWorkspaceView->document(), *m_activeResult, m_activeResultPointIndex, metric)
     );
 }
 
-void MainWindow::populateComparisonChart(
-    ChartWidget* graphWidget,
-    const QJsonArray& baselineSeries,
-    const QJsonArray& candidateSeries,
-    const QString& metricKey,
-    const QString& title,
-    const QString& yTitle
-)
+void MainWindow::refreshResultScrubber()
 {
-    if (graphWidget == nullptr) {
+    if (m_resultTimeSlider == nullptr || m_resultTimeLabel == nullptr) {
         return;
     }
-    graphWidget->showComparison(
-        title,
-        yTitle,
-        toChartSeries(baselineSeries, metricKey, "Baseline", QColor(123, 135, 148), true),
-        toChartSeries(candidateSeries, metricKey, "Candidate", QColor(14, 165, 233))
+
+    QSignalBlocker blocker(m_resultTimeSlider);
+    if (!m_activeResult.has_value() || !m_activeResult->valid || !m_activeResult->hasPoints()) {
+        m_resultTimeSlider->setEnabled(false);
+        m_resultTimeSlider->setRange(0, 0);
+        m_resultTimeSlider->setValue(0);
+        m_resultTimeLabel->setText("Time: --");
+        return;
+    }
+
+    m_activeResultPointIndex = m_activeResult->clampedPointIndex(m_activeResultPointIndex < 0 ? m_activeResult->pointCount() - 1 : m_activeResultPointIndex);
+    m_resultTimeSlider->setEnabled(true);
+    m_resultTimeSlider->setRange(0, m_activeResult->pointCount() - 1);
+    m_resultTimeSlider->setValue(m_activeResultPointIndex);
+
+    if (const auto* point = m_activeResult->pointAt(m_activeResultPointIndex); point != nullptr) {
+        m_resultTimeLabel->setText(QString("Time: %1 s").arg(point->time_s, 0, 'f', 0));
+    }
+}
+
+void MainWindow::refreshSelectedGroupCharts()
+{
+    const auto clearGroupChart = [](ChartWidget* chart, const QString& title, const QString& yAxis) {
+        if (chart != nullptr) {
+            chart->showSingleSeries(title, yAxis, charts::Series{});
+            chart->setMarkerTime(std::nullopt);
+        }
+    };
+
+    if (!m_activeResult.has_value() || !m_activeResult->valid || m_selectedResultGroupIndex < 0) {
+        clearGroupChart(m_groupVoltageChartView, "Selected Group Voltage", "Voltage (V)");
+        clearGroupChart(m_groupTemperatureChartView, "Selected Group Temperature", "Temperature (C)");
+        clearGroupChart(m_groupSocChartView, "Selected Group SOC", "SOC");
+        return;
+    }
+
+    const QString groupName = m_activeResult->groupLabel(m_selectedResultGroupIndex);
+    const auto markerTime = m_activeResult->pointAt(m_activeResultPointIndex) != nullptr
+        ? std::optional<double>(m_activeResult->pointAt(m_activeResultPointIndex)->time_s)
+        : std::nullopt;
+
+    m_groupVoltageChartView->showSingleSeries(
+        QString("%1 Voltage").arg(groupName),
+        "Voltage (V)",
+        makeSeries(pointSeriesForGroupMetric(*m_activeResult, m_selectedResultGroupIndex, "group_voltage"), groupName, QColor(59, 130, 246))
     );
+    m_groupTemperatureChartView->showSingleSeries(
+        QString("%1 Temperature").arg(groupName),
+        "Temperature (C)",
+        makeSeries(pointSeriesForGroupMetric(*m_activeResult, m_selectedResultGroupIndex, "group_temp"), groupName, QColor(245, 113, 61))
+    );
+    m_groupSocChartView->showSingleSeries(
+        QString("%1 SOC").arg(groupName),
+        "SOC",
+        makeSeries(pointSeriesForGroupMetric(*m_activeResult, m_selectedResultGroupIndex, "group_soc"), groupName, QColor(34, 197, 94))
+    );
+    m_groupVoltageChartView->setMarkerTime(markerTime);
+    m_groupTemperatureChartView->setMarkerTime(markerTime);
+    m_groupSocChartView->setMarkerTime(markerTime);
+}
+
+void MainWindow::clearSimulationVisualization()
+{
+    const auto clearChart = [](ChartWidget* chart, const QString& title, const QString& yAxis) {
+        if (chart != nullptr) {
+            chart->showSingleSeries(title, yAxis, charts::Series{});
+            chart->setMarkerTime(std::nullopt);
+        }
+    };
+
+    m_activeResult.reset();
+    m_activeResultPointIndex = -1;
+    m_selectedResultGroupIndex = -1;
+    m_summaryLabel->setText("Run a simulation to view the desktop-first results. Capture a baseline when you want to compare design changes.");
+    clearChart(m_voltageChartView, "Pack Voltage vs Time", "Voltage (V)");
+    clearChart(m_currentChartView, "Current vs Time", "Current (A)");
+    clearChart(m_powerChartView, "Pack Power vs Time", "Power (W)");
+    clearChart(m_socChartView, "Average SOC vs Time", "SOC");
+    clearChart(m_socEnvelopeChartView, "SOC Envelope", "SOC");
+    clearChart(m_temperatureChartView, "Temperature vs Time", "Temperature (C)");
+    clearChart(m_groupVoltageChartView, "Selected Group Voltage", "Voltage (V)");
+    clearChart(m_groupTemperatureChartView, "Selected Group Temperature", "Temperature (C)");
+    clearChart(m_groupSocChartView, "Selected Group SOC", "SOC");
+    if (m_groupTable != nullptr) {
+        m_groupTable->setRowCount(0);
+    }
+    if (m_resultTimeSlider != nullptr) {
+        m_resultTimeSlider->setEnabled(false);
+        m_resultTimeSlider->setRange(0, 0);
+        m_resultTimeSlider->setValue(0);
+    }
+    if (m_resultTimeLabel != nullptr) {
+        m_resultTimeLabel->setText("Time: --");
+    }
+    if (m_resultSelectionLabel != nullptr) {
+        m_resultSelectionLabel->setText("Selected group: --");
+    }
+    if (m_cadWorkspaceView != nullptr) {
+        m_cadWorkspaceView->clearSimulationOverlay();
+    }
+    if (m_outputText != nullptr) {
+        m_outputText->clear();
+    }
+}
+
+void MainWindow::handleResultScrubChanged(int value)
+{
+    if (!m_activeResult.has_value() || !m_activeResult->valid) {
+        return;
+    }
+    m_activeResultPointIndex = m_activeResult->clampedPointIndex(value);
+    refreshResultScrubber();
+    refreshGroupTable();
+    refreshSelectedGroupCharts();
+    refreshCadOverlay();
+    refreshCharts();
+}
+
+void MainWindow::handleOverlayMetricChanged(int index)
+{
+    if (m_overlayMetricCombo != nullptr) {
+        m_overlayMetricCombo->setStyleSheet(QString("border:1px solid %1;").arg(overlayMetricAccent(index).name()));
+    }
+    refreshCadOverlay();
+}
+
+void MainWindow::handleGroupSelectionChanged()
+{
+    if (m_isSyncingGroupPanel || m_groupTable == nullptr) {
+        return;
+    }
+    const auto items = m_groupTable->selectionModel()->selectedRows();
+    if (items.isEmpty()) {
+        return;
+    }
+    m_selectedResultGroupIndex = items.front().row();
+    if (m_activeResult.has_value()) {
+        m_resultSelectionLabel->setText(QString("Selected group: %1").arg(m_activeResult->groupLabel(m_selectedResultGroupIndex)));
+    }
+    refreshSelectedGroupCharts();
 }

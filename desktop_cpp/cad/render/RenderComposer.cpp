@@ -17,6 +17,54 @@ Vec3 temperatureColor(double temp_c)
     return cad::math::mix({0.28f, 0.73f, 1.0f}, {1.0f, 0.42f, 0.25f}, normalized);
 }
 
+Vec3 gradientColor(double value, double min_value, double max_value)
+{
+    if (max_value <= min_value) {
+        return {0.70f, 0.74f, 0.79f};
+    }
+
+    const float normalized = cad::math::clamp(static_cast<float>((value - min_value) / (max_value - min_value)), 0.0f, 1.0f);
+    if (normalized < 0.5f) {
+        const float local = normalized / 0.5f;
+        return cad::math::mix({0.14f, 0.45f, 0.94f}, {0.97f, 0.84f, 0.26f}, local);
+    }
+    const float local = (normalized - 0.5f) / 0.5f;
+    return cad::math::mix({0.97f, 0.84f, 0.26f}, {0.95f, 0.32f, 0.25f}, local);
+}
+
+Vec3 overlayCellColor(const battery::BatteryVisualizationOverlay& overlay, const battery::CellEntity& cell)
+{
+    switch (overlay.active_metric) {
+    case battery::BatteryVisualizationOverlay::Metric::Soc: {
+        const auto it = overlay.cell_soc.find(cell.id);
+        if (it != overlay.cell_soc.end()) {
+            return gradientColor(it->second, 0.0, 1.0);
+        }
+        break;
+    }
+    case battery::BatteryVisualizationOverlay::Metric::Voltage: {
+        const auto it = overlay.cell_voltage_v.find(cell.id);
+        if (it != overlay.cell_voltage_v.end()) {
+            return gradientColor(it->second, 2.8, 4.25);
+        }
+        break;
+    }
+    case battery::BatteryVisualizationOverlay::Metric::Temperature:
+    default: {
+        const auto it = overlay.cell_temperature_c.find(cell.id);
+        if (it != overlay.cell_temperature_c.end()) {
+            return temperatureColor(it->second);
+        }
+        break;
+    }
+    }
+
+    if (const auto it = overlay.cell_temperature_c.find(cell.id); it != overlay.cell_temperature_c.end()) {
+        return temperatureColor(it->second);
+    }
+    return {0.68f, 0.71f, 0.76f};
+}
+
 void appendTriangle(std::vector<RenderVertex>& vertices, const Vec3& a, const Vec3& b, const Vec3& c, const Vec3& color)
 {
     vertices.push_back({a, color});
@@ -299,11 +347,7 @@ RenderPacket RenderComposer::compose(
     }
 
     for (const battery::CellEntity& cell : document.cells()) {
-        Vec3 color = {0.68f, 0.71f, 0.76f};
-        const auto temp_it = overlay.cell_temperature_c.find(cell.id);
-        if (temp_it != overlay.cell_temperature_c.end()) {
-            color = temperatureColor(temp_it->second);
-        }
+        const Vec3 color = overlayCellColor(overlay, cell);
         if (cell_mesh != nullptr && !cell_mesh->vertices.empty()) {
             appendMesh(packet.triangles, *cell_mesh, cell.position, color);
             if (document.selection().primary == cell.id) {

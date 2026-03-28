@@ -43,6 +43,12 @@ void Module::show_comparison(
     m_view.comparison_mode = true;
 }
 
+void Module::set_marker(std::optional<double> marker_x)
+{
+    m_view.marker_enabled = marker_x.has_value();
+    m_view.marker_x = marker_x.value_or(0.0);
+}
+
 const ViewModel& Module::view_model() const
 {
     return m_view;
