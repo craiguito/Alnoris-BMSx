@@ -1,6 +1,48 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+
+@dataclass(frozen=True)
+class RcBranchParams:
+    """One RC branch in a Thevenin-style equivalent circuit model."""
+
+    resistance_ohm: float
+    capacitance_f: float
+
+
+@dataclass(frozen=True)
+class ElectricalModelConfig:
+    model_type: str = "rint"
+    r0_ohm_per_cell: float | None = None
+    rc_branches: tuple[RcBranchParams, ...] = ()
+
+
+@dataclass(frozen=True)
+class CurrentProfilePoint:
+    time_s: int
+    current_a: float
+
+
+@dataclass(frozen=True)
+class CurrentProfile:
+    points: tuple[CurrentProfilePoint, ...] = ()
+
+
+@dataclass(frozen=True)
+class GroupVariationConfig:
+    capacity_variation_fraction: float = 0.0
+    resistance_variation_fraction: float = 0.0
+    initial_soc_variation_abs: float = 0.0
+
+
+@dataclass(frozen=True)
+class DegradationConfig:
+    capacity_fade_per_throughput_ah: float = 2.5e-5
+    resistance_growth_per_throughput_ah: float = 1.2e-5
+    temperature_reference_c: float = 25.0
+    temperature_acceleration_per_c: float = 0.02
+    depth_of_discharge_weight: float = 0.15
 
 
 @dataclass(frozen=True)
@@ -21,6 +63,11 @@ class SimulationConfig:
     pack_mass_kg: float
     pack_heat_capacity_j_per_kgk: float
     cooling_coeff_w_per_k: float
+    electrical_model: ElectricalModelConfig = field(default_factory=ElectricalModelConfig)
+    current_profile: CurrentProfile | None = None
+    group_count: int | None = None
+    group_variation: GroupVariationConfig = field(default_factory=GroupVariationConfig)
+    degradation: DegradationConfig = field(default_factory=DegradationConfig)
 
 
 @dataclass(frozen=True)
@@ -37,6 +84,43 @@ class PackProperties:
     theoretical_energy_wh: float
     resistance_ohm: float
     capacity_as: float
+    group_count: int
+    series_factor: float
+    group_nominal_voltage_v: float
+    group_capacity_ah: float
+    group_capacity_as: float
+    group_base_resistance_ohm: float
+
+
+@dataclass(frozen=True)
+class DegradationState:
+    cumulative_throughput_ah: float = 0.0
+    capacity_loss_fraction: float = 0.0
+    resistance_growth_fraction: float = 0.0
+
+
+@dataclass(frozen=True)
+class GroupElectricalState:
+    rc_branch_voltages_v: tuple[float, ...] = ()
+
+
+@dataclass(frozen=True)
+class CellGroupState:
+    index: int
+    soc: float
+    temp_c: float
+    resistance_scale: float = 1.0
+    capacity_scale: float = 1.0
+    electrical_state: GroupElectricalState = field(default_factory=GroupElectricalState)
+    degradation: DegradationState = field(default_factory=DegradationState)
+
+
+@dataclass(frozen=True)
+class GroupStepResult:
+    terminal_voltage_v: float
+    open_circuit_voltage_v: float
+    heat_w: float
+    next_state: CellGroupState
 
 
 @dataclass(frozen=True)
@@ -47,6 +131,18 @@ class SimulationPoint:
     power_w: float
     heat_w: float
     temp_c: float
+    current_a: float
+    pack_voltage_v: float
+    pack_power_w: float
+    pack_heat_w: float
+    pack_temp_max_c: float
+    pack_temp_avg_c: float
+    soc_min: float
+    soc_max: float
+    soc_avg: float
+    group_voltage_min_v: float
+    group_voltage_max_v: float
+    weakest_group_index: int
 
 
 @dataclass(frozen=True)
@@ -59,6 +155,14 @@ class SimulationSummary:
     final_soc: float
     termination_reason: str
     warnings: list[SimulationWarning]
+    final_soc_avg: float
+    soc_spread: float
+    max_group_temp_c: float
+    min_group_voltage_v: float
+    estimated_capacity_retention: float
+    estimated_resistance_growth: float
+    electrical_model_type: str
+    profile_used: bool
 
 
 @dataclass(frozen=True)

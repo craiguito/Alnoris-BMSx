@@ -1,6 +1,12 @@
 from .engine import run_simulation
 from .types import (
+    CellGroupState,
+    CurrentProfile,
+    CurrentProfilePoint,
+    DegradationConfig,
+    ElectricalModelConfig,
     PackProperties,
+    RcBranchParams,
     SimulationConfig,
     SimulationPoint,
     SimulationResult,
@@ -9,7 +15,13 @@ from .types import (
 )
 
 __all__ = [
+    "CellGroupState",
+    "CurrentProfile",
+    "CurrentProfilePoint",
+    "DegradationConfig",
+    "ElectricalModelConfig",
     "PackProperties",
+    "RcBranchParams",
     "SimulationConfig",
     "SimulationPoint",
     "SimulationResult",
