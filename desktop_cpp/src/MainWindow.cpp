@@ -4,6 +4,7 @@
 #include <QComboBox>
 #include <QCheckBox>
 #include <QColorDialog>
+#include <QDateTime>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
@@ -21,8 +22,10 @@
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QCoreApplication>
 #include <QFrame>
 #include <QFile>
+#include <QFileInfo>
 #include <QScrollArea>
 #include <QSignalBlocker>
 #include <QSlider>
@@ -30,6 +33,8 @@
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QTabWidget>
+#include <QTextStream>
+#include <QTimer>
 #include <QToolBar>
 #include <QHBoxLayout>
 #include <QSplitter>
@@ -69,6 +74,17 @@ QColor overlayMetricAccent(int index)
 QString formatMaybeNumber(double value, int decimals = 3)
 {
     return QString::number(value, 'f', decimals);
+}
+
+void appendDesktopStartupLog(const QString& line)
+{
+    const QString path = QDir(QCoreApplication::applicationDirPath()).filePath("alnoris_startup.log");
+    QFile file(path);
+    if (!file.open(QIODevice::Append | QIODevice::Text)) {
+        return;
+    }
+    QTextStream stream(&file);
+    stream << QDateTime::currentDateTime().toString(Qt::ISODate) << " " << line << '\n';
 }
 
 cad::battery::CellFormFactor cellFormFactorFromString(const QString& value)
@@ -279,15 +295,24 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
 
     setCentralWidget(central);
     applyTheme();
-    loadSystemPresetCatalog();
-    loadVirtualTestCatalog();
-    if (m_systemPresetCombo != nullptr && m_systemPresetCombo->count() > 0) {
-        applySelectedSystemPreset();
-    } else {
-        updateCadWorkspace();
-    }
+    updateCadWorkspace();
     refreshCadProperties();
     clearSimulationVisualization();
+
+    QTimer::singleShot(0, this, [this]() {
+        appendDesktopStartupLog("main window deferred initialization begin");
+        loadSystemPresetCatalog();
+        appendDesktopStartupLog("system preset catalog loaded");
+        loadVirtualTestCatalog();
+        appendDesktopStartupLog("virtual test catalog loaded");
+        if (m_systemPresetCombo != nullptr && m_systemPresetCombo->count() > 0) {
+            applySelectedSystemPreset();
+            appendDesktopStartupLog("default system preset applied");
+        } else {
+            updateCadWorkspace();
+            appendDesktopStartupLog("fallback CAD workspace refreshed");
+        }
+    });
 }
 
 void MainWindow::runSimulation()
