@@ -90,7 +90,7 @@ Vec3 overlayCellColor(const battery::BatteryVisualizationOverlay& overlay, const
     if (const auto it = overlay.cell_core_temperature_c.find(cell.id); it != overlay.cell_core_temperature_c.end()) {
         return temperatureColor(it->second);
     }
-    return {0.74f, 0.73f, 0.70f};
+    return {0.73f, 0.70f, 0.66f};
 }
 
 void appendTriangle(std::vector<RenderVertex>& vertices, const Vec3& a, const Vec3& b, const Vec3& c, const Vec3& color)
@@ -374,18 +374,21 @@ RenderPacket RenderComposer::compose(
         return std::find(selected_subtree.begin(), selected_subtree.end(), id) != selected_subtree.end();
     };
 
-    const Vec3 grid_color{0.73f, 0.77f, 0.82f};
-    const Vec3 grid_axis_color{0.60f, 0.65f, 0.71f};
-    const Vec3 pack_structure_color{0.72f, 0.75f, 0.79f};
-    const Vec3 module_structure_color{0.61f, 0.68f, 0.76f};
-    const Vec3 group_structure_color{0.67f, 0.72f, 0.77f};
+    const Vec3 grid_color{0.81f, 0.84f, 0.88f};
+    const Vec3 grid_axis_color{0.73f, 0.77f, 0.82f};
+    const Vec3 pack_structure_color{0.74f, 0.77f, 0.80f};
+    const Vec3 module_structure_color{0.67f, 0.72f, 0.78f};
+    const Vec3 group_structure_color{0.69f, 0.73f, 0.77f};
     const Vec3 selected_overlay_color{0.11f, 0.45f, 0.98f};
-    const Vec3 cooling_color{0.36f, 0.58f, 0.80f};
-    const Vec3 busbar_color{0.76f, 0.47f, 0.20f};
-    const Vec3 enclosure_color{0.80f, 0.82f, 0.85f};
-    const int grid_extent = 14;
+    const Vec3 cooling_color{0.56f, 0.66f, 0.76f};
+    const Vec3 busbar_color{0.72f, 0.48f, 0.24f};
+    const Vec3 enclosure_color{0.80f, 0.82f, 0.84f};
+    const int grid_extent = 12;
     const float grid_step = 70.0f;
     for (int i = -grid_extent; i <= grid_extent; ++i) {
+        if ((i % 2) != 0) {
+            continue;
+        }
         const float offset = i * grid_step;
         const Vec3 color = (i % 4) == 0 ? grid_axis_color : grid_color;
         packet.lines.push_back({{offset, -120.0f, -grid_extent * grid_step}, color});
@@ -399,10 +402,9 @@ RenderPacket RenderComposer::compose(
             continue;
         }
         const battery::BoundingBox bounds = document.worldBounds(pack.id);
-        appendCornerBox(packet.lines, bounds.center, bounds.size, pack_structure_color, 0.18f);
         appendBoxPickable(packet.pickables, pack.id, 80, mvp, bounds.center, bounds.size, viewport_width, viewport_height);
         if (isSelectedOrDescendant(pack.id)) {
-            appendWireBox(packet.selection_overlay_lines, bounds.center, bounds.size, selected_overlay_color);
+            appendCornerBox(packet.selection_overlay_lines, bounds.center, bounds.size, pack_structure_color, 0.16f);
         }
     }
     for (const battery::ModuleBoundaryEntity& module : document.modules()) {
@@ -410,10 +412,9 @@ RenderPacket RenderComposer::compose(
             continue;
         }
         const battery::BoundingBox bounds = document.worldBounds(module.id);
-        appendCornerBox(packet.lines, bounds.center, bounds.size, module_structure_color, 0.18f);
         appendBoxPickable(packet.pickables, module.id, 160, mvp, bounds.center, bounds.size, viewport_width, viewport_height);
         if (isSelectedOrDescendant(module.id)) {
-            appendWireBox(packet.selection_overlay_lines, bounds.center, bounds.size, selected_overlay_color);
+            appendCornerBox(packet.selection_overlay_lines, bounds.center, bounds.size, module_structure_color, 0.16f);
         }
     }
     for (const battery::CellGroupEntity& group : document.cellGroups()) {
@@ -421,10 +422,9 @@ RenderPacket RenderComposer::compose(
             continue;
         }
         const battery::BoundingBox bounds = document.worldBounds(group.id);
-        appendCornerBox(packet.lines, bounds.center, bounds.size, group_structure_color, 0.16f);
         appendBoxPickable(packet.pickables, group.id, 240, mvp, bounds.center, bounds.size, viewport_width, viewport_height);
         if (isSelectedOrDescendant(group.id)) {
-            appendWireBox(packet.selection_overlay_lines, bounds.center, bounds.size, selected_overlay_color);
+            appendCornerBox(packet.selection_overlay_lines, bounds.center, bounds.size, group_structure_color, 0.14f);
         }
     }
 
@@ -455,10 +455,9 @@ RenderPacket RenderComposer::compose(
             continue;
         }
         const battery::BoundingBox bounds = document.worldBounds(enclosure.id);
-        appendCornerBox(packet.lines, bounds.center, bounds.size, enclosure_color, 0.14f);
         appendBoxPickable(packet.pickables, enclosure.id, 120, mvp, bounds.center, bounds.size, viewport_width, viewport_height);
         if (isSelectedOrDescendant(enclosure.id)) {
-            appendWireBox(packet.selection_overlay_lines, bounds.center, bounds.size, selected_overlay_color);
+            appendCornerBox(packet.selection_overlay_lines, bounds.center, bounds.size, enclosure_color, 0.12f);
         }
     }
 
@@ -485,12 +484,12 @@ RenderPacket RenderComposer::compose(
                     Vec3{0.84f, 0.90f, 0.96f}
                 );
                 if (isSelectedOrDescendant(cell.id)) {
-                    appendWireCylinder(packet.selection_overlay_lines, world_position, cell.radius + 2.5f, cell.height + 6.0f, 32, selected_overlay_color);
+                    appendWireCylinder(packet.selection_overlay_lines, world_position, cell.radius + 1.6f, cell.height + 3.0f, 28, selected_overlay_color);
                 }
             } else {
                 appendBox(packet.triangles, world_position, {cell.width, cell.height, cell.depth}, color);
                 if (isSelectedOrDescendant(cell.id)) {
-                    appendWireBox(packet.selection_overlay_lines, world_position, {cell.width + 4.0f, cell.height + 4.0f, cell.depth + 4.0f}, selected_overlay_color);
+                    appendWireBox(packet.selection_overlay_lines, world_position, {cell.width + 2.0f, cell.height + 2.0f, cell.depth + 2.0f}, selected_overlay_color);
                 }
             }
         }
@@ -524,12 +523,12 @@ RenderPacket RenderComposer::compose(
         return a.depth < b.depth;
     });
 
-    packet.lines.push_back({{-900.0f, 0.0f, 0.0f}, {0.79f, 0.48f, 0.48f}});
-    packet.lines.push_back({{900.0f, 0.0f, 0.0f}, {0.79f, 0.48f, 0.48f}});
-    packet.lines.push_back({{0.0f, -200.0f, 0.0f}, {0.48f, 0.72f, 0.54f}});
-    packet.lines.push_back({{0.0f, 340.0f, 0.0f}, {0.48f, 0.72f, 0.54f}});
-    packet.lines.push_back({{0.0f, 0.0f, -900.0f}, {0.48f, 0.60f, 0.85f}});
-    packet.lines.push_back({{0.0f, 0.0f, 900.0f}, {0.48f, 0.60f, 0.85f}});
+    packet.lines.push_back({{-220.0f, 0.0f, 0.0f}, {0.76f, 0.62f, 0.62f}});
+    packet.lines.push_back({{220.0f, 0.0f, 0.0f}, {0.76f, 0.62f, 0.62f}});
+    packet.lines.push_back({{0.0f, -120.0f, 0.0f}, {0.62f, 0.76f, 0.66f}});
+    packet.lines.push_back({{0.0f, 220.0f, 0.0f}, {0.62f, 0.76f, 0.66f}});
+    packet.lines.push_back({{0.0f, 0.0f, -220.0f}, {0.62f, 0.68f, 0.83f}});
+    packet.lines.push_back({{0.0f, 0.0f, 220.0f}, {0.62f, 0.68f, 0.83f}});
 
     return packet;
 }

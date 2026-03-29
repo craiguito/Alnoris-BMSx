@@ -67,11 +67,10 @@ QColor toColor(const cad::math::Vec3& color)
 void drawSelectionOverlay(QPainter& painter, const cad::render::ScreenPickable& pickable)
 {
     const QColor outline(31, 116, 247);
-    const QColor fill(70, 150, 255, 24);
 
     painter.save();
-    painter.setPen(QPen(outline, 2.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-    painter.setBrush(fill);
+    painter.setPen(QPen(outline, 2.2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setBrush(Qt::NoBrush);
     if (pickable.shape == cad::render::ScreenPickable::Shape::Circle) {
         const QRectF outlineRect(
             pickable.x - pickable.half_width - 6.0f,
@@ -312,8 +311,8 @@ void CadViewportWidget::paintEvent(QPaintEvent* event)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);
     QLinearGradient backgroundGradient(0.0, 0.0, 0.0, static_cast<qreal>(height()));
-    backgroundGradient.setColorAt(0.0, m_backgroundColor.lighter(106));
-    backgroundGradient.setColorAt(1.0, m_backgroundColor.darker(102));
+    backgroundGradient.setColorAt(0.0, m_backgroundColor.lighter(103));
+    backgroundGradient.setColorAt(1.0, m_backgroundColor.darker(101));
     painter.fillRect(rect(), backgroundGradient);
 
     const cad::render::RenderPacket& frame = m_engine.renderPacket();
@@ -368,13 +367,13 @@ void CadViewportWidget::paintEvent(QPaintEvent* event)
         if (!a.valid || !b.valid) {
             continue;
         }
-        painter.setPen(QPen(toColor(frame.lines[i].color), 0.9, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.setPen(QPen(toColor(frame.lines[i].color), 0.7, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         painter.drawLine(a.point, b.point);
     }
 
     if (!frame.selection_overlay_lines.empty()) {
         painter.setRenderHint(QPainter::Antialiasing, true);
-        painter.setPen(QPen(QColor(31, 116, 247), 2.2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.setPen(QPen(QColor(31, 116, 247), 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         for (std::size_t i = 0; i + 1 < frame.selection_overlay_lines.size(); i += 2) {
             const ProjectedVertex a = projectPoint(frame.mvp, frame.selection_overlay_lines[i].position, width(), height());
             const ProjectedVertex b = projectPoint(frame.mvp, frame.selection_overlay_lines[i + 1].position, width(), height());

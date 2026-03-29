@@ -602,6 +602,7 @@ This pass focuses on readability inside the software-rendered CAD viewport rathe
 - Always-visible structural wireframes were reduced substantially.
 - Non-selected box-form cells no longer draw their own extra edge cages on top of the filled solid pass.
 - Grid and axis lines were softened so they provide orientation without dominating the scene.
+- Pack/module/group/enclosure framing is now largely suppressed by default and primarily appears through selection context rather than as persistent scene clutter.
 
 ### Cleaner selection treatment
 
@@ -609,6 +610,12 @@ This pass focuses on readability inside the software-rendered CAD viewport rathe
   - one projected blue outline pass
   - one screen-space blue selection ring/box
 - The older layered halo-style selection stack was reduced so selection is still obvious without feeling like a debug overlay.
+
+### Stronger industrial default view
+
+- Cells now read more clearly as the dominant opaque geometry in the scene.
+- Busbars remain distinct, but the conductive geometry is kept restrained instead of glowing against the rest of the pack.
+- Cooling/support geometry stays readable while receding behind the cells in the visual hierarchy.
 
 ### Remaining viewport polish ideas
 
