@@ -6,12 +6,21 @@
 
 namespace cad::geometry {
 
+enum class SurfaceLayer : unsigned char
+{
+    Background = 0,
+    Support = 1,
+    Cell = 2,
+    Busbar = 3
+};
+
 struct ColoredTriangle
 {
     math::Vec3 a{};
     math::Vec3 b{};
     math::Vec3 c{};
     math::Vec3 color{};
+    SurfaceLayer layer = SurfaceLayer::Support;
 };
 
 struct ColoredLine
@@ -19,6 +28,7 @@ struct ColoredLine
     math::Vec3 a{};
     math::Vec3 b{};
     math::Vec3 color{};
+    SurfaceLayer layer = SurfaceLayer::Support;
 };
 
 struct GeometryBuffer
@@ -41,9 +51,9 @@ struct CylindricalCellProfile
     float bottom_cap_height = 3.0f;
 };
 
-void appendBox(GeometryBuffer& geometry, const math::Vec3& center, const math::Vec3& size, const math::Vec3& color);
-void appendCylinder(GeometryBuffer& geometry, const math::Vec3& center, float radius, float height, int segments, const math::Vec3& color);
-void appendRing(GeometryBuffer& geometry, const math::Vec3& center, float outer_radius, float inner_radius, float height, int segments, const math::Vec3& color);
+void appendBox(GeometryBuffer& geometry, const math::Vec3& center, const math::Vec3& size, const math::Vec3& color, SurfaceLayer layer = SurfaceLayer::Support);
+void appendCylinder(GeometryBuffer& geometry, const math::Vec3& center, float radius, float height, int segments, const math::Vec3& color, SurfaceLayer layer = SurfaceLayer::Support);
+void appendRing(GeometryBuffer& geometry, const math::Vec3& center, float outer_radius, float inner_radius, float height, int segments, const math::Vec3& color, SurfaceLayer layer = SurfaceLayer::Support);
 void appendOpenTopTray(
     GeometryBuffer& geometry,
     const math::Vec3& seating_plane_center,
@@ -51,7 +61,8 @@ void appendOpenTopTray(
     float base_thickness,
     float wall_thickness,
     float wall_height,
-    const math::Vec3& color
+    const math::Vec3& color,
+    SurfaceLayer layer = SurfaceLayer::Support
 );
 void appendOpenShell(
     GeometryBuffer& geometry,
@@ -60,7 +71,8 @@ void appendOpenShell(
     float wall_thickness,
     float floor_thickness,
     float wall_height,
-    const math::Vec3& color
+    const math::Vec3& color,
+    SurfaceLayer layer = SurfaceLayer::Background
 );
 void appendCylindricalCell(
     GeometryBuffer& geometry,
@@ -69,7 +81,8 @@ void appendCylindricalCell(
     int segments,
     const math::Vec3& body_color,
     const math::Vec3& cap_color,
-    const math::Vec3& insulator_color
+    const math::Vec3& insulator_color,
+    SurfaceLayer layer = SurfaceLayer::Cell
 );
 
 } // namespace cad::geometry

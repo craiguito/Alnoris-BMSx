@@ -100,6 +100,9 @@ public:
     [[nodiscard]] const RenderDiagnostics& renderDiagnostics() const { return m_renderDiagnostics; }
 
 private:
+    [[nodiscard]] battery::BoundingBox sceneBounds() const;
+    [[nodiscard]] battery::BoundingBox visualGeometryBounds() const;
+    void fitCameraToVisualGeometry();
     void rebuildDocument();
     void rebuildVisualization();
     void rebuildVisualGeometry();

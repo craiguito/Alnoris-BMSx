@@ -12,6 +12,7 @@ struct RenderVertex
 {
     math::Vec3 position;
     math::Vec3 color;
+    unsigned char layer = 0;
 };
 
 struct ScreenPickable

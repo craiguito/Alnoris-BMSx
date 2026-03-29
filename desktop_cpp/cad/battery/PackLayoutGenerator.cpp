@@ -1,6 +1,7 @@
 #include "PackLayoutGenerator.h"
 
 #include <algorithm>
+#include <numeric>
 #include <map>
 #include <utility>
 
@@ -222,12 +223,23 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
         config.cell_height * 0.5f + busbar_clearance_y + config.busbar_thickness + 18.0f,
         config.cell_height * 0.5f + tray_base_thickness + config.cooling_channel_thickness + cooling_gap_y + 18.0f
     );
-    const float pack_width = std::max(240.0f, (series_count - 1) * config.x_spacing + cell_width * 1.8f + (module_count - 1) * config.module_gap_x);
     const float pack_depth = std::max(180.0f, (parallel_count - 1) * config.z_spacing + cell_depth * 1.8f);
     const float module_height = module_half_height * 2.0f;
     const float enclosure_height = module_height + 44.0f;
     const float group_width = std::max(config.x_spacing * 0.78f, cell_width * 1.35f);
     const float group_depth = std::max(pack_depth + 28.0f, cell_depth * 1.35f);
+    std::vector<int> module_series_counts;
+    std::vector<float> module_widths;
+    module_series_counts.reserve(module_count);
+    module_widths.reserve(module_count);
+    for (int moduleIndex = 0; moduleIndex < module_count; ++moduleIndex) {
+        const int moduleSeriesCount = base_series_per_module + (moduleIndex < module_remainder ? 1 : 0);
+        module_series_counts.push_back(moduleSeriesCount);
+        module_widths.push_back(std::max(180.0f, (moduleSeriesCount - 1) * config.x_spacing + group_width + 52.0f));
+    }
+    const float modules_span_x = std::accumulate(module_widths.begin(), module_widths.end(), 0.0f)
+        + std::max(0, module_count - 1) * config.module_gap_x;
+    const float pack_width = std::max(240.0f, modules_span_x);
 
     BatteryPackEntity generatedPack;
     generatedPack.label = "Battery pack";
@@ -244,10 +256,10 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
     BatteryPackEntity& pack = document.addPack(mergedPack);
 
     int runningSeriesStart = 0;
-    float runningCenterX = -((series_count - 1) * config.x_spacing + (module_count - 1) * config.module_gap_x) * 0.5f;
+    float runningCenterX = -modules_span_x * 0.5f;
     for (int moduleIndex = 0; moduleIndex < module_count; ++moduleIndex) {
-        const int moduleSeriesCount = base_series_per_module + (moduleIndex < module_remainder ? 1 : 0);
-        const float moduleWidth = std::max(180.0f, (moduleSeriesCount - 1) * config.x_spacing + group_width + 52.0f);
+        const int moduleSeriesCount = module_series_counts[static_cast<std::size_t>(moduleIndex)];
+        const float moduleWidth = module_widths[static_cast<std::size_t>(moduleIndex)];
         const float moduleCenterX = runningCenterX + moduleWidth * 0.5f;
 
         ModuleBoundaryEntity generatedModuleBoundary;

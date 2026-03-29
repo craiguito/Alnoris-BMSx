@@ -99,6 +99,29 @@ cad::battery::CellFormFactor cellFormFactorFromString(const QString& value)
     return cad::battery::CellFormFactor::Cylindrical;
 }
 
+struct CadCellDefaults
+{
+    cad::battery::CellFormFactor form_factor = cad::battery::CellFormFactor::Cylindrical;
+    float radius_mm = 9.0f;
+    float height_mm = 65.0f;
+    float width_mm = 18.0f;
+    float depth_mm = 18.0f;
+    float x_spacing_mm = 23.0f;
+    float z_spacing_mm = 23.0f;
+};
+
+CadCellDefaults fallbackCadCellDefaults(const QString& referencePreset)
+{
+    const QString normalized = referencePreset.trimmed().toLower();
+    if (normalized.contains("26650")) {
+        return {cad::battery::CellFormFactor::Cylindrical, 13.0f, 65.0f, 26.0f, 26.0f, 31.0f, 31.0f};
+    }
+    if (normalized.contains("21700")) {
+        return {cad::battery::CellFormFactor::Cylindrical, 10.5f, 70.0f, 21.0f, 21.0f, 26.0f, 26.0f};
+    }
+    return {};
+}
+
 cad::battery::BatteryVisualizationOverlay buildSimulationOverlay(
     const cad::core::CadDocument& document,
     const desktop::SimulationResultModel& result,
@@ -1301,13 +1324,18 @@ void MainWindow::updateCadWorkspace()
 
     cad::battery::BatteryCadConfig cadConfig;
     const QJsonObject cadDefaults = m_activeSystemPreset.value("cad_defaults").toObject();
+    const CadCellDefaults fallbackDefaults = fallbackCadCellDefaults(
+        m_referencePreset != nullptr ? m_referencePreset->currentText() : QString()
+    );
     cadConfig.layout.preset_name = !cadDefaults.isEmpty()
         ? m_activeSystemPreset.value("display_name").toString().toStdString()
         : (m_referencePreset != nullptr ? m_referencePreset->currentText().toStdString() : std::string("Custom"));
     cadConfig.layout.cells_in_series = m_cellsInSeries != nullptr ? static_cast<int>(m_cellsInSeries->value()) : 0;
     cadConfig.layout.cells_in_parallel = m_cellsInParallel != nullptr ? static_cast<int>(m_cellsInParallel->value()) : 0;
     cadConfig.layout.module_count = cadDefaults.value("module_count").toInt(1);
-    cadConfig.layout.cell_form_factor = cellFormFactorFromString(cadDefaults.value("cell_form_factor").toString("cylindrical"));
+    cadConfig.layout.cell_form_factor = cadDefaults.isEmpty()
+        ? fallbackDefaults.form_factor
+        : cellFormFactorFromString(cadDefaults.value("cell_form_factor").toString("cylindrical"));
     cadConfig.electrical.cell_nominal_voltage = m_cellNominalVoltage != nullptr ? m_cellNominalVoltage->value() : 0.0;
     cadConfig.electrical.cell_capacity_ah = m_cellCapacity != nullptr ? m_cellCapacity->value() : 0.0;
     cadConfig.thermal.ambient_temp_c = m_ambientTemp != nullptr ? m_ambientTemp->value() : 0.0;
@@ -1322,12 +1350,12 @@ void MainWindow::updateCadWorkspace()
     cadConfig.metrics.pack_capacity_ah = m_cellCapacity != nullptr && m_cellsInParallel != nullptr
         ? m_cellCapacity->value() * m_cellsInParallel->value()
         : 0.0;
-    cadConfig.layout.cell_radius = static_cast<float>(cadDefaults.value("cell_radius_mm").toDouble(cadConfig.layout.cell_radius));
-    cadConfig.layout.cell_height = static_cast<float>(cadDefaults.value("cell_height_mm").toDouble(cadConfig.layout.cell_height));
-    cadConfig.layout.cell_width = static_cast<float>(cadDefaults.value("cell_width_mm").toDouble(cadConfig.layout.cell_width));
-    cadConfig.layout.cell_depth = static_cast<float>(cadDefaults.value("cell_depth_mm").toDouble(cadConfig.layout.cell_depth));
-    cadConfig.layout.x_spacing = static_cast<float>(cadDefaults.value("x_spacing_mm").toDouble(cadConfig.layout.x_spacing));
-    cadConfig.layout.z_spacing = static_cast<float>(cadDefaults.value("z_spacing_mm").toDouble(cadConfig.layout.z_spacing));
+    cadConfig.layout.cell_radius = static_cast<float>(cadDefaults.value("cell_radius_mm").toDouble(fallbackDefaults.radius_mm));
+    cadConfig.layout.cell_height = static_cast<float>(cadDefaults.value("cell_height_mm").toDouble(fallbackDefaults.height_mm));
+    cadConfig.layout.cell_width = static_cast<float>(cadDefaults.value("cell_width_mm").toDouble(fallbackDefaults.width_mm));
+    cadConfig.layout.cell_depth = static_cast<float>(cadDefaults.value("cell_depth_mm").toDouble(fallbackDefaults.depth_mm));
+    cadConfig.layout.x_spacing = static_cast<float>(cadDefaults.value("x_spacing_mm").toDouble(fallbackDefaults.x_spacing_mm));
+    cadConfig.layout.z_spacing = static_cast<float>(cadDefaults.value("z_spacing_mm").toDouble(fallbackDefaults.z_spacing_mm));
     cadConfig.layout.module_gap_x = static_cast<float>(cadDefaults.value("module_gap_x_mm").toDouble(cadConfig.layout.module_gap_x));
     cadConfig.layout.busbar_thickness = static_cast<float>(cadDefaults.value("busbar_thickness_mm").toDouble(cadConfig.layout.busbar_thickness));
     cadConfig.layout.cooling_channel_thickness = static_cast<float>(cadDefaults.value("cooling_channel_thickness_mm").toDouble(cadConfig.layout.cooling_channel_thickness));

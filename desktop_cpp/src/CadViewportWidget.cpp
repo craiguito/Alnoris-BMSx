@@ -534,11 +534,15 @@ void CadViewportWidget::rebuildScreenSpaceCache()
             b.point,
             c.point,
             toColor(avgColor),
-            (a.depth + b.depth + c.depth) / 3.0f
+            (a.depth + b.depth + c.depth) / 3.0f,
+            frame.triangles[i].layer
         });
     }
 
     std::sort(m_cachedTriangles.begin(), m_cachedTriangles.end(), [](const CachedScreenTriangle& lhs, const CachedScreenTriangle& rhs) {
+        if (lhs.layer != rhs.layer) {
+            return lhs.layer < rhs.layer;
+        }
         return lhs.depth > rhs.depth;
     });
 

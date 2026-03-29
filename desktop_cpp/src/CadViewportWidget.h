@@ -66,6 +66,7 @@ private:
         QPointF c;
         QColor color;
         float depth = 0.0f;
+        unsigned char layer = 0;
     };
 
     struct CachedScreenLine

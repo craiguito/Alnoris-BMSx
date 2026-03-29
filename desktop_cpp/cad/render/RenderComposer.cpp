@@ -23,13 +23,15 @@ void appendCornerBox(
 void appendGeneratedGeometry(RenderPacket& packet, const geometry::GeometryBuffer& geometry)
 {
     for (const geometry::ColoredTriangle& triangle : geometry.triangles) {
-        packet.triangles.push_back({triangle.a, triangle.color});
-        packet.triangles.push_back({triangle.b, triangle.color});
-        packet.triangles.push_back({triangle.c, triangle.color});
+        const unsigned char layer = static_cast<unsigned char>(triangle.layer);
+        packet.triangles.push_back({triangle.a, triangle.color, layer});
+        packet.triangles.push_back({triangle.b, triangle.color, layer});
+        packet.triangles.push_back({triangle.c, triangle.color, layer});
     }
     for (const geometry::ColoredLine& line : geometry.lines) {
-        packet.lines.push_back({line.a, line.color});
-        packet.lines.push_back({line.b, line.color});
+        const unsigned char layer = static_cast<unsigned char>(line.layer);
+        packet.lines.push_back({line.a, line.color, layer});
+        packet.lines.push_back({line.b, line.color, layer});
     }
 }
 
@@ -419,10 +421,10 @@ RenderPacket RenderComposer::compose(
         }
         const float offset = i * grid_step;
         const Vec3 color = (i == 0) ? grid_axis_color : grid_color;
-        packet.lines.push_back({{offset, -120.0f, -grid_extent * grid_step}, color});
-        packet.lines.push_back({{offset, -120.0f, grid_extent * grid_step}, color});
-        packet.lines.push_back({{-grid_extent * grid_step, -120.0f, offset}, color});
-        packet.lines.push_back({{grid_extent * grid_step, -120.0f, offset}, color});
+        packet.lines.push_back({{offset, -120.0f, -grid_extent * grid_step}, color, 0});
+        packet.lines.push_back({{offset, -120.0f, grid_extent * grid_step}, color, 0});
+        packet.lines.push_back({{-grid_extent * grid_step, -120.0f, offset}, color, 0});
+        packet.lines.push_back({{grid_extent * grid_step, -120.0f, offset}, color, 0});
     }
 
     appendGeneratedGeometry(packet, scene_geometry);
@@ -533,12 +535,12 @@ RenderPacket RenderComposer::compose(
         return a.depth < b.depth;
     });
 
-    packet.lines.push_back({{-180.0f, 0.0f, 0.0f}, {0.79f, 0.72f, 0.72f}});
-    packet.lines.push_back({{180.0f, 0.0f, 0.0f}, {0.79f, 0.72f, 0.72f}});
-    packet.lines.push_back({{0.0f, -90.0f, 0.0f}, {0.71f, 0.79f, 0.73f}});
-    packet.lines.push_back({{0.0f, 180.0f, 0.0f}, {0.71f, 0.79f, 0.73f}});
-    packet.lines.push_back({{0.0f, 0.0f, -180.0f}, {0.71f, 0.75f, 0.82f}});
-    packet.lines.push_back({{0.0f, 0.0f, 180.0f}, {0.71f, 0.75f, 0.82f}});
+    packet.lines.push_back({{-180.0f, 0.0f, 0.0f}, {0.79f, 0.72f, 0.72f}, 0});
+    packet.lines.push_back({{180.0f, 0.0f, 0.0f}, {0.79f, 0.72f, 0.72f}, 0});
+    packet.lines.push_back({{0.0f, -90.0f, 0.0f}, {0.71f, 0.79f, 0.73f}, 0});
+    packet.lines.push_back({{0.0f, 180.0f, 0.0f}, {0.71f, 0.79f, 0.73f}, 0});
+    packet.lines.push_back({{0.0f, 0.0f, -180.0f}, {0.71f, 0.75f, 0.82f}, 0});
+    packet.lines.push_back({{0.0f, 0.0f, 180.0f}, {0.71f, 0.75f, 0.82f}, 0});
 
     return packet;
 }

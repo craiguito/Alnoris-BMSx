@@ -29,6 +29,12 @@ Vec3 gradientColor(double value, double min_value, double max_value)
     return cad::math::mix({0.97f, 0.84f, 0.26f}, {0.95f, 0.32f, 0.25f}, (normalized - 0.5f) / 0.5f);
 }
 
+int quantizeColorComponent(float value)
+{
+    const float clamped = cad::math::clamp(value, 0.0f, 1.0f);
+    return static_cast<int>(std::lround(clamped * 15.0f));
+}
+
 Vec3 overlayCellColor(const battery::BatteryVisualizationOverlay& overlay, const battery::CellEntity& cell)
 {
     switch (overlay.active_metric) {
@@ -78,7 +84,8 @@ void appendMesh(GeometryBuffer& geometry, const io::TriangleMesh& mesh, const Ve
             cad::math::add(mesh.vertices[i], offset),
             cad::math::add(mesh.vertices[i + 1], offset),
             cad::math::add(mesh.vertices[i + 2], offset),
-            color
+            color,
+            SurfaceLayer::Cell
         });
     }
 }
@@ -91,7 +98,8 @@ void appendTranslatedGeometry(GeometryBuffer& target, const GeometryBuffer& loca
             cad::math::add(triangle.a, offset),
             cad::math::add(triangle.b, offset),
             cad::math::add(triangle.c, offset),
-            triangle.color
+            triangle.color,
+            triangle.layer
         });
     }
     target.lines.reserve(target.lines.size() + local.lines.size());
@@ -99,7 +107,8 @@ void appendTranslatedGeometry(GeometryBuffer& target, const GeometryBuffer& loca
         target.lines.push_back({
             cad::math::add(line.a, offset),
             cad::math::add(line.b, offset),
-            line.color
+            line.color,
+            line.layer
         });
     }
 }
@@ -195,13 +204,15 @@ void appendCoolingFeatures(GeometryBuffer& geometry, const battery::BoundingBox&
         geometry,
         {bounds.center.x, bounds.center.y + bounds.size.y * 0.5f - inset_depth * 0.5f, bounds.center.z - offset},
         {bounds.size.x * 0.84f, inset_depth, lane_width},
-        feature_color
+        feature_color,
+        SurfaceLayer::Support
     );
     appendBox(
         geometry,
         {bounds.center.x, bounds.center.y + bounds.size.y * 0.5f - inset_depth * 0.5f, bounds.center.z + offset},
         {bounds.size.x * 0.84f, inset_depth, lane_width},
-        feature_color
+        feature_color,
+        SurfaceLayer::Support
     );
 }
 
@@ -216,7 +227,7 @@ void appendBusbarGeometry(
 )
 {
     const Vec3 copper_color{0.72f, 0.48f, 0.24f};
-    appendBox(geometry, bounds.center, {bounds.size.x * 0.92f, bounds.size.y, bounds.size.z}, copper_color);
+    appendBox(geometry, bounds.center, {bounds.size.x * 0.92f, bounds.size.y, bounds.size.z}, copper_color, SurfaceLayer::Busbar);
 
     if (module == nullptr || module_context.cells.empty()) {
         return;
@@ -251,7 +262,8 @@ void appendBusbarGeometry(
             geometry,
             tab_center,
             {tab_width, bounds.size.y, std::max(tab_depth, bridge_depth)},
-            cad::math::mix(copper_color, {1.0f, 1.0f, 1.0f}, 0.05f)
+            cad::math::mix(copper_color, {1.0f, 1.0f, 1.0f}, 0.05f),
+            SurfaceLayer::Busbar
         );
     }
 }
@@ -288,7 +300,8 @@ void appendModuleTrayGeometry(
         tray_base_thickness,
         tray_wall_thickness,
         tray_wall_height,
-        tray_color
+        tray_color,
+        SurfaceLayer::Support
     );
 }
 
@@ -308,7 +321,8 @@ void appendEnclosureGeometry(
         enclosure.wall_thickness,
         floor_thickness,
         wall_height,
-        enclosure_color
+        enclosure_color,
+        SurfaceLayer::Background
     );
 }
 
@@ -323,7 +337,7 @@ GeometryBuffer BatteryGeometryGenerator::buildCachedCylindricalCellGeometry(
 ) const
 {
     GeometryBuffer geometry;
-    appendCylindricalCell(geometry, {0.0f, 0.0f, 0.0f}, profile, segments, body_color, cap_color, insulator_color);
+    appendCylindricalCell(geometry, {0.0f, 0.0f, 0.0f}, profile, segments, body_color, cap_color, insulator_color, SurfaceLayer::Cell);
     return geometry;
 }
 
@@ -343,15 +357,15 @@ const GeometryBuffer& BatteryGeometryGenerator::cachedCylindricalCellGeometry(
         << std::lround(profile.cap_radius * 100.0f) << ':'
         << std::lround(profile.terminal_radius * 100.0f) << ':'
         << std::lround(profile.terminal_height * 100.0f) << ':'
-        << std::lround(body_color.x * 255.0f) << ','
-        << std::lround(body_color.y * 255.0f) << ','
-        << std::lround(body_color.z * 255.0f) << ':'
-        << std::lround(cap_color.x * 255.0f) << ','
-        << std::lround(cap_color.y * 255.0f) << ','
-        << std::lround(cap_color.z * 255.0f) << ':'
-        << std::lround(insulator_color.x * 255.0f) << ','
-        << std::lround(insulator_color.y * 255.0f) << ','
-        << std::lround(insulator_color.z * 255.0f) << ':'
+        << quantizeColorComponent(body_color.x) << ','
+        << quantizeColorComponent(body_color.y) << ','
+        << quantizeColorComponent(body_color.z) << ':'
+        << quantizeColorComponent(cap_color.x) << ','
+        << quantizeColorComponent(cap_color.y) << ','
+        << quantizeColorComponent(cap_color.z) << ':'
+        << quantizeColorComponent(insulator_color.x) << ','
+        << quantizeColorComponent(insulator_color.y) << ','
+        << quantizeColorComponent(insulator_color.z) << ':'
         << segments;
     const std::string key = key_stream.str();
 
@@ -377,6 +391,9 @@ GeometryBuffer BatteryGeometryGenerator::buildVisualGeometry(
 {
     GeometryBuffer geometry;
     const battery::PackLayoutConfig& layout = document.metadata().layout_config;
+    const int cell_count = static_cast<int>(document.cells().size());
+    const int cylindrical_segments = cell_count > 300 ? 6 : (cell_count > 150 ? 8 : 12);
+    const bool large_pack_mode = cell_count > 200;
     std::unordered_map<core::EntityId, ModuleGeometryContext, core::EntityIdHash> module_contexts;
     module_contexts.reserve(document.modules().size());
 
@@ -410,9 +427,12 @@ GeometryBuffer BatteryGeometryGenerator::buildVisualGeometry(
                 bounds.size.y,
                 bounds.size.z + layout.cooling_plate_margin_z * 2.0f
             },
-            {0.56f, 0.66f, 0.76f}
+            {0.56f, 0.66f, 0.76f},
+            SurfaceLayer::Support
         );
-        appendCoolingFeatures(geometry, bounds, layout);
+        if (!large_pack_mode) {
+            appendCoolingFeatures(geometry, bounds, layout);
+        }
     }
 
     for (const battery::BusbarEntity& busbar : document.busbars()) {
@@ -434,7 +454,9 @@ GeometryBuffer BatteryGeometryGenerator::buildVisualGeometry(
         if (!enclosure.visible) {
             continue;
         }
-        appendEnclosureGeometry(geometry, enclosure, layout);
+        if (!large_pack_mode) {
+            appendEnclosureGeometry(geometry, enclosure, layout);
+        }
     }
 
     for (const battery::CellEntity& cell : document.cells()) {
@@ -452,14 +474,14 @@ GeometryBuffer BatteryGeometryGenerator::buildVisualGeometry(
         if (cell.form_factor == battery::CellFormFactor::Cylindrical) {
             const GeometryBuffer& cell_geometry = cachedCylindricalCellGeometry(
                 makeCellProfile(cell),
-                24,
+                cylindrical_segments,
                 body_color,
                 {0.86f, 0.88f, 0.91f},
                 {0.95f, 0.92f, 0.77f}
             );
             appendTranslatedGeometry(geometry, cell_geometry, world_position);
         } else {
-            appendBox(geometry, world_position, {cell.width, cell.height, cell.depth}, body_color);
+            appendBox(geometry, world_position, {cell.width, cell.height, cell.depth}, body_color, SurfaceLayer::Cell);
         }
     }
 

@@ -8,20 +8,20 @@ namespace {
 
 using cad::math::Vec3;
 
-void appendTriangle(GeometryBuffer& geometry, const Vec3& a, const Vec3& b, const Vec3& c, const Vec3& color)
+void appendTriangle(GeometryBuffer& geometry, const Vec3& a, const Vec3& b, const Vec3& c, const Vec3& color, SurfaceLayer layer)
 {
-    geometry.triangles.push_back({a, b, c, color});
+    geometry.triangles.push_back({a, b, c, color, layer});
 }
 
-void appendQuad(GeometryBuffer& geometry, const Vec3& a, const Vec3& b, const Vec3& c, const Vec3& d, const Vec3& color)
+void appendQuad(GeometryBuffer& geometry, const Vec3& a, const Vec3& b, const Vec3& c, const Vec3& d, const Vec3& color, SurfaceLayer layer)
 {
-    appendTriangle(geometry, a, b, c, color);
-    appendTriangle(geometry, a, c, d, color);
+    appendTriangle(geometry, a, b, c, color, layer);
+    appendTriangle(geometry, a, c, d, color, layer);
 }
 
 } // namespace
 
-void appendBox(GeometryBuffer& geometry, const Vec3& center, const Vec3& size, const Vec3& color)
+void appendBox(GeometryBuffer& geometry, const Vec3& center, const Vec3& size, const Vec3& color, SurfaceLayer layer)
 {
     const Vec3 half{size.x * 0.5f, size.y * 0.5f, size.z * 0.5f};
     const Vec3 p000{center.x - half.x, center.y - half.y, center.z - half.z};
@@ -33,15 +33,15 @@ void appendBox(GeometryBuffer& geometry, const Vec3& center, const Vec3& size, c
     const Vec3 p110{center.x + half.x, center.y + half.y, center.z - half.z};
     const Vec3 p111{center.x + half.x, center.y + half.y, center.z + half.z};
 
-    appendQuad(geometry, p000, p100, p110, p010, color);
-    appendQuad(geometry, p101, p001, p011, p111, color);
-    appendQuad(geometry, p001, p000, p010, p011, color);
-    appendQuad(geometry, p100, p101, p111, p110, color);
-    appendQuad(geometry, p010, p110, p111, p011, cad::math::mix(color, {1.0f, 1.0f, 1.0f}, 0.07f));
-    appendQuad(geometry, p001, p101, p100, p000, cad::math::mix(color, {0.0f, 0.0f, 0.0f}, 0.14f));
+    appendQuad(geometry, p000, p100, p110, p010, color, layer);
+    appendQuad(geometry, p101, p001, p011, p111, color, layer);
+    appendQuad(geometry, p001, p000, p010, p011, color, layer);
+    appendQuad(geometry, p100, p101, p111, p110, color, layer);
+    appendQuad(geometry, p010, p110, p111, p011, cad::math::mix(color, {1.0f, 1.0f, 1.0f}, 0.07f), layer);
+    appendQuad(geometry, p001, p101, p100, p000, cad::math::mix(color, {0.0f, 0.0f, 0.0f}, 0.14f), layer);
 }
 
-void appendCylinder(GeometryBuffer& geometry, const Vec3& center, float radius, float height, int segments, const Vec3& color)
+void appendCylinder(GeometryBuffer& geometry, const Vec3& center, float radius, float height, int segments, const Vec3& color, SurfaceLayer layer)
 {
     const float half_height = height * 0.5f;
     const Vec3 top_center{center.x, center.y + half_height, center.z};
@@ -61,26 +61,29 @@ void appendCylinder(GeometryBuffer& geometry, const Vec3& center, float radius, 
             cad::math::add(top_center, p1),
             cad::math::add(bottom_center, p1),
             cad::math::add(bottom_center, p0),
-            side_color
+            side_color,
+            layer
         );
         appendTriangle(
             geometry,
             top_center,
             cad::math::add(top_center, p1),
             cad::math::add(top_center, p0),
-            cad::math::mix(color, {1.0f, 1.0f, 1.0f}, 0.18f)
+            cad::math::mix(color, {1.0f, 1.0f, 1.0f}, 0.18f),
+            layer
         );
         appendTriangle(
             geometry,
             bottom_center,
             cad::math::add(bottom_center, p0),
             cad::math::add(bottom_center, p1),
-            cad::math::mix(color, {0.0f, 0.0f, 0.0f}, 0.14f)
+            cad::math::mix(color, {0.0f, 0.0f, 0.0f}, 0.14f),
+            layer
         );
     }
 }
 
-void appendRing(GeometryBuffer& geometry, const Vec3& center, float outer_radius, float inner_radius, float height, int segments, const Vec3& color)
+void appendRing(GeometryBuffer& geometry, const Vec3& center, float outer_radius, float inner_radius, float height, int segments, const Vec3& color, SurfaceLayer layer)
 {
     const float half_height = height * 0.5f;
     for (int i = 0; i < segments; ++i) {
@@ -96,10 +99,10 @@ void appendRing(GeometryBuffer& geometry, const Vec3& center, float outer_radius
         const Vec3 inner_bottom0{inner_top0.x, center.y - half_height, inner_top0.z};
         const Vec3 inner_bottom1{inner_top1.x, center.y - half_height, inner_top1.z};
 
-        appendQuad(geometry, outer_top0, outer_top1, inner_top1, inner_top0, color);
-        appendQuad(geometry, outer_bottom1, outer_bottom0, inner_bottom0, inner_bottom1, cad::math::mix(color, {0.0f, 0.0f, 0.0f}, 0.08f));
-        appendQuad(geometry, outer_top0, outer_bottom0, outer_bottom1, outer_top1, cad::math::mix(color, {1.0f, 1.0f, 1.0f}, 0.03f));
-        appendQuad(geometry, inner_top1, inner_bottom1, inner_bottom0, inner_top0, cad::math::mix(color, {0.0f, 0.0f, 0.0f}, 0.08f));
+        appendQuad(geometry, outer_top0, outer_top1, inner_top1, inner_top0, color, layer);
+        appendQuad(geometry, outer_bottom1, outer_bottom0, inner_bottom0, inner_bottom1, cad::math::mix(color, {0.0f, 0.0f, 0.0f}, 0.08f), layer);
+        appendQuad(geometry, outer_top0, outer_bottom0, outer_bottom1, outer_top1, cad::math::mix(color, {1.0f, 1.0f, 1.0f}, 0.03f), layer);
+        appendQuad(geometry, inner_top1, inner_bottom1, inner_bottom0, inner_top0, cad::math::mix(color, {0.0f, 0.0f, 0.0f}, 0.08f), layer);
     }
 }
 
@@ -110,7 +113,8 @@ void appendOpenTopTray(
     float base_thickness,
     float wall_thickness,
     float wall_height,
-    const Vec3& color
+    const Vec3& color,
+    SurfaceLayer layer
 )
 {
     appendBox(
@@ -121,7 +125,8 @@ void appendOpenTopTray(
             seating_plane_center.z
         },
         {footprint.x, base_thickness, footprint.z},
-        cad::math::mix(color, {0.0f, 0.0f, 0.0f}, 0.04f)
+        cad::math::mix(color, {0.0f, 0.0f, 0.0f}, 0.04f),
+        layer
     );
 
     const float side_height = std::max(wall_height, 2.0f);
@@ -133,25 +138,29 @@ void appendOpenTopTray(
         geometry,
         {seating_plane_center.x - half_width + wall_thickness * 0.5f, wall_center_y, seating_plane_center.z},
         {wall_thickness, side_height, footprint.z},
-        color
+        color,
+        layer
     );
     appendBox(
         geometry,
         {seating_plane_center.x + half_width - wall_thickness * 0.5f, wall_center_y, seating_plane_center.z},
         {wall_thickness, side_height, footprint.z},
-        color
+        color,
+        layer
     );
     appendBox(
         geometry,
         {seating_plane_center.x, wall_center_y, seating_plane_center.z - half_depth + wall_thickness * 0.5f},
         {footprint.x - wall_thickness * 2.0f, side_height, wall_thickness},
-        color
+        color,
+        layer
     );
     appendBox(
         geometry,
         {seating_plane_center.x, wall_center_y, seating_plane_center.z + half_depth - wall_thickness * 0.5f},
         {footprint.x - wall_thickness * 2.0f, side_height, wall_thickness},
-        color
+        color,
+        layer
     );
 }
 
@@ -162,14 +171,16 @@ void appendOpenShell(
     float wall_thickness,
     float floor_thickness,
     float wall_height,
-    const Vec3& color
+    const Vec3& color,
+    SurfaceLayer layer
 )
 {
     appendBox(
         geometry,
         {center.x, center.y - outer_size.y * 0.5f + floor_thickness * 0.5f, center.z},
         {outer_size.x, floor_thickness, outer_size.z},
-        cad::math::mix(color, {0.0f, 0.0f, 0.0f}, 0.04f)
+        cad::math::mix(color, {0.0f, 0.0f, 0.0f}, 0.04f),
+        layer
     );
 
     const float effective_wall_height = std::min(wall_height, outer_size.y - floor_thickness);
@@ -177,10 +188,10 @@ void appendOpenShell(
     const float half_width = outer_size.x * 0.5f;
     const float half_depth = outer_size.z * 0.5f;
 
-    appendBox(geometry, {center.x - half_width + wall_thickness * 0.5f, wall_center_y, center.z}, {wall_thickness, effective_wall_height, outer_size.z}, color);
-    appendBox(geometry, {center.x + half_width - wall_thickness * 0.5f, wall_center_y, center.z}, {wall_thickness, effective_wall_height, outer_size.z}, color);
-    appendBox(geometry, {center.x, wall_center_y, center.z - half_depth + wall_thickness * 0.5f}, {outer_size.x - wall_thickness * 2.0f, effective_wall_height, wall_thickness}, color);
-    appendBox(geometry, {center.x, wall_center_y, center.z + half_depth - wall_thickness * 0.5f}, {outer_size.x - wall_thickness * 2.0f, effective_wall_height, wall_thickness}, color);
+    appendBox(geometry, {center.x - half_width + wall_thickness * 0.5f, wall_center_y, center.z}, {wall_thickness, effective_wall_height, outer_size.z}, color, layer);
+    appendBox(geometry, {center.x + half_width - wall_thickness * 0.5f, wall_center_y, center.z}, {wall_thickness, effective_wall_height, outer_size.z}, color, layer);
+    appendBox(geometry, {center.x, wall_center_y, center.z - half_depth + wall_thickness * 0.5f}, {outer_size.x - wall_thickness * 2.0f, effective_wall_height, wall_thickness}, color, layer);
+    appendBox(geometry, {center.x, wall_center_y, center.z + half_depth - wall_thickness * 0.5f}, {outer_size.x - wall_thickness * 2.0f, effective_wall_height, wall_thickness}, color, layer);
 }
 
 void appendCylindricalCell(
@@ -190,17 +201,18 @@ void appendCylindricalCell(
     int segments,
     const Vec3& body_color,
     const Vec3& cap_color,
-    const Vec3& insulator_color
+    const Vec3& insulator_color,
+    SurfaceLayer layer
 )
 {
     const float half_body_height = profile.body_height * 0.5f;
-    appendCylinder(geometry, center, profile.body_radius, profile.body_height, segments, body_color);
+    appendCylinder(geometry, center, profile.body_radius, profile.body_height, segments, body_color, layer);
 
     const Vec3 top_cap_center{center.x, center.y + half_body_height - profile.cap_height * 0.5f, center.z};
-    appendCylinder(geometry, top_cap_center, profile.cap_radius, profile.cap_height, segments, cap_color);
+    appendCylinder(geometry, top_cap_center, profile.cap_radius, profile.cap_height, segments, cap_color, layer);
 
     const Vec3 bottom_cap_center{center.x, center.y - half_body_height + profile.bottom_cap_height * 0.5f, center.z};
-    appendCylinder(geometry, bottom_cap_center, profile.cap_radius * 0.98f, profile.bottom_cap_height, segments, cad::math::mix(cap_color, {0.0f, 0.0f, 0.0f}, 0.08f));
+    appendCylinder(geometry, bottom_cap_center, profile.cap_radius * 0.98f, profile.bottom_cap_height, segments, cad::math::mix(cap_color, {0.0f, 0.0f, 0.0f}, 0.08f), layer);
 
     const float ring_y = center.y + half_body_height - profile.cap_height + profile.insulator_height * 0.5f;
     appendRing(
@@ -210,7 +222,8 @@ void appendCylindricalCell(
         std::min(profile.insulator_inner_radius, profile.insulator_outer_radius - 1.0f),
         profile.insulator_height,
         segments,
-        insulator_color
+        insulator_color,
+        layer
     );
 
     const Vec3 terminal_center{
@@ -224,7 +237,8 @@ void appendCylindricalCell(
         std::min(profile.terminal_radius, profile.insulator_inner_radius * 0.95f),
         profile.terminal_height,
         segments,
-        cad::math::mix(cap_color, {1.0f, 1.0f, 1.0f}, 0.05f)
+        cad::math::mix(cap_color, {1.0f, 1.0f, 1.0f}, 0.05f),
+        layer
     );
 }
 

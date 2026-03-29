@@ -16,6 +16,7 @@ CadEngine::CadEngine()
     rebuildDocument();
     rebuildVisualization();
     rebuildVisualGeometry();
+    fitCameraToVisualGeometry();
     rebuildRenderPacket();
 }
 
@@ -47,6 +48,7 @@ void CadEngine::setBatteryConfig(const battery::BatteryCadConfig& config)
     rebuildDocument();
     rebuildVisualization();
     rebuildVisualGeometry();
+    fitCameraToVisualGeometry();
     rebuildRenderPacket();
 }
 
@@ -455,6 +457,8 @@ void CadEngine::rebuildDocument()
     const std::string existing_mesh_path = m_document.metadata().cell_mesh_path;
     battery::PackLayoutGenerator::rebuildDocument(m_document, m_config.layout);
     m_document.metadata().cell_mesh_path = existing_mesh_path;
+    const battery::BoundingBox bounds = sceneBounds();
+    m_camera.fitToBounds(bounds.center, bounds.size);
 }
 
 void CadEngine::rebuildVisualization()
@@ -513,6 +517,83 @@ void CadEngine::rebuildVisualGeometry()
     const auto& cache_stats = m_geometryGenerator.cacheStats();
     m_renderDiagnostics.cylindrical_cell_cache_hits = cache_stats.cylindrical_cell_hits;
     m_renderDiagnostics.cylindrical_cell_cache_misses = cache_stats.cylindrical_cell_misses;
+}
+
+battery::BoundingBox CadEngine::sceneBounds() const
+{
+    if (!m_document.packEnclosures().empty()) {
+        return m_document.worldBounds(m_document.packEnclosures().front().id);
+    }
+    if (!m_document.packs().empty()) {
+        return m_document.worldBounds(m_document.packs().front().id);
+    }
+    return {{0.0f, 0.0f, 0.0f}, {320.0f, 220.0f, 240.0f}};
+}
+
+battery::BoundingBox CadEngine::visualGeometryBounds() const
+{
+    math::Vec3 min_point{};
+    math::Vec3 max_point{};
+    bool initialized = false;
+
+    for (const auto& triangle : m_visualGeometry.triangles) {
+        const math::Vec3 vertices[] = {triangle.a, triangle.b, triangle.c};
+        for (const math::Vec3& vertex : vertices) {
+            if (!initialized) {
+                min_point = vertex;
+                max_point = vertex;
+                initialized = true;
+                continue;
+            }
+            min_point.x = std::min(min_point.x, vertex.x);
+            min_point.y = std::min(min_point.y, vertex.y);
+            min_point.z = std::min(min_point.z, vertex.z);
+            max_point.x = std::max(max_point.x, vertex.x);
+            max_point.y = std::max(max_point.y, vertex.y);
+            max_point.z = std::max(max_point.z, vertex.z);
+        }
+    }
+
+    for (const auto& line : m_visualGeometry.lines) {
+        const math::Vec3 vertices[] = {line.a, line.b};
+        for (const math::Vec3& vertex : vertices) {
+            if (!initialized) {
+                min_point = vertex;
+                max_point = vertex;
+                initialized = true;
+                continue;
+            }
+            min_point.x = std::min(min_point.x, vertex.x);
+            min_point.y = std::min(min_point.y, vertex.y);
+            min_point.z = std::min(min_point.z, vertex.z);
+            max_point.x = std::max(max_point.x, vertex.x);
+            max_point.y = std::max(max_point.y, vertex.y);
+            max_point.z = std::max(max_point.z, vertex.z);
+        }
+    }
+
+    if (!initialized) {
+        return sceneBounds();
+    }
+
+    return {
+        {
+            (min_point.x + max_point.x) * 0.5f,
+            (min_point.y + max_point.y) * 0.5f,
+            (min_point.z + max_point.z) * 0.5f
+        },
+        {
+            std::max(1.0f, max_point.x - min_point.x),
+            std::max(1.0f, max_point.y - min_point.y),
+            std::max(1.0f, max_point.z - min_point.z)
+        }
+    };
+}
+
+void CadEngine::fitCameraToVisualGeometry()
+{
+    const battery::BoundingBox bounds = visualGeometryBounds();
+    m_camera.fitToBounds(bounds.center, bounds.size);
 }
 
 } // namespace cad
