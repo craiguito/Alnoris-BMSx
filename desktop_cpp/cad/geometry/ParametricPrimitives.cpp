@@ -208,24 +208,44 @@ void appendCylindricalCell(
     const float half_body_height = profile.body_height * 0.5f;
     if (segments <= 8) {
         appendCylinder(geometry, center, profile.body_radius, profile.body_height, segments, body_color, layer);
-        const Vec3 top_cap_center{center.x, center.y + half_body_height - profile.cap_height * 0.5f, center.z};
-        appendCylinder(geometry, top_cap_center, profile.cap_radius, profile.cap_height, segments, cap_color, layer);
+        const Vec3 top_cap_center{center.x, center.y + half_body_height + profile.top_cap_shoulder_height * 0.5f, center.z};
+        appendCylinder(geometry, top_cap_center, profile.top_cap_outer_radius, profile.top_cap_shoulder_height, segments, cap_color, layer);
         return;
     }
 
     appendCylinder(geometry, center, profile.body_radius, profile.body_height, segments, body_color, layer);
 
-    const Vec3 top_cap_center{center.x, center.y + half_body_height - profile.cap_height * 0.5f, center.z};
-    appendCylinder(geometry, top_cap_center, profile.cap_radius, profile.cap_height, segments, cap_color, layer);
+    const Vec3 top_cap_center{center.x, center.y + half_body_height + profile.top_cap_shoulder_height * 0.5f, center.z};
+    appendCylinder(geometry, top_cap_center, profile.top_cap_outer_radius, profile.top_cap_shoulder_height, segments, cap_color, layer);
 
     const Vec3 bottom_cap_center{center.x, center.y - half_body_height + profile.bottom_cap_height * 0.5f, center.z};
-    appendCylinder(geometry, bottom_cap_center, profile.cap_radius * 0.98f, profile.bottom_cap_height, segments, cad::math::mix(cap_color, {0.0f, 0.0f, 0.0f}, 0.08f), layer);
+    appendCylinder(
+        geometry,
+        bottom_cap_center,
+        profile.body_radius * 0.96f,
+        profile.bottom_cap_height,
+        segments,
+        cad::math::mix(cap_color, {0.0f, 0.0f, 0.0f}, 0.08f),
+        layer
+    );
 
-    const float ring_y = center.y + half_body_height - profile.cap_height + profile.insulator_height * 0.5f;
+    const float shoulder_top_y = center.y + half_body_height + profile.top_cap_shoulder_height;
+    appendRing(
+        geometry,
+        {center.x, shoulder_top_y - profile.top_cap_shoulder_height * 0.15f, center.z},
+        std::min(profile.top_cap_outer_radius, profile.body_radius * 0.98f),
+        std::min(profile.top_cap_inner_radius, profile.top_cap_outer_radius - 0.5f),
+        std::max(0.2f, profile.top_cap_shoulder_height * 0.35f),
+        segments,
+        cad::math::mix(cap_color, {0.0f, 0.0f, 0.0f}, 0.10f),
+        layer
+    );
+
+    const float ring_y = shoulder_top_y + profile.insulator_height * 0.5f;
     appendRing(
         geometry,
         {center.x, ring_y, center.z},
-        std::min(profile.insulator_outer_radius, profile.cap_radius * 0.98f),
+        std::min(profile.insulator_outer_radius, profile.top_cap_outer_radius * 0.98f),
         std::min(profile.insulator_inner_radius, profile.insulator_outer_radius - 1.0f),
         profile.insulator_height,
         segments,
@@ -235,7 +255,7 @@ void appendCylindricalCell(
 
     const Vec3 terminal_center{
         center.x,
-        center.y + half_body_height - profile.cap_height + profile.terminal_height * 0.5f + 0.6f,
+        shoulder_top_y + profile.terminal_height * 0.5f,
         center.z
     };
     appendCylinder(

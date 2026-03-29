@@ -1,4 +1,5 @@
 #include "PackLayoutGenerator.h"
+#include "PackLayoutMetrics.h"
 
 #include <algorithm>
 #include <numeric>
@@ -206,79 +207,45 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
     document.clear();
     document.metadata().layout_config = config;
 
-    const int series_count = std::max(1, config.cells_in_series);
-    const int parallel_count = std::max(1, config.cells_in_parallel);
-    const int module_count = std::max(1, std::min(config.module_count, series_count));
-    const int base_series_per_module = series_count / module_count;
-    const int module_remainder = series_count % module_count;
-    const bool cylindrical = config.cell_form_factor == CellFormFactor::Cylindrical;
-    const float cell_width = cylindrical ? config.cell_radius * 2.0f : std::max(10.0f, config.cell_width);
-    const float cell_depth = cylindrical ? config.cell_radius * 2.0f : std::max(10.0f, config.cell_depth);
-    const float row_outer_z = ((parallel_count - 1) * config.z_spacing) * 0.5f;
-    const float tray_base_thickness = std::max(8.0f, config.cooling_channel_thickness * 0.34f);
-    const float busbar_depth = 16.0f;
-    const float busbar_clearance_y = std::max(4.0f, config.busbar_thickness * 0.45f);
-    const float cooling_gap_y = 8.0f;
-    const float module_half_height = std::max(
-        config.cell_height * 0.5f + busbar_clearance_y + config.busbar_thickness + 18.0f,
-        config.cell_height * 0.5f + tray_base_thickness + config.cooling_channel_thickness + cooling_gap_y + 18.0f
-    );
-    const float pack_depth = std::max(180.0f, (parallel_count - 1) * config.z_spacing + cell_depth * 1.8f);
-    const float module_height = module_half_height * 2.0f;
-    const float enclosure_height = module_height + 44.0f;
-    const float group_width = std::max(config.x_spacing * 0.78f, cell_width * 1.35f);
-    const float group_depth = std::max(pack_depth + 28.0f, cell_depth * 1.35f);
-    std::vector<int> module_series_counts;
-    std::vector<float> module_widths;
-    module_series_counts.reserve(module_count);
-    module_widths.reserve(module_count);
-    for (int moduleIndex = 0; moduleIndex < module_count; ++moduleIndex) {
-        const int moduleSeriesCount = base_series_per_module + (moduleIndex < module_remainder ? 1 : 0);
-        module_series_counts.push_back(moduleSeriesCount);
-        module_widths.push_back(std::max(180.0f, (moduleSeriesCount - 1) * config.x_spacing + group_width + 52.0f));
-    }
-    const float modules_span_x = std::accumulate(module_widths.begin(), module_widths.end(), 0.0f)
-        + std::max(0, module_count - 1) * config.module_gap_x;
-    const float pack_width = std::max(240.0f, modules_span_x);
+    const ResolvedPackLayout resolved = resolvePackLayout(config);
+    const int series_count = resolved.series_count;
+    const int parallel_count = resolved.parallel_count;
+    const bool cylindrical = resolved.cylindrical;
 
     BatteryPackEntity generatedPack;
     generatedPack.label = "Battery pack";
-    generatedPack.center = {0.0f, 0.0f, 0.0f};
-    generatedPack.size = {pack_width + 140.0f, enclosure_height, pack_depth + 136.0f};
+    generatedPack.center = {0.0f, resolved.stack.bounds_center_y, 0.0f};
+    generatedPack.size = {resolved.pack_outer_width, resolved.stack.bounds_height, resolved.pack_outer_depth};
     generatedPack.series_count = series_count;
     generatedPack.parallel_count = parallel_count;
     generatedPack.layout_type = LayoutType::Grid;
     generatedPack.cell_radius = config.cell_radius;
     generatedPack.cell_height = config.cell_height;
-    generatedPack.spacing_x = config.x_spacing;
-    generatedPack.spacing_z = config.z_spacing;
+    generatedPack.spacing_x = resolved.pitch_x;
+    generatedPack.spacing_z = resolved.pitch_z;
     const BatteryPackEntity mergedPack = mergePack(generatedPack, previousPack);
     BatteryPackEntity& pack = document.addPack(mergedPack);
 
-    int runningSeriesStart = 0;
-    float runningCenterX = -modules_span_x * 0.5f;
-    for (int moduleIndex = 0; moduleIndex < module_count; ++moduleIndex) {
-        const int moduleSeriesCount = module_series_counts[static_cast<std::size_t>(moduleIndex)];
-        const float moduleWidth = module_widths[static_cast<std::size_t>(moduleIndex)];
-        const float moduleCenterX = runningCenterX + moduleWidth * 0.5f;
+    for (const ModuleLayoutSlice& slice : resolved.modules) {
+        const int moduleIndex = slice.module_index;
 
         ModuleBoundaryEntity generatedModuleBoundary;
-        generatedModuleBoundary.label = module_count == 1
+        generatedModuleBoundary.label = resolved.module_count == 1
             ? "Battery module"
             : ("Battery module " + std::to_string(moduleIndex + 1));
         generatedModuleBoundary.parent_id = pack.id;
         generatedModuleBoundary.module_index = moduleIndex;
-        generatedModuleBoundary.center = {moduleCenterX, 0.0f, 0.0f};
-        generatedModuleBoundary.size = {moduleWidth, module_height, pack_depth + 92.0f};
-        generatedModuleBoundary.series_span = moduleSeriesCount;
+        generatedModuleBoundary.center = {slice.center_x, 0.0f, 0.0f};
+        generatedModuleBoundary.size = {slice.boundary_width, resolved.stack.bounds_height, resolved.boundary_depth};
+        generatedModuleBoundary.series_span = slice.series_count;
         generatedModuleBoundary.parallel_span = parallel_count;
         const auto previousModuleBoundary = previousModuleBoundaries.find(moduleIndex);
         ModuleBoundaryEntity& module = document.addModuleBoundary(
             mergeModuleBoundary(generatedModuleBoundary, previousModuleBoundary == previousModuleBoundaries.end() ? nullptr : &previousModuleBoundary->second)
         );
-        for (int localSeries = 0; localSeries < moduleSeriesCount; ++localSeries) {
-            const int globalSeries = runningSeriesStart + localSeries;
-            const float localCenterX = (localSeries - (moduleSeriesCount - 1) / 2.0f) * config.x_spacing;
+        for (int localSeries = 0; localSeries < slice.series_count; ++localSeries) {
+            const int globalSeries = slice.series_start + localSeries;
+            const float localCenterX = (localSeries - (slice.series_count - 1) / 2.0f) * resolved.pitch_x;
 
             CellGroupEntity generatedGroup;
             generatedGroup.label = "Cell group";
@@ -287,24 +254,24 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
             generatedGroup.series_index = globalSeries;
             generatedGroup.simulation_group_index = globalSeries;
             generatedGroup.center = {localCenterX, 0.0f, 0.0f};
-            generatedGroup.size = {group_width, config.cell_height + 24.0f, group_depth};
+            generatedGroup.size = {resolved.group_width, resolved.stack.bounds_height, resolved.tray_depth};
             generatedGroup.cell_count = parallel_count;
             const auto previousGroup = previousGroups.find(globalSeries);
             document.addCellGroup(mergeGroup(generatedGroup, previousGroup == previousGroups.end() ? nullptr : &previousGroup->second));
         }
 
         CoolingPlateEntity generatedCoolingPlate;
-        generatedCoolingPlate.label = module_count == 1
-            ? "Cooling channel"
-            : ("Cooling channel " + std::to_string(moduleIndex + 1));
+        generatedCoolingPlate.label = resolved.module_count == 1
+            ? "Cooling plate"
+            : ("Cooling plate " + std::to_string(moduleIndex + 1));
         generatedCoolingPlate.parent_id = module.id;
         generatedCoolingPlate.plate_index = moduleIndex;
         generatedCoolingPlate.center = {
             0.0f,
-            -(config.cell_height * 0.5f + tray_base_thickness + cooling_gap_y + config.cooling_channel_thickness * 0.5f),
+            resolved.stack.cooling_plate_center_y - resolved.stack.bounds_center_y,
             0.0f
         };
-        generatedCoolingPlate.size = {moduleWidth - 24.0f, config.cooling_channel_thickness, pack_depth + 92.0f};
+        generatedCoolingPlate.size = {slice.cooling_width, config.cooling_channel_thickness, resolved.cooling_depth};
         const auto previousPlate = previousCoolingPlates.find(generatedCoolingPlate.plate_index);
         document.addCoolingPlate(mergeCoolingPlate(generatedCoolingPlate, previousPlate == previousCoolingPlates.end() ? nullptr : &previousPlate->second));
 
@@ -314,10 +281,10 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
         generatedNegativeBusbar.role = BusbarRole::Negative;
         generatedNegativeBusbar.center = {
             0.0f,
-            config.cell_height * 0.5f + busbar_clearance_y + config.busbar_thickness * 0.5f,
-            -(row_outer_z + cell_depth * 0.5f + busbar_depth * 0.5f + 5.0f)
+            resolved.stack.busbar_center_y - resolved.stack.bounds_center_y,
+            -resolved.row_center_z
         };
-        generatedNegativeBusbar.size = {moduleWidth, config.busbar_thickness, busbar_depth};
+        generatedNegativeBusbar.size = {slice.busbar_length, config.busbar_thickness, config.busbar_width};
         const auto previousNegativeBusbar = previousBusbars.find({moduleIndex, generatedNegativeBusbar.role});
         document.addBusbar(mergeBusbar(generatedNegativeBusbar, previousNegativeBusbar == previousBusbars.end() ? nullptr : &previousNegativeBusbar->second));
 
@@ -327,15 +294,12 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
         generatedPositiveBusbar.role = BusbarRole::Positive;
         generatedPositiveBusbar.center = {
             0.0f,
-            config.cell_height * 0.5f + busbar_clearance_y + config.busbar_thickness * 0.5f,
-            row_outer_z + cell_depth * 0.5f + busbar_depth * 0.5f + 5.0f
+            resolved.stack.busbar_center_y - resolved.stack.bounds_center_y,
+            resolved.row_center_z
         };
-        generatedPositiveBusbar.size = {moduleWidth, config.busbar_thickness, busbar_depth};
+        generatedPositiveBusbar.size = {slice.busbar_length, config.busbar_thickness, config.busbar_width};
         const auto previousPositiveBusbar = previousBusbars.find({moduleIndex, generatedPositiveBusbar.role});
         document.addBusbar(mergeBusbar(generatedPositiveBusbar, previousPositiveBusbar == previousBusbars.end() ? nullptr : &previousPositiveBusbar->second));
-
-        runningSeriesStart += moduleSeriesCount;
-        runningCenterX += moduleWidth + config.module_gap_x;
     }
 
     for (int row = 0; row < parallel_count; ++row) {
@@ -345,20 +309,21 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
             generated.parent_id = document.cellGroups()[static_cast<std::size_t>(col)].id;
             generated.position = {
                 0.0f,
-                0.0f,
-                (row - (parallel_count - 1) / 2.0f) * config.z_spacing
+                resolved.stack.cell_center_y - resolved.stack.bounds_center_y,
+                (row - (parallel_count - 1) / 2.0f) * resolved.pitch_z
             };
             generated.form_factor = config.cell_form_factor;
             generated.radius = config.cell_radius;
             generated.height = config.cell_height;
-            generated.width = cell_width;
-            generated.depth = cell_depth;
+            generated.width = resolved.cell_width;
+            generated.depth = resolved.cell_depth;
             generated.series_index = col;
             generated.parallel_index = row;
             generated.simulation_group_index = col;
             generated.cell_type = config.cell_form_factor == CellFormFactor::Prismatic
                 ? "prismatic"
-                : (config.cell_form_factor == CellFormFactor::Pouch ? "pouch" : (config.cell_radius >= 32.0f ? "21700" : "18650"));
+                : (config.cell_form_factor == CellFormFactor::Pouch ? "pouch"
+                    : (resolved.cell_diameter >= 20.0f && config.cell_height >= 68.0f ? "21700" : "18650"));
 
             const auto previousIt = previousCells.find({col, row});
             const CellEntity merged = mergeCell(generated, previousIt == previousCells.end() ? nullptr : &previousIt->second);
@@ -371,7 +336,7 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
     generatedEnclosure.parent_id = pack.id;
     generatedEnclosure.enclosure_index = 0;
     generatedEnclosure.center = {0.0f, 0.0f, 0.0f};
-    generatedEnclosure.size = {pack_width + 140.0f, enclosure_height, pack_depth + 136.0f};
+    generatedEnclosure.size = {resolved.pack_outer_width, resolved.stack.bounds_height, resolved.pack_outer_depth};
     generatedEnclosure.wall_thickness = config.enclosure_wall_thickness;
     const auto previousEnclosure = previousEnclosures.find(generatedEnclosure.enclosure_index);
     document.addPackEnclosure(mergeEnclosure(generatedEnclosure, previousEnclosure == previousEnclosures.end() ? nullptr : &previousEnclosure->second));

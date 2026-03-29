@@ -668,3 +668,64 @@ This pass moves the CAD visuals away from placeholder primitives living directly
 - TODO: add tray ribs / fastening details behind a controlled detail level
 - TODO: add richer procedural cooling channel features without cluttering the viewport
 - TODO: support alternate procedural detail levels / LOD
+
+## Engineering-Accurate 21700 Assembly Pass
+
+This pass tightens the procedural battery geometry around one explicit cylindrical reference assembly instead of letting pack layout, tray geometry, and busbar placement drift through separate heuristics.
+
+### Shared 21700 reference dimensions
+
+- Cylindrical cells now default to a 21700-style body:
+  - `21.0 mm` diameter
+  - `70.0 mm` body height
+- Top terminal detail now uses explicit procedural dimensions:
+  - `18.5 mm` top-cap outer diameter
+  - `14.5 mm` top-cap inner diameter
+  - `8.0 mm` positive terminal diameter
+  - `1.4 mm` positive terminal height
+  - `16.5 mm` / `9.0 mm` insulator ring outer/inner diameters
+- Default cylindrical layout pitch is now:
+  - `23.0 mm` in X
+  - `23.0 mm` in Z
+
+### Shared assembly stack
+
+- The layout generator and reset-to-generated path now use the same resolved stack model instead of separate hardcoded offsets.
+- The procedural stack is now derived from:
+  - enclosure floor
+  - cooling plate
+  - tray base
+  - cell seating pad
+  - cylindrical cell body
+  - top terminal / busbar clearance
+- This keeps busbars, trays, cooling plates, and enclosure dimensions mechanically consistent with the cells they surround.
+
+### Procedural geometry improvements
+
+- Cylindrical cells now render with a more engineering-oriented top profile:
+  - can body
+  - top-cap shoulder
+  - central positive nub
+  - insulating ring
+  - subtle bottom-cap treatment
+- Busbars are now generated from the resolved terminal plane and outer-row placement instead of floating at ad hoc heights.
+- Module trays now derive from the actual cell footprint and include:
+  - explicit base thickness
+  - side wall thickness / wall height
+  - a seating/support pad under the cells
+- Cooling plates now use the resolved assembly footprint and a shallower channel-indication depth.
+- Pack enclosure geometry now uses world-space enclosure bounds instead of a local-center shortcut.
+
+### Current limitations after this pass
+
+- Busbar topology is still simplified rail-plus-bridge geometry rather than a full weld-tab or solver-derived interconnect model.
+- Module and pack boundary entities still use coarse bounds for selection and editing, even though the procedural visual stack is more exact.
+- Prismatic and pouch cells still use simpler box-form geometry.
+
+### Follow-up TODOs
+
+- TODO: add explicit 18650 and 26650 cylindrical presets on top of the same shared stack model
+- TODO: add richer series-link busbar segmentation and end-link geometry
+- TODO: add optional compression/end plates for module assemblies
+- TODO: add prismatic and pouch generators with the same level of assembly rigor
+- TODO: expose more of the new geometric dimensions directly in the desktop inspector and preset system

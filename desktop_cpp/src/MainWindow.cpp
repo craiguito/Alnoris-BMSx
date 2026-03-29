@@ -102,10 +102,10 @@ cad::battery::CellFormFactor cellFormFactorFromString(const QString& value)
 struct CadCellDefaults
 {
     cad::battery::CellFormFactor form_factor = cad::battery::CellFormFactor::Cylindrical;
-    float radius_mm = 9.0f;
-    float height_mm = 65.0f;
-    float width_mm = 18.0f;
-    float depth_mm = 18.0f;
+    float radius_mm = 10.5f;
+    float height_mm = 70.0f;
+    float width_mm = 21.0f;
+    float depth_mm = 21.0f;
     float x_spacing_mm = 23.0f;
     float z_spacing_mm = 23.0f;
 };
@@ -117,7 +117,7 @@ CadCellDefaults fallbackCadCellDefaults(const QString& referencePreset)
         return {cad::battery::CellFormFactor::Cylindrical, 13.0f, 65.0f, 26.0f, 26.0f, 31.0f, 31.0f};
     }
     if (normalized.contains("21700")) {
-        return {cad::battery::CellFormFactor::Cylindrical, 10.5f, 70.0f, 21.0f, 21.0f, 26.0f, 26.0f};
+        return {cad::battery::CellFormFactor::Cylindrical, 10.5f, 70.0f, 21.0f, 21.0f, 23.0f, 23.0f};
     }
     return {};
 }
@@ -1354,12 +1354,38 @@ void MainWindow::updateCadWorkspace()
     cadConfig.layout.cell_height = static_cast<float>(cadDefaults.value("cell_height_mm").toDouble(fallbackDefaults.height_mm));
     cadConfig.layout.cell_width = static_cast<float>(cadDefaults.value("cell_width_mm").toDouble(fallbackDefaults.width_mm));
     cadConfig.layout.cell_depth = static_cast<float>(cadDefaults.value("cell_depth_mm").toDouble(fallbackDefaults.depth_mm));
+    cadConfig.layout.top_cap_outer_diameter = static_cast<float>(cadDefaults.value("top_cap_outer_diameter_mm").toDouble(cadConfig.layout.top_cap_outer_diameter));
+    cadConfig.layout.top_cap_inner_diameter = static_cast<float>(cadDefaults.value("top_cap_inner_diameter_mm").toDouble(cadConfig.layout.top_cap_inner_diameter));
+    cadConfig.layout.top_cap_shoulder_height = static_cast<float>(cadDefaults.value("top_cap_shoulder_height_mm").toDouble(cadConfig.layout.top_cap_shoulder_height));
+    cadConfig.layout.positive_terminal_diameter = static_cast<float>(cadDefaults.value("positive_terminal_diameter_mm").toDouble(cadConfig.layout.positive_terminal_diameter));
+    cadConfig.layout.positive_terminal_height = static_cast<float>(cadDefaults.value("positive_terminal_height_mm").toDouble(cadConfig.layout.positive_terminal_height));
+    cadConfig.layout.insulating_ring_outer_diameter = static_cast<float>(cadDefaults.value("insulating_ring_outer_diameter_mm").toDouble(cadConfig.layout.insulating_ring_outer_diameter));
+    cadConfig.layout.insulating_ring_inner_diameter = static_cast<float>(cadDefaults.value("insulating_ring_inner_diameter_mm").toDouble(cadConfig.layout.insulating_ring_inner_diameter));
+    cadConfig.layout.insulating_ring_height = static_cast<float>(cadDefaults.value("insulating_ring_height_mm").toDouble(cadConfig.layout.insulating_ring_height));
     cadConfig.layout.x_spacing = static_cast<float>(cadDefaults.value("x_spacing_mm").toDouble(fallbackDefaults.x_spacing_mm));
     cadConfig.layout.z_spacing = static_cast<float>(cadDefaults.value("z_spacing_mm").toDouble(fallbackDefaults.z_spacing_mm));
     cadConfig.layout.module_gap_x = static_cast<float>(cadDefaults.value("module_gap_x_mm").toDouble(cadConfig.layout.module_gap_x));
     cadConfig.layout.busbar_thickness = static_cast<float>(cadDefaults.value("busbar_thickness_mm").toDouble(cadConfig.layout.busbar_thickness));
+    cadConfig.layout.busbar_width = static_cast<float>(cadDefaults.value("busbar_width_mm").toDouble(cadConfig.layout.busbar_width));
+    cadConfig.layout.busbar_terminal_clearance = static_cast<float>(cadDefaults.value("busbar_terminal_clearance_mm").toDouble(cadConfig.layout.busbar_terminal_clearance));
+    cadConfig.layout.busbar_support_offset = static_cast<float>(cadDefaults.value("busbar_support_offset_mm").toDouble(cadConfig.layout.busbar_support_offset));
+    cadConfig.layout.busbar_overlap_width = static_cast<float>(cadDefaults.value("busbar_overlap_width_mm").toDouble(cadConfig.layout.busbar_overlap_width));
     cadConfig.layout.cooling_channel_thickness = static_cast<float>(cadDefaults.value("cooling_channel_thickness_mm").toDouble(cadConfig.layout.cooling_channel_thickness));
+    cadConfig.layout.cooling_channel_depth = static_cast<float>(cadDefaults.value("cooling_channel_depth_mm").toDouble(cadConfig.layout.cooling_channel_depth));
+    cadConfig.layout.cooling_plate_margin_x = static_cast<float>(cadDefaults.value("cooling_plate_margin_x_mm").toDouble(cadConfig.layout.cooling_plate_margin_x));
+    cadConfig.layout.cooling_plate_margin_z = static_cast<float>(cadDefaults.value("cooling_plate_margin_z_mm").toDouble(cadConfig.layout.cooling_plate_margin_z));
+    cadConfig.layout.cooling_plate_offset_below_tray = static_cast<float>(cadDefaults.value("cooling_plate_offset_below_tray_mm").toDouble(cadConfig.layout.cooling_plate_offset_below_tray));
     cadConfig.layout.enclosure_wall_thickness = static_cast<float>(cadDefaults.value("enclosure_wall_thickness_mm").toDouble(cadConfig.layout.enclosure_wall_thickness));
+    cadConfig.layout.enclosure_floor_thickness = static_cast<float>(cadDefaults.value("enclosure_floor_thickness_mm").toDouble(cadConfig.layout.enclosure_floor_thickness));
+    cadConfig.layout.enclosure_floor_offset = static_cast<float>(cadDefaults.value("enclosure_floor_offset_mm").toDouble(cadConfig.layout.enclosure_floor_offset));
+    cadConfig.layout.enclosure_clearance_x = static_cast<float>(cadDefaults.value("enclosure_clearance_x_mm").toDouble(cadConfig.layout.enclosure_clearance_x));
+    cadConfig.layout.enclosure_clearance_z = static_cast<float>(cadDefaults.value("enclosure_clearance_z_mm").toDouble(cadConfig.layout.enclosure_clearance_z));
+    cadConfig.layout.module_tray_base_thickness = static_cast<float>(cadDefaults.value("tray_base_thickness_mm").toDouble(cadConfig.layout.module_tray_base_thickness));
+    cadConfig.layout.module_tray_wall_thickness = static_cast<float>(cadDefaults.value("tray_wall_thickness_mm").toDouble(cadConfig.layout.module_tray_wall_thickness));
+    cadConfig.layout.module_tray_wall_height = static_cast<float>(cadDefaults.value("tray_wall_height_mm").toDouble(cadConfig.layout.module_tray_wall_height));
+    cadConfig.layout.cell_seating_offset = static_cast<float>(cadDefaults.value("cell_seating_offset_mm").toDouble(cadConfig.layout.cell_seating_offset));
+    cadConfig.layout.module_tray_margin_x = static_cast<float>(cadDefaults.value("tray_margin_x_mm").toDouble(cadConfig.layout.module_tray_margin_x));
+    cadConfig.layout.module_tray_margin_z = static_cast<float>(cadDefaults.value("tray_margin_z_mm").toDouble(cadConfig.layout.module_tray_margin_z));
     m_cadWorkspaceView->setPackConfig(cadConfig);
     refreshCadOverlay();
 }

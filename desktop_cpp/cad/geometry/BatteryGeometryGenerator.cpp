@@ -172,32 +172,28 @@ battery::BoundingBox boundsFromCells(const core::CadDocument& document, const st
     };
 }
 
-CylindricalCellProfile makeCellProfile(const battery::CellEntity& cell)
+CylindricalCellProfile makeCellProfile(const battery::CellEntity& cell, const battery::PackLayoutConfig& layout)
 {
     CylindricalCellProfile profile;
     profile.body_radius = cell.radius;
     profile.body_height = cell.height;
-    profile.cap_height = std::max(4.0f, cell.height * 0.028f);
-    profile.cap_radius = cell.radius * 0.93f;
-    profile.terminal_radius = cell.radius * 0.34f;
-    profile.terminal_height = std::max(2.0f, cell.height * 0.014f);
-    profile.insulator_outer_radius = cell.radius * 0.62f;
-    profile.insulator_inner_radius = cell.radius * 0.36f;
-    profile.insulator_height = std::max(1.2f, cell.height * 0.007f);
-    profile.bottom_cap_height = std::max(2.0f, cell.height * 0.012f);
-
-    if (cell.cell_type == "21700") {
-        profile.cap_height *= 1.08f;
-        profile.terminal_radius *= 1.10f;
-    }
+    profile.top_cap_shoulder_height = std::max(0.5f, layout.top_cap_shoulder_height);
+    profile.top_cap_outer_radius = std::min(cell.radius * 0.98f, layout.top_cap_outer_diameter * 0.5f);
+    profile.top_cap_inner_radius = std::min(profile.top_cap_outer_radius - 0.4f, layout.top_cap_inner_diameter * 0.5f);
+    profile.terminal_radius = std::min(profile.top_cap_inner_radius * 0.92f, layout.positive_terminal_diameter * 0.5f);
+    profile.terminal_height = std::max(0.6f, layout.positive_terminal_height);
+    profile.insulator_outer_radius = std::min(profile.top_cap_outer_radius * 0.98f, layout.insulating_ring_outer_diameter * 0.5f);
+    profile.insulator_inner_radius = std::min(profile.insulator_outer_radius - 0.6f, layout.insulating_ring_inner_diameter * 0.5f);
+    profile.insulator_height = std::max(0.2f, layout.insulating_ring_height);
+    profile.bottom_cap_height = std::max(0.2f, layout.bottom_cap_height);
     return profile;
 }
 
 void appendCoolingFeatures(GeometryBuffer& geometry, const battery::BoundingBox& bounds, const battery::PackLayoutConfig& config)
 {
-    const float inset_depth = std::min(config.cooling_channel_thickness * 0.3f, 5.0f);
-    const float lane_width = std::max(18.0f, bounds.size.z * 0.14f);
-    const float offset = bounds.size.z * 0.22f;
+    const float inset_depth = std::min(config.cooling_channel_depth, config.cooling_channel_thickness * 0.35f);
+    const float lane_width = std::max(10.0f, bounds.size.z * 0.12f);
+    const float offset = bounds.size.z * 0.18f;
     const Vec3 feature_color{0.50f, 0.60f, 0.71f};
 
     appendBox(
@@ -227,15 +223,16 @@ void appendBusbarGeometry(
 )
 {
     const Vec3 copper_color{0.72f, 0.48f, 0.24f};
-    appendBox(geometry, bounds.center, {bounds.size.x * 0.92f, bounds.size.y, bounds.size.z}, copper_color, SurfaceLayer::Busbar);
+    appendBox(geometry, bounds.center, bounds.size, copper_color, SurfaceLayer::Busbar);
 
     if (module == nullptr || module_context.cells.empty()) {
         return;
     }
 
-    const float tab_depth = std::max(layout.busbar_tab_depth, bounds.size.z * 1.5f);
-    const float tab_width = std::max(layout.busbar_tab_width, bounds.size.x / std::max(1, module->series_span * 3));
-    const float group_z = busbar.role == battery::BusbarRole::Negative ? -1.0f : 1.0f;
+    const float tab_width = std::min(
+        std::max(layout.busbar_tab_width, layout.busbar_overlap_width),
+        std::max(6.0f, bounds.size.x / std::max(1, module->series_span * 2))
+    );
     std::vector<int> series_indices;
     for (const battery::CellEntity* cell : module_context.cells) {
         if (std::find(series_indices.begin(), series_indices.end(), cell->series_index) == series_indices.end()) {
@@ -251,18 +248,30 @@ void appendBusbarGeometry(
             }
         }
         const battery::BoundingBox group_bounds = boundsFromCells(document, group_cells);
-        const float target_edge_z = group_bounds.center.z + group_z * (group_bounds.size.z * 0.5f);
-        const float bridge_depth = std::max(bounds.size.z, std::abs(bounds.center.z - target_edge_z) + bounds.size.z * 0.35f);
+        const float target_z = group_bounds.center.z;
+        const float bridge_depth = std::max(
+            layout.busbar_tab_depth,
+            std::abs(bounds.center.z - target_z) + layout.busbar_overlap_width
+        );
         const Vec3 tab_center{
             group_bounds.center.x,
             bounds.center.y,
-            (bounds.center.z + target_edge_z) * 0.5f
+            (bounds.center.z + target_z) * 0.5f
         };
+        if (bridge_depth > bounds.size.z + 0.5f) {
+            appendBox(
+                geometry,
+                tab_center,
+                {tab_width, bounds.size.y, bridge_depth},
+                cad::math::mix(copper_color, {1.0f, 1.0f, 1.0f}, 0.05f),
+                SurfaceLayer::Busbar
+            );
+        }
         appendBox(
             geometry,
-            tab_center,
-            {tab_width, bounds.size.y, std::max(tab_depth, bridge_depth)},
-            cad::math::mix(copper_color, {1.0f, 1.0f, 1.0f}, 0.05f),
+            {group_bounds.center.x, bounds.center.y, target_z},
+            {tab_width, bounds.size.y, std::max(layout.busbar_overlap_width, bounds.size.z)},
+            cad::math::mix(copper_color, {1.0f, 1.0f, 1.0f}, 0.10f),
             SurfaceLayer::Busbar
         );
     }
@@ -282,18 +291,20 @@ void appendModuleTrayGeometry(
     }
 
     const battery::BoundingBox cell_bounds = module_context.cell_bounds;
-    const float tray_margin_x = std::max(config.module_tray_margin_x, config.x_spacing * 0.18f);
-    const float tray_margin_z = std::max(config.module_tray_margin_z, config.z_spacing * 0.16f);
-    const float tray_base_thickness = std::max(8.0f, config.cooling_channel_thickness * 0.34f);
-    const float tray_wall_thickness = std::max(5.0f, config.enclosure_wall_thickness * 0.72f);
-    const float tray_wall_height = std::max(config.module_tray_wall_height, config.cell_height * 0.10f);
+    const float tray_margin_x = config.module_tray_margin_x;
+    const float tray_margin_z = config.module_tray_margin_z;
+    const float tray_base_thickness = config.module_tray_base_thickness;
+    const float tray_wall_thickness = config.module_tray_wall_thickness;
+    const float tray_wall_height = config.module_tray_wall_height;
+    const float seating_plane_y = cell_bounds.center.y - cell_bounds.size.y * 0.5f - config.cell_seating_offset;
     const Vec3 tray_color{0.60f, 0.63f, 0.67f};
+    const Vec3 support_pad_color{0.68f, 0.71f, 0.75f};
 
     appendOpenTopTray(
         geometry,
         {
             cell_bounds.center.x,
-            cell_bounds.center.y - cell_bounds.size.y * 0.5f,
+            seating_plane_y,
             cell_bounds.center.z
         },
         {cell_bounds.size.x + tray_margin_x * 2.0f, cell_bounds.size.z + tray_margin_z * 2.0f, 0.0f},
@@ -303,23 +314,40 @@ void appendModuleTrayGeometry(
         tray_color,
         SurfaceLayer::Support
     );
+
+    if (config.cell_seating_offset > 0.05f) {
+        appendBox(
+            geometry,
+            {
+                cell_bounds.center.x,
+                seating_plane_y + config.cell_seating_offset * 0.5f,
+                cell_bounds.center.z
+            },
+            {
+                cell_bounds.size.x + std::max(1.0f, config.busbar_overlap_width),
+                config.cell_seating_offset,
+                cell_bounds.size.z + std::max(1.0f, config.busbar_overlap_width)
+            },
+            support_pad_color,
+            SurfaceLayer::Support
+        );
+    }
 }
 
 void appendEnclosureGeometry(
     GeometryBuffer& geometry,
-    const battery::PackEnclosureEntity& enclosure,
+    const battery::BoundingBox& bounds,
     const battery::PackLayoutConfig& config
 )
 {
     const Vec3 enclosure_color{0.79f, 0.81f, 0.84f};
-    const float floor_thickness = std::max(config.enclosure_floor_thickness, enclosure.wall_thickness * 1.15f);
-    const float wall_height = enclosure.size.y * 0.72f;
+    const float wall_height = bounds.size.y - config.enclosure_floor_thickness;
     appendOpenShell(
         geometry,
-        enclosure.center,
-        enclosure.size,
-        enclosure.wall_thickness,
-        floor_thickness,
+        bounds.center,
+        bounds.size,
+        config.enclosure_wall_thickness,
+        config.enclosure_floor_thickness,
         wall_height,
         enclosure_color,
         SurfaceLayer::Background
@@ -353,10 +381,15 @@ const GeometryBuffer& BatteryGeometryGenerator::cachedCylindricalCellGeometry(
     key_stream
         << std::lround(profile.body_radius * 100.0f) << ':'
         << std::lround(profile.body_height * 100.0f) << ':'
-        << std::lround(profile.cap_height * 100.0f) << ':'
-        << std::lround(profile.cap_radius * 100.0f) << ':'
+        << std::lround(profile.top_cap_shoulder_height * 100.0f) << ':'
+        << std::lround(profile.top_cap_outer_radius * 100.0f) << ':'
+        << std::lround(profile.top_cap_inner_radius * 100.0f) << ':'
         << std::lround(profile.terminal_radius * 100.0f) << ':'
         << std::lround(profile.terminal_height * 100.0f) << ':'
+        << std::lround(profile.insulator_outer_radius * 100.0f) << ':'
+        << std::lround(profile.insulator_inner_radius * 100.0f) << ':'
+        << std::lround(profile.insulator_height * 100.0f) << ':'
+        << std::lround(profile.bottom_cap_height * 100.0f) << ':'
         << quantizeColorComponent(body_color.x) << ','
         << quantizeColorComponent(body_color.y) << ','
         << quantizeColorComponent(body_color.z) << ':'
@@ -392,7 +425,7 @@ GeometryBuffer BatteryGeometryGenerator::buildVisualGeometry(
     GeometryBuffer geometry;
     const battery::PackLayoutConfig& layout = document.metadata().layout_config;
     const int cell_count = static_cast<int>(document.cells().size());
-    const int cylindrical_segments = cell_count > 300 ? 6 : (cell_count > 150 ? 8 : 12);
+    const int cylindrical_segments = cell_count > 300 ? 6 : (cell_count > 150 ? 8 : 14);
     const bool large_pack_mode = cell_count > 200;
     std::unordered_map<core::EntityId, ModuleGeometryContext, core::EntityIdHash> module_contexts;
     module_contexts.reserve(document.modules().size());
@@ -422,11 +455,7 @@ GeometryBuffer BatteryGeometryGenerator::buildVisualGeometry(
         appendBox(
             geometry,
             bounds.center,
-            {
-                bounds.size.x + layout.cooling_plate_margin_x * 2.0f,
-                bounds.size.y,
-                bounds.size.z + layout.cooling_plate_margin_z * 2.0f
-            },
+            bounds.size,
             {0.56f, 0.66f, 0.76f},
             SurfaceLayer::Support
         );
@@ -455,7 +484,7 @@ GeometryBuffer BatteryGeometryGenerator::buildVisualGeometry(
             continue;
         }
         if (!large_pack_mode) {
-            appendEnclosureGeometry(geometry, enclosure, layout);
+            appendEnclosureGeometry(geometry, document.worldBounds(enclosure.id), layout);
         }
     }
 
@@ -473,7 +502,7 @@ GeometryBuffer BatteryGeometryGenerator::buildVisualGeometry(
 
         if (cell.form_factor == battery::CellFormFactor::Cylindrical) {
             const GeometryBuffer& cell_geometry = cachedCylindricalCellGeometry(
-                makeCellProfile(cell),
+                makeCellProfile(cell, layout),
                 cylindrical_segments,
                 body_color,
                 {0.86f, 0.88f, 0.91f},

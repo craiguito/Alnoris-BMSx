@@ -19,6 +19,8 @@ qt_add_executable(alnoris_desktop WIN32
     cad/battery/BatteryVisualizationBuilder.h
     cad/battery/PackLayoutGenerator.cpp
     cad/battery/PackLayoutGenerator.h
+    cad/battery/PackLayoutMetrics.cpp
+    cad/battery/PackLayoutMetrics.h
     cad/camera/Camera.cpp
     cad/camera/Camera.h
     cad/commands/BatteryCommands.cpp

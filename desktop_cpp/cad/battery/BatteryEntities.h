@@ -112,10 +112,10 @@ struct BatteryCell : CadEntity
 {
     math::Vec3 position{};
     CellFormFactor form_factor = CellFormFactor::Cylindrical;
-    float radius = 28.0f;
-    float height = 220.0f;
-    float width = 56.0f;
-    float depth = 56.0f;
+    float radius = 10.5f;
+    float height = 70.0f;
+    float width = 21.0f;
+    float depth = 21.0f;
     int series_index = 0;
     int parallel_index = 0;
     std::string cell_type = "18650";

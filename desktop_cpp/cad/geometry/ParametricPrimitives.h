@@ -39,16 +39,17 @@ struct GeometryBuffer
 
 struct CylindricalCellProfile
 {
-    float body_radius = 28.0f;
-    float body_height = 220.0f;
-    float cap_height = 7.0f;
-    float cap_radius = 25.5f;
-    float terminal_radius = 8.5f;
-    float terminal_height = 3.6f;
-    float insulator_outer_radius = 17.5f;
-    float insulator_inner_radius = 10.0f;
-    float insulator_height = 1.6f;
-    float bottom_cap_height = 3.0f;
+    float body_radius = 10.5f;
+    float body_height = 70.0f;
+    float top_cap_shoulder_height = 1.0f;
+    float top_cap_outer_radius = 9.25f;
+    float top_cap_inner_radius = 7.25f;
+    float terminal_radius = 4.0f;
+    float terminal_height = 1.4f;
+    float insulator_outer_radius = 8.25f;
+    float insulator_inner_radius = 4.5f;
+    float insulator_height = 0.5f;
+    float bottom_cap_height = 0.8f;
 };
 
 void appendBox(GeometryBuffer& geometry, const math::Vec3& center, const math::Vec3& size, const math::Vec3& color, SurfaceLayer layer = SurfaceLayer::Support);
