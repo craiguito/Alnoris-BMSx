@@ -10,6 +10,13 @@ using cad::math::Vec3;
 using cad::math::Vec4;
 
 void appendWireBox(std::vector<RenderVertex>& lines, const Vec3& center, const Vec3& size, const Vec3& color);
+void appendCornerBox(
+    std::vector<RenderVertex>& lines,
+    const Vec3& center,
+    const Vec3& size,
+    const Vec3& color,
+    float corner_fraction = 0.22f
+);
 
 Vec3 temperatureColor(double temp_c)
 {
@@ -83,7 +90,7 @@ Vec3 overlayCellColor(const battery::BatteryVisualizationOverlay& overlay, const
     if (const auto it = overlay.cell_core_temperature_c.find(cell.id); it != overlay.cell_core_temperature_c.end()) {
         return temperatureColor(it->second);
     }
-    return {0.68f, 0.71f, 0.76f};
+    return {0.74f, 0.73f, 0.70f};
 }
 
 void appendTriangle(std::vector<RenderVertex>& vertices, const Vec3& a, const Vec3& b, const Vec3& c, const Vec3& color)
@@ -285,6 +292,42 @@ void appendWireBox(std::vector<RenderVertex>& lines, const Vec3& center, const V
     }
 }
 
+void appendCornerBox(
+    std::vector<RenderVertex>& lines,
+    const Vec3& center,
+    const Vec3& size,
+    const Vec3& color,
+    float corner_fraction
+)
+{
+    const Vec3 half{size.x * 0.5f, size.y * 0.5f, size.z * 0.5f};
+    const Vec3 corner{
+        std::max(6.0f, size.x * corner_fraction),
+        std::max(6.0f, size.y * corner_fraction),
+        std::max(6.0f, size.z * corner_fraction)
+    };
+
+    const int signs[2] = {-1, 1};
+    for (const int sx : signs) {
+        for (const int sy : signs) {
+            for (const int sz : signs) {
+                const Vec3 p{
+                    center.x + half.x * static_cast<float>(sx),
+                    center.y + half.y * static_cast<float>(sy),
+                    center.z + half.z * static_cast<float>(sz)
+                };
+
+                lines.push_back({p, color});
+                lines.push_back({{p.x - corner.x * static_cast<float>(sx), p.y, p.z}, color});
+                lines.push_back({p, color});
+                lines.push_back({{p.x, p.y - corner.y * static_cast<float>(sy), p.z}, color});
+                lines.push_back({p, color});
+                lines.push_back({{p.x, p.y, p.z - corner.z * static_cast<float>(sz)}, color});
+            }
+        }
+    }
+}
+
 void appendWireCylinder(std::vector<RenderVertex>& lines, const Vec3& center, float radius, float height, int segments, const Vec3& color)
 {
     const float half_height = height * 0.5f;
@@ -331,16 +374,24 @@ RenderPacket RenderComposer::compose(
         return std::find(selected_subtree.begin(), selected_subtree.end(), id) != selected_subtree.end();
     };
 
-    const Vec3 grid_color{0.29f, 0.35f, 0.42f};
-    const Vec3 selected_overlay_color{0.12f, 0.47f, 1.0f};
+    const Vec3 grid_color{0.73f, 0.77f, 0.82f};
+    const Vec3 grid_axis_color{0.60f, 0.65f, 0.71f};
+    const Vec3 pack_structure_color{0.72f, 0.75f, 0.79f};
+    const Vec3 module_structure_color{0.61f, 0.68f, 0.76f};
+    const Vec3 group_structure_color{0.67f, 0.72f, 0.77f};
+    const Vec3 selected_overlay_color{0.11f, 0.45f, 0.98f};
+    const Vec3 cooling_color{0.36f, 0.58f, 0.80f};
+    const Vec3 busbar_color{0.76f, 0.47f, 0.20f};
+    const Vec3 enclosure_color{0.80f, 0.82f, 0.85f};
     const int grid_extent = 14;
     const float grid_step = 70.0f;
     for (int i = -grid_extent; i <= grid_extent; ++i) {
         const float offset = i * grid_step;
-        packet.lines.push_back({{offset, -120.0f, -grid_extent * grid_step}, grid_color});
-        packet.lines.push_back({{offset, -120.0f, grid_extent * grid_step}, grid_color});
-        packet.lines.push_back({{-grid_extent * grid_step, -120.0f, offset}, grid_color});
-        packet.lines.push_back({{grid_extent * grid_step, -120.0f, offset}, grid_color});
+        const Vec3 color = (i % 4) == 0 ? grid_axis_color : grid_color;
+        packet.lines.push_back({{offset, -120.0f, -grid_extent * grid_step}, color});
+        packet.lines.push_back({{offset, -120.0f, grid_extent * grid_step}, color});
+        packet.lines.push_back({{-grid_extent * grid_step, -120.0f, offset}, color});
+        packet.lines.push_back({{grid_extent * grid_step, -120.0f, offset}, color});
     }
 
     for (const battery::BatteryPackEntity& pack : document.packs()) {
@@ -348,7 +399,7 @@ RenderPacket RenderComposer::compose(
             continue;
         }
         const battery::BoundingBox bounds = document.worldBounds(pack.id);
-        appendWireBox(packet.lines, bounds.center, bounds.size, {0.46f, 0.50f, 0.55f});
+        appendCornerBox(packet.lines, bounds.center, bounds.size, pack_structure_color, 0.18f);
         appendBoxPickable(packet.pickables, pack.id, 80, mvp, bounds.center, bounds.size, viewport_width, viewport_height);
         if (isSelectedOrDescendant(pack.id)) {
             appendWireBox(packet.selection_overlay_lines, bounds.center, bounds.size, selected_overlay_color);
@@ -359,7 +410,7 @@ RenderPacket RenderComposer::compose(
             continue;
         }
         const battery::BoundingBox bounds = document.worldBounds(module.id);
-        appendWireBox(packet.lines, bounds.center, bounds.size, {0.37f, 0.53f, 0.82f});
+        appendCornerBox(packet.lines, bounds.center, bounds.size, module_structure_color, 0.18f);
         appendBoxPickable(packet.pickables, module.id, 160, mvp, bounds.center, bounds.size, viewport_width, viewport_height);
         if (isSelectedOrDescendant(module.id)) {
             appendWireBox(packet.selection_overlay_lines, bounds.center, bounds.size, selected_overlay_color);
@@ -370,7 +421,7 @@ RenderPacket RenderComposer::compose(
             continue;
         }
         const battery::BoundingBox bounds = document.worldBounds(group.id);
-        appendWireBox(packet.lines, bounds.center, bounds.size, {0.64f, 0.71f, 0.77f});
+        appendCornerBox(packet.lines, bounds.center, bounds.size, group_structure_color, 0.16f);
         appendBoxPickable(packet.pickables, group.id, 240, mvp, bounds.center, bounds.size, viewport_width, viewport_height);
         if (isSelectedOrDescendant(group.id)) {
             appendWireBox(packet.selection_overlay_lines, bounds.center, bounds.size, selected_overlay_color);
@@ -382,7 +433,7 @@ RenderPacket RenderComposer::compose(
             continue;
         }
         const battery::BoundingBox bounds = document.worldBounds(plate.id);
-        appendBox(packet.triangles, bounds.center, bounds.size, {0.22f, 0.49f, 0.82f});
+        appendBox(packet.triangles, bounds.center, bounds.size, cooling_color);
         appendBoxPickable(packet.pickables, plate.id, 300, mvp, bounds.center, bounds.size, viewport_width, viewport_height);
         if (isSelectedOrDescendant(plate.id)) {
             appendWireBox(packet.selection_overlay_lines, bounds.center, bounds.size, selected_overlay_color);
@@ -393,7 +444,7 @@ RenderPacket RenderComposer::compose(
             continue;
         }
         const battery::BoundingBox bounds = document.worldBounds(busbar.id);
-        appendBox(packet.triangles, bounds.center, bounds.size, {0.87f, 0.53f, 0.19f});
+        appendBox(packet.triangles, bounds.center, bounds.size, busbar_color);
         appendBoxPickable(packet.pickables, busbar.id, 400, mvp, bounds.center, bounds.size, viewport_width, viewport_height);
         if (isSelectedOrDescendant(busbar.id)) {
             appendWireBox(packet.selection_overlay_lines, bounds.center, bounds.size, selected_overlay_color);
@@ -404,7 +455,7 @@ RenderPacket RenderComposer::compose(
             continue;
         }
         const battery::BoundingBox bounds = document.worldBounds(enclosure.id);
-        appendWireBox(packet.lines, bounds.center, bounds.size, {0.58f, 0.62f, 0.67f});
+        appendCornerBox(packet.lines, bounds.center, bounds.size, enclosure_color, 0.14f);
         appendBoxPickable(packet.pickables, enclosure.id, 120, mvp, bounds.center, bounds.size, viewport_width, viewport_height);
         if (isSelectedOrDescendant(enclosure.id)) {
             appendWireBox(packet.selection_overlay_lines, bounds.center, bounds.size, selected_overlay_color);
@@ -438,7 +489,6 @@ RenderPacket RenderComposer::compose(
                 }
             } else {
                 appendBox(packet.triangles, world_position, {cell.width, cell.height, cell.depth}, color);
-                appendBox(packet.lines, world_position, {cell.width, cell.height, cell.depth}, cad::math::mix(color, {0.10f, 0.16f, 0.24f}, 0.35f));
                 if (isSelectedOrDescendant(cell.id)) {
                     appendWireBox(packet.selection_overlay_lines, world_position, {cell.width + 4.0f, cell.height + 4.0f, cell.depth + 4.0f}, selected_overlay_color);
                 }
@@ -474,12 +524,12 @@ RenderPacket RenderComposer::compose(
         return a.depth < b.depth;
     });
 
-    packet.lines.push_back({{-900.0f, 0.0f, 0.0f}, {0.78f, 0.22f, 0.22f}});
-    packet.lines.push_back({{900.0f, 0.0f, 0.0f}, {0.78f, 0.22f, 0.22f}});
-    packet.lines.push_back({{0.0f, -200.0f, 0.0f}, {0.24f, 0.72f, 0.36f}});
-    packet.lines.push_back({{0.0f, 340.0f, 0.0f}, {0.24f, 0.72f, 0.36f}});
-    packet.lines.push_back({{0.0f, 0.0f, -900.0f}, {0.25f, 0.45f, 0.86f}});
-    packet.lines.push_back({{0.0f, 0.0f, 900.0f}, {0.25f, 0.45f, 0.86f}});
+    packet.lines.push_back({{-900.0f, 0.0f, 0.0f}, {0.79f, 0.48f, 0.48f}});
+    packet.lines.push_back({{900.0f, 0.0f, 0.0f}, {0.79f, 0.48f, 0.48f}});
+    packet.lines.push_back({{0.0f, -200.0f, 0.0f}, {0.48f, 0.72f, 0.54f}});
+    packet.lines.push_back({{0.0f, 340.0f, 0.0f}, {0.48f, 0.72f, 0.54f}});
+    packet.lines.push_back({{0.0f, 0.0f, -900.0f}, {0.48f, 0.60f, 0.85f}});
+    packet.lines.push_back({{0.0f, 0.0f, 900.0f}, {0.48f, 0.60f, 0.85f}});
 
     return packet;
 }

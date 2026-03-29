@@ -4,6 +4,7 @@
 #include <QKeyEvent>
 #include <QPainter>
 #include <QPainterPath>
+#include <QLinearGradient>
 #include <QPaintEvent>
 #include <QResizeEvent>
 #include <QWheelEvent>
@@ -65,39 +66,28 @@ QColor toColor(const cad::math::Vec3& color)
 
 void drawSelectionOverlay(QPainter& painter, const cad::render::ScreenPickable& pickable)
 {
-    const QColor glow(47, 128, 237, 90);
-    const QColor outline(34, 120, 255);
-    const QColor inner(142, 198, 255);
+    const QColor outline(31, 116, 247);
+    const QColor fill(70, 150, 255, 24);
 
     painter.save();
+    painter.setPen(QPen(outline, 2.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setBrush(fill);
     if (pickable.shape == cad::render::ScreenPickable::Shape::Circle) {
-        const QRectF outerRect(
-            pickable.x - pickable.half_width - 8.0f,
-            pickable.y - pickable.half_height - 8.0f,
-            (pickable.half_width + 8.0f) * 2.0f,
-            (pickable.half_height + 8.0f) * 2.0f
+        const QRectF outlineRect(
+            pickable.x - pickable.half_width - 6.0f,
+            pickable.y - pickable.half_height - 6.0f,
+            (pickable.half_width + 6.0f) * 2.0f,
+            (pickable.half_height + 6.0f) * 2.0f
         );
-        painter.setPen(QPen(glow, 10.0));
-        painter.setBrush(Qt::NoBrush);
-        painter.drawEllipse(outerRect);
-        painter.setPen(QPen(outline, 4.0));
-        painter.drawEllipse(outerRect.adjusted(2.0, 2.0, -2.0, -2.0));
-        painter.setPen(QPen(inner, 1.5));
-        painter.drawEllipse(outerRect.adjusted(8.0, 8.0, -8.0, -8.0));
+        painter.drawEllipse(outlineRect);
     } else {
-        const QRectF outerRect(
-            pickable.x - pickable.half_width - 8.0f,
-            pickable.y - pickable.half_height - 8.0f,
-            (pickable.half_width + 8.0f) * 2.0f,
-            (pickable.half_height + 8.0f) * 2.0f
+        const QRectF outlineRect(
+            pickable.x - pickable.half_width - 6.0f,
+            pickable.y - pickable.half_height - 6.0f,
+            (pickable.half_width + 6.0f) * 2.0f,
+            (pickable.half_height + 6.0f) * 2.0f
         );
-        painter.setPen(QPen(glow, 10.0));
-        painter.setBrush(Qt::NoBrush);
-        painter.drawRoundedRect(outerRect, 10.0, 10.0);
-        painter.setPen(QPen(outline, 4.0));
-        painter.drawRoundedRect(outerRect.adjusted(2.0, 2.0, -2.0, -2.0), 8.0, 8.0);
-        painter.setPen(QPen(inner, 1.5));
-        painter.drawRoundedRect(outerRect.adjusted(8.0, 8.0, -8.0, -8.0), 6.0, 6.0);
+        painter.drawRoundedRect(outlineRect, 8.0, 8.0);
     }
     painter.restore();
 }
@@ -321,7 +311,10 @@ void CadViewportWidget::paintEvent(QPaintEvent* event)
 
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.fillRect(rect(), m_backgroundColor);
+    QLinearGradient backgroundGradient(0.0, 0.0, 0.0, static_cast<qreal>(height()));
+    backgroundGradient.setColorAt(0.0, m_backgroundColor.lighter(106));
+    backgroundGradient.setColorAt(1.0, m_backgroundColor.darker(102));
+    painter.fillRect(rect(), backgroundGradient);
 
     const cad::render::RenderPacket& frame = m_engine.renderPacket();
     if (frame.triangles.empty() && frame.lines.empty()) {
@@ -369,31 +362,26 @@ void CadViewportWidget::paintEvent(QPaintEvent* event)
         painter.fillPath(path, tri.color);
     }
 
-    painter.setPen(QPen(QColor(156, 166, 178), 1.0));
     for (std::size_t i = 0; i + 1 < frame.lines.size(); i += 2) {
         const ProjectedVertex a = projectPoint(frame.mvp, frame.lines[i].position, width(), height());
         const ProjectedVertex b = projectPoint(frame.mvp, frame.lines[i + 1].position, width(), height());
         if (!a.valid || !b.valid) {
             continue;
         }
-        painter.setPen(QPen(toColor(frame.lines[i].color), 1.0));
+        painter.setPen(QPen(toColor(frame.lines[i].color), 0.9, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         painter.drawLine(a.point, b.point);
     }
 
     if (!frame.selection_overlay_lines.empty()) {
         painter.setRenderHint(QPainter::Antialiasing, true);
-        for (int pass = 0; pass < 2; ++pass) {
-            const QColor lineColor = pass == 0 ? QColor(46, 126, 255, 85) : QColor(32, 120, 255);
-            const qreal lineWidth = pass == 0 ? 6.0 : 2.4;
-            painter.setPen(QPen(lineColor, lineWidth, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-            for (std::size_t i = 0; i + 1 < frame.selection_overlay_lines.size(); i += 2) {
-                const ProjectedVertex a = projectPoint(frame.mvp, frame.selection_overlay_lines[i].position, width(), height());
-                const ProjectedVertex b = projectPoint(frame.mvp, frame.selection_overlay_lines[i + 1].position, width(), height());
-                if (!a.valid || !b.valid) {
-                    continue;
-                }
-                painter.drawLine(a.point, b.point);
+        painter.setPen(QPen(QColor(31, 116, 247), 2.2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        for (std::size_t i = 0; i + 1 < frame.selection_overlay_lines.size(); i += 2) {
+            const ProjectedVertex a = projectPoint(frame.mvp, frame.selection_overlay_lines[i].position, width(), height());
+            const ProjectedVertex b = projectPoint(frame.mvp, frame.selection_overlay_lines[i + 1].position, width(), height());
+            if (!a.valid || !b.valid) {
+                continue;
             }
+            painter.drawLine(a.point, b.point);
         }
     }
 
@@ -409,7 +397,7 @@ void CadViewportWidget::paintEvent(QPaintEvent* event)
         }
     }
 
-    painter.setPen(QColor(90, 102, 116));
+    painter.setPen(QColor(92, 102, 114));
     painter.drawText(
         QRect(16, 12, width() - 32, 20),
         Qt::AlignLeft | Qt::AlignVCenter,

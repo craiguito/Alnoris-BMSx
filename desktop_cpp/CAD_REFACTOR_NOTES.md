@@ -584,3 +584,36 @@ This pass adds full battery-system presets rather than only cell presets or demo
 
 - Preset thermal-zone multipliers still flow most strongly through generated CAD cooling/module heuristics rather than a full explicit zone editor.
 - The desktop still exposes only a compact subset of preset parameters for direct manual editing after load.
+
+## Viewport Rendering Cleanup Pass
+
+This pass focuses on readability inside the software-rendered CAD viewport rather than adding more geometric detail.
+
+### Cleaner visual hierarchy
+
+- The viewport now emphasizes solid battery geometry first:
+  - cells remain the primary readable mass
+  - busbars use a restrained copper tone
+  - cooling plates use a quieter blue support color
+- Pack/module/group/enclosure structure is still visible, but it is now rendered as lighter corner framing rather than heavy full wire cages.
+
+### Reduced clutter
+
+- Always-visible structural wireframes were reduced substantially.
+- Non-selected box-form cells no longer draw their own extra edge cages on top of the filled solid pass.
+- Grid and axis lines were softened so they provide orientation without dominating the scene.
+
+### Cleaner selection treatment
+
+- Selected entities now use a simpler blue selection language:
+  - one projected blue outline pass
+  - one screen-space blue selection ring/box
+- The older layered halo-style selection stack was reduced so selection is still obvious without feeling like a debug overlay.
+
+### Remaining viewport polish ideas
+
+- TODO: add optional debug render modes for richer structural wireframes when needed
+- TODO: add hover highlighting separate from persistent selection
+- TODO: improve silhouette outlining in a future GPU-backed renderer
+- TODO: support alternate viewport visual styles for thermal/result review
+- TODO: revisit lighting/material polish later once the OpenGL/Vulkan backend matures
