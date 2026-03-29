@@ -213,10 +213,19 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
     const bool cylindrical = config.cell_form_factor == CellFormFactor::Cylindrical;
     const float cell_width = cylindrical ? config.cell_radius * 2.0f : std::max(10.0f, config.cell_width);
     const float cell_depth = cylindrical ? config.cell_radius * 2.0f : std::max(10.0f, config.cell_depth);
+    const float row_outer_z = ((parallel_count - 1) * config.z_spacing) * 0.5f;
+    const float tray_base_thickness = std::max(8.0f, config.cooling_channel_thickness * 0.34f);
+    const float busbar_depth = 16.0f;
+    const float busbar_clearance_y = std::max(4.0f, config.busbar_thickness * 0.45f);
+    const float cooling_gap_y = 8.0f;
+    const float module_half_height = std::max(
+        config.cell_height * 0.5f + busbar_clearance_y + config.busbar_thickness + 18.0f,
+        config.cell_height * 0.5f + tray_base_thickness + config.cooling_channel_thickness + cooling_gap_y + 18.0f
+    );
     const float pack_width = std::max(240.0f, (series_count - 1) * config.x_spacing + cell_width * 1.8f + (module_count - 1) * config.module_gap_x);
     const float pack_depth = std::max(180.0f, (parallel_count - 1) * config.z_spacing + cell_depth * 1.8f);
-    const float module_height = config.cell_height + 56.0f;
-    const float enclosure_height = config.cell_height + 92.0f;
+    const float module_height = module_half_height * 2.0f;
+    const float enclosure_height = module_height + 44.0f;
     const float group_width = std::max(config.x_spacing * 0.78f, cell_width * 1.35f);
     const float group_depth = std::max(pack_depth + 28.0f, cell_depth * 1.35f);
 
@@ -278,7 +287,11 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
             : ("Cooling channel " + std::to_string(moduleIndex + 1));
         generatedCoolingPlate.parent_id = module.id;
         generatedCoolingPlate.plate_index = moduleIndex;
-        generatedCoolingPlate.center = {0.0f, -128.0f, 0.0f};
+        generatedCoolingPlate.center = {
+            0.0f,
+            -(config.cell_height * 0.5f + tray_base_thickness + cooling_gap_y + config.cooling_channel_thickness * 0.5f),
+            0.0f
+        };
         generatedCoolingPlate.size = {moduleWidth - 24.0f, config.cooling_channel_thickness, pack_depth + 92.0f};
         const auto previousPlate = previousCoolingPlates.find(generatedCoolingPlate.plate_index);
         document.addCoolingPlate(mergeCoolingPlate(generatedCoolingPlate, previousPlate == previousCoolingPlates.end() ? nullptr : &previousPlate->second));
@@ -287,8 +300,12 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
         generatedNegativeBusbar.label = "Negative busbar";
         generatedNegativeBusbar.parent_id = module.id;
         generatedNegativeBusbar.role = BusbarRole::Negative;
-        generatedNegativeBusbar.center = {0.0f, 112.0f, -pack_depth * 0.5f};
-        generatedNegativeBusbar.size = {moduleWidth, config.busbar_thickness, 16.0f};
+        generatedNegativeBusbar.center = {
+            0.0f,
+            config.cell_height * 0.5f + busbar_clearance_y + config.busbar_thickness * 0.5f,
+            -(row_outer_z + cell_depth * 0.5f + busbar_depth * 0.5f + 5.0f)
+        };
+        generatedNegativeBusbar.size = {moduleWidth, config.busbar_thickness, busbar_depth};
         const auto previousNegativeBusbar = previousBusbars.find({moduleIndex, generatedNegativeBusbar.role});
         document.addBusbar(mergeBusbar(generatedNegativeBusbar, previousNegativeBusbar == previousBusbars.end() ? nullptr : &previousNegativeBusbar->second));
 
@@ -296,8 +313,12 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
         generatedPositiveBusbar.label = "Positive busbar";
         generatedPositiveBusbar.parent_id = module.id;
         generatedPositiveBusbar.role = BusbarRole::Positive;
-        generatedPositiveBusbar.center = {0.0f, 112.0f, pack_depth * 0.5f};
-        generatedPositiveBusbar.size = {moduleWidth, config.busbar_thickness, 16.0f};
+        generatedPositiveBusbar.center = {
+            0.0f,
+            config.cell_height * 0.5f + busbar_clearance_y + config.busbar_thickness * 0.5f,
+            row_outer_z + cell_depth * 0.5f + busbar_depth * 0.5f + 5.0f
+        };
+        generatedPositiveBusbar.size = {moduleWidth, config.busbar_thickness, busbar_depth};
         const auto previousPositiveBusbar = previousBusbars.find({moduleIndex, generatedPositiveBusbar.role});
         document.addBusbar(mergeBusbar(generatedPositiveBusbar, previousPositiveBusbar == previousBusbars.end() ? nullptr : &previousPositiveBusbar->second));
 

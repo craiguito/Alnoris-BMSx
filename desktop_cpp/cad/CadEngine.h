@@ -5,6 +5,7 @@
 #include "camera/Camera.h"
 #include "commands/CommandStack.h"
 #include "core/CadDocument.h"
+#include "geometry/BatteryGeometryGenerator.h"
 #include "io/MeshLoader.h"
 #include "picking/HitTester.h"
 #include "render/RenderComposer.h"
@@ -18,6 +19,16 @@ namespace cad {
 class CadEngine
 {
 public:
+    struct RenderDiagnostics
+    {
+        double last_geometry_build_ms = 0.0;
+        double last_render_packet_ms = 0.0;
+        std::size_t geometry_rebuild_count = 0;
+        std::size_t packet_rebuild_count = 0;
+        std::size_t triangle_count = 0;
+        std::size_t line_count = 0;
+    };
+
     CadEngine();
 
     bool setCellMeshPath(const std::string& path);
@@ -84,10 +95,12 @@ public:
     [[nodiscard]] std::optional<battery::CoolingPlateProperties> getCoolingPlateProperties(core::EntityId entity_id) const;
     [[nodiscard]] std::optional<battery::ModuleBoundaryProperties> getModuleBoundaryProperties(core::EntityId entity_id) const;
     [[nodiscard]] std::optional<battery::PackEnclosureProperties> getEnclosureProperties(core::EntityId entity_id) const;
+    [[nodiscard]] const RenderDiagnostics& renderDiagnostics() const { return m_renderDiagnostics; }
 
 private:
     void rebuildDocument();
     void rebuildVisualization();
+    void rebuildVisualGeometry();
     void rebuildRenderPacket();
     void refreshDocumentView(bool rebuild_visualization);
 
@@ -96,12 +109,15 @@ private:
     battery::BatteryVisualizationOverlay m_visualizationOverlay;
     std::optional<battery::BatteryVisualizationOverlay> m_overrideVisualizationOverlay;
     camera::Camera m_camera;
+    geometry::BatteryGeometryGenerator m_geometryGenerator;
+    geometry::GeometryBuffer m_visualGeometry;
     render::RenderComposer m_renderComposer;
     picking::HitTester m_hitTester;
     io::TriangleMesh m_cellMesh;
     int m_viewportWidth = 1;
     int m_viewportHeight = 1;
     render::RenderPacket m_renderPacket;
+    RenderDiagnostics m_renderDiagnostics;
     commands::CommandStack m_commandStack;
 };
 

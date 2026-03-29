@@ -371,6 +371,7 @@ void appendWireCylinder(std::vector<RenderVertex>& lines, const Vec3& center, fl
 RenderPacket RenderComposer::compose(
     const core::CadDocument& document,
     const battery::BatteryVisualizationOverlay& overlay,
+    const geometry::GeometryBuffer& scene_geometry,
     const camera::Camera& camera,
     const io::TriangleMesh* cell_mesh,
     int viewport_width,
@@ -378,6 +379,18 @@ RenderPacket RenderComposer::compose(
 ) const
 {
     RenderPacket packet;
+    packet.triangles.reserve(scene_geometry.triangles.size() * 3);
+    packet.lines.reserve(scene_geometry.lines.size() * 2 + 128);
+    packet.selection_overlay_lines.reserve(256);
+    packet.pickables.reserve(
+        document.cells().size()
+        + document.busbars().size()
+        + document.coolingPlates().size()
+        + document.moduleBoundaries().size()
+        + document.packEnclosures().size()
+        + document.cellGroups().size()
+        + document.packs().size()
+    );
 
     const Mat4 projection = camera.projectionMatrix(static_cast<float>(std::max(1, viewport_width)) / static_cast<float>(std::max(1, viewport_height)));
     const Mat4 view = camera.viewMatrix();
@@ -412,8 +425,7 @@ RenderPacket RenderComposer::compose(
         packet.lines.push_back({{grid_extent * grid_step, -120.0f, offset}, color});
     }
 
-    const geometry::BatteryGeometryGenerator geometry_generator;
-    appendGeneratedGeometry(packet, geometry_generator.buildVisualGeometry(document, overlay, cell_mesh));
+    appendGeneratedGeometry(packet, scene_geometry);
 
     for (const battery::BatteryPackEntity& pack : document.packs()) {
         if (!pack.visible) {

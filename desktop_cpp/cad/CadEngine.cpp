@@ -6,6 +6,7 @@
 #include "edit/CadEditService.h"
 
 #include <algorithm>
+#include <chrono>
 #include <utility>
 
 namespace cad {
@@ -14,6 +15,7 @@ CadEngine::CadEngine()
 {
     rebuildDocument();
     rebuildVisualization();
+    rebuildVisualGeometry();
     rebuildRenderPacket();
 }
 
@@ -26,6 +28,7 @@ bool CadEngine::setCellMeshPath(const std::string& path)
 
     m_cellMesh = std::move(mesh);
     m_document.metadata().cell_mesh_path = path;
+    rebuildVisualGeometry();
     rebuildRenderPacket();
     return true;
 }
@@ -43,6 +46,7 @@ void CadEngine::setBatteryConfig(const battery::BatteryCadConfig& config)
     m_overrideVisualizationOverlay.reset();
     rebuildDocument();
     rebuildVisualization();
+    rebuildVisualGeometry();
     rebuildRenderPacket();
 }
 
@@ -50,6 +54,7 @@ void CadEngine::setVisualizationOverlay(const battery::BatteryVisualizationOverl
 {
     m_overrideVisualizationOverlay = overlay;
     m_visualizationOverlay = overlay;
+    rebuildVisualGeometry();
     rebuildRenderPacket();
 }
 
@@ -57,6 +62,7 @@ void CadEngine::clearVisualizationOverlay()
 {
     m_overrideVisualizationOverlay.reset();
     rebuildVisualization();
+    rebuildVisualGeometry();
     rebuildRenderPacket();
 }
 
@@ -467,14 +473,21 @@ void CadEngine::rebuildVisualization()
 
 void CadEngine::rebuildRenderPacket()
 {
+    const auto start = std::chrono::steady_clock::now();
     m_renderPacket = m_renderComposer.compose(
         m_document,
         m_visualizationOverlay,
+        m_visualGeometry,
         m_camera,
         m_cellMesh.vertices.empty() ? nullptr : &m_cellMesh,
         m_viewportWidth,
         m_viewportHeight
     );
+    const auto end = std::chrono::steady_clock::now();
+    m_renderDiagnostics.last_render_packet_ms = std::chrono::duration<double, std::milli>(end - start).count();
+    m_renderDiagnostics.packet_rebuild_count += 1;
+    m_renderDiagnostics.triangle_count = m_renderPacket.triangles.size() / 3;
+    m_renderDiagnostics.line_count = m_renderPacket.lines.size() / 2;
 }
 
 void CadEngine::refreshDocumentView(bool rebuild_visualization)
@@ -482,7 +495,21 @@ void CadEngine::refreshDocumentView(bool rebuild_visualization)
     if (rebuild_visualization) {
         rebuildVisualization();
     }
+    rebuildVisualGeometry();
     rebuildRenderPacket();
+}
+
+void CadEngine::rebuildVisualGeometry()
+{
+    const auto start = std::chrono::steady_clock::now();
+    m_visualGeometry = m_geometryGenerator.buildVisualGeometry(
+        m_document,
+        m_visualizationOverlay,
+        m_cellMesh.vertices.empty() ? nullptr : &m_cellMesh
+    );
+    const auto end = std::chrono::steady_clock::now();
+    m_renderDiagnostics.last_geometry_build_ms = std::chrono::duration<double, std::milli>(end - start).count();
+    m_renderDiagnostics.geometry_rebuild_count += 1;
 }
 
 } // namespace cad

@@ -353,12 +353,9 @@ void CadViewportWidget::paintEvent(QPaintEvent* event)
 
     painter.setPen(Qt::NoPen);
     for (const ProjectedTriangle& tri : projectedTriangles) {
-        QPainterPath path;
-        path.moveTo(tri.a);
-        path.lineTo(tri.b);
-        path.lineTo(tri.c);
-        path.closeSubpath();
-        painter.fillPath(path, tri.color);
+        const QPointF points[3] = {tri.a, tri.b, tri.c};
+        painter.setBrush(tri.color);
+        painter.drawConvexPolygon(points, 3);
     }
 
     for (std::size_t i = 0; i + 1 < frame.lines.size(); i += 2) {
@@ -403,6 +400,14 @@ void CadViewportWidget::paintEvent(QPaintEvent* event)
         QString("Battery CAD viewport  |  Shift-drag move  |  G snap %1  |  Axis %2")
             .arg(m_gridSnapEnabled ? "on" : "off")
             .arg(m_moveAxis == MoveAxis::X ? "X" : m_moveAxis == MoveAxis::Y ? "Y" : m_moveAxis == MoveAxis::Z ? "Z" : "XZ")
+    );
+    painter.drawText(
+        QRect(16, 32, width() - 32, 18),
+        Qt::AlignLeft | Qt::AlignVCenter,
+        QString("Scene %1 tris  |  Geo %2 ms  |  Frame %3 ms")
+            .arg(static_cast<qlonglong>(m_engine.renderDiagnostics().triangle_count))
+            .arg(m_engine.renderDiagnostics().last_geometry_build_ms, 0, 'f', 1)
+            .arg(m_engine.renderDiagnostics().last_render_packet_ms, 0, 'f', 1)
     );
 }
 

@@ -1,6 +1,9 @@
 #include "BatteryGeometryGenerator.h"
 
 #include <algorithm>
+#include <cmath>
+#include <sstream>
+#include <unordered_map>
 
 namespace cad::geometry {
 namespace {
@@ -80,6 +83,27 @@ void appendMesh(GeometryBuffer& geometry, const io::TriangleMesh& mesh, const Ve
     }
 }
 
+void appendTranslatedGeometry(GeometryBuffer& target, const GeometryBuffer& local, const Vec3& offset)
+{
+    target.triangles.reserve(target.triangles.size() + local.triangles.size());
+    for (const ColoredTriangle& triangle : local.triangles) {
+        target.triangles.push_back({
+            cad::math::add(triangle.a, offset),
+            cad::math::add(triangle.b, offset),
+            cad::math::add(triangle.c, offset),
+            triangle.color
+        });
+    }
+    target.lines.reserve(target.lines.size() + local.lines.size());
+    for (const ColoredLine& line : local.lines) {
+        target.lines.push_back({
+            cad::math::add(line.a, offset),
+            cad::math::add(line.b, offset),
+            line.color
+        });
+    }
+}
+
 std::vector<const battery::CellEntity*> collectModuleCells(const core::CadDocument& document, core::EntityId module_id)
 {
     std::vector<const battery::CellEntity*> cells;
@@ -90,6 +114,12 @@ std::vector<const battery::CellEntity*> collectModuleCells(const core::CadDocume
     }
     return cells;
 }
+
+struct ModuleGeometryContext
+{
+    std::vector<const battery::CellEntity*> cells;
+    battery::BoundingBox cell_bounds{};
+};
 
 battery::BoundingBox boundsFromCells(const core::CadDocument& document, const std::vector<const battery::CellEntity*>& cells)
 {
@@ -179,24 +209,24 @@ void appendBusbarGeometry(
     GeometryBuffer& geometry,
     const core::CadDocument& document,
     const battery::BusbarEntity& busbar,
-    const battery::BoundingBox& bounds
+    const battery::BoundingBox& bounds,
+    const battery::BatteryModule* module,
+    const ModuleGeometryContext& module_context,
+    const battery::PackLayoutConfig& layout
 )
 {
     const Vec3 copper_color{0.72f, 0.48f, 0.24f};
     appendBox(geometry, bounds.center, {bounds.size.x * 0.92f, bounds.size.y, bounds.size.z}, copper_color);
 
-    const auto* module = document.findModuleBoundary(busbar.parent_id);
-    if (module == nullptr) {
+    if (module == nullptr || module_context.cells.empty()) {
         return;
     }
 
-    const std::vector<const battery::CellEntity*> module_cells = collectModuleCells(document, module->id);
-    const battery::PackLayoutConfig& layout = document.metadata().layout_config;
     const float tab_depth = std::max(layout.busbar_tab_depth, bounds.size.z * 1.5f);
     const float tab_width = std::max(layout.busbar_tab_width, bounds.size.x / std::max(1, module->series_span * 3));
     const float group_z = busbar.role == battery::BusbarRole::Negative ? -1.0f : 1.0f;
     std::vector<int> series_indices;
-    for (const battery::CellEntity* cell : module_cells) {
+    for (const battery::CellEntity* cell : module_context.cells) {
         if (std::find(series_indices.begin(), series_indices.end(), cell->series_index) == series_indices.end()) {
             series_indices.push_back(cell->series_index);
         }
@@ -204,18 +234,25 @@ void appendBusbarGeometry(
 
     for (const int series_index : series_indices) {
         std::vector<const battery::CellEntity*> group_cells;
-        for (const battery::CellEntity* cell : module_cells) {
+        for (const battery::CellEntity* cell : module_context.cells) {
             if (cell->series_index == series_index) {
                 group_cells.push_back(cell);
             }
         }
         const battery::BoundingBox group_bounds = boundsFromCells(document, group_cells);
+        const float target_edge_z = group_bounds.center.z + group_z * (group_bounds.size.z * 0.5f);
+        const float bridge_depth = std::max(bounds.size.z, std::abs(bounds.center.z - target_edge_z) + bounds.size.z * 0.35f);
         const Vec3 tab_center{
             group_bounds.center.x,
             bounds.center.y,
-            bounds.center.z + group_z * (tab_depth * 0.5f + std::max(4.0f, bounds.size.z * 0.2f))
+            (bounds.center.z + target_edge_z) * 0.5f
         };
-        appendBox(geometry, tab_center, {tab_width, bounds.size.y, tab_depth}, cad::math::mix(copper_color, {1.0f, 1.0f, 1.0f}, 0.05f));
+        appendBox(
+            geometry,
+            tab_center,
+            {tab_width, bounds.size.y, std::max(tab_depth, bridge_depth)},
+            cad::math::mix(copper_color, {1.0f, 1.0f, 1.0f}, 0.05f)
+        );
     }
 }
 
@@ -223,15 +260,16 @@ void appendModuleTrayGeometry(
     GeometryBuffer& geometry,
     const core::CadDocument& document,
     const battery::ModuleBoundaryEntity& module,
+    const ModuleGeometryContext& module_context,
     const battery::PackLayoutConfig& config
 )
 {
-    const std::vector<const battery::CellEntity*> module_cells = collectModuleCells(document, module.id);
-    if (module_cells.empty()) {
+    (void)document;
+    if (module_context.cells.empty()) {
         return;
     }
 
-    const battery::BoundingBox cell_bounds = boundsFromCells(document, module_cells);
+    const battery::BoundingBox cell_bounds = module_context.cell_bounds;
     const float tray_margin_x = std::max(config.module_tray_margin_x, config.x_spacing * 0.18f);
     const float tray_margin_z = std::max(config.module_tray_margin_z, config.z_spacing * 0.16f);
     const float tray_base_thickness = std::max(8.0f, config.cooling_channel_thickness * 0.34f);
@@ -241,7 +279,11 @@ void appendModuleTrayGeometry(
 
     appendOpenTopTray(
         geometry,
-        {cell_bounds.center.x, cell_bounds.center.y - cell_bounds.size.y * 0.5f - tray_base_thickness * 0.1f, cell_bounds.center.z},
+        {
+            cell_bounds.center.x,
+            cell_bounds.center.y - cell_bounds.size.y * 0.5f - tray_base_thickness * 0.5f + tray_wall_height * 0.5f,
+            cell_bounds.center.z
+        },
         {cell_bounds.size.x + tray_margin_x * 2.0f, cell_bounds.size.z + tray_margin_z * 2.0f, 0.0f},
         tray_base_thickness,
         tray_wall_thickness,
@@ -272,6 +314,59 @@ void appendEnclosureGeometry(
 
 } // namespace
 
+GeometryBuffer BatteryGeometryGenerator::buildCachedCylindricalCellGeometry(
+    const CylindricalCellProfile& profile,
+    int segments,
+    const Vec3& body_color,
+    const Vec3& cap_color,
+    const Vec3& insulator_color
+) const
+{
+    GeometryBuffer geometry;
+    appendCylindricalCell(geometry, {0.0f, 0.0f, 0.0f}, profile, segments, body_color, cap_color, insulator_color);
+    return geometry;
+}
+
+const GeometryBuffer& BatteryGeometryGenerator::cachedCylindricalCellGeometry(
+    const CylindricalCellProfile& profile,
+    int segments,
+    const Vec3& body_color,
+    const Vec3& cap_color,
+    const Vec3& insulator_color
+) const
+{
+    std::ostringstream key_stream;
+    key_stream
+        << std::lround(profile.body_radius * 100.0f) << ':'
+        << std::lround(profile.body_height * 100.0f) << ':'
+        << std::lround(profile.cap_height * 100.0f) << ':'
+        << std::lround(profile.cap_radius * 100.0f) << ':'
+        << std::lround(profile.terminal_radius * 100.0f) << ':'
+        << std::lround(profile.terminal_height * 100.0f) << ':'
+        << std::lround(body_color.x * 255.0f) << ','
+        << std::lround(body_color.y * 255.0f) << ','
+        << std::lround(body_color.z * 255.0f) << ':'
+        << std::lround(cap_color.x * 255.0f) << ','
+        << std::lround(cap_color.y * 255.0f) << ','
+        << std::lround(cap_color.z * 255.0f) << ':'
+        << std::lround(insulator_color.x * 255.0f) << ','
+        << std::lround(insulator_color.y * 255.0f) << ','
+        << std::lround(insulator_color.z * 255.0f) << ':'
+        << segments;
+    const std::string key = key_stream.str();
+
+    const auto existing = m_cylindricalCellCache.find(key);
+    if (existing != m_cylindricalCellCache.end()) {
+        return existing->second;
+    }
+
+    auto inserted = m_cylindricalCellCache.emplace(
+        key,
+        buildCachedCylindricalCellGeometry(profile, segments, body_color, cap_color, insulator_color)
+    );
+    return inserted.first->second;
+}
+
 GeometryBuffer BatteryGeometryGenerator::buildVisualGeometry(
     const core::CadDocument& document,
     const battery::BatteryVisualizationOverlay& overlay,
@@ -280,12 +375,24 @@ GeometryBuffer BatteryGeometryGenerator::buildVisualGeometry(
 {
     GeometryBuffer geometry;
     const battery::PackLayoutConfig& layout = document.metadata().layout_config;
+    std::unordered_map<core::EntityId, ModuleGeometryContext, core::EntityIdHash> module_contexts;
+    module_contexts.reserve(document.modules().size());
+
+    for (const battery::ModuleBoundaryEntity& module : document.modules()) {
+        ModuleGeometryContext context;
+        context.cells = collectModuleCells(document, module.id);
+        context.cell_bounds = boundsFromCells(document, context.cells);
+        module_contexts.emplace(module.id, std::move(context));
+    }
 
     for (const battery::ModuleBoundaryEntity& module : document.modules()) {
         if (!module.visible) {
             continue;
         }
-        appendModuleTrayGeometry(geometry, document, module, layout);
+        const auto context_it = module_contexts.find(module.id);
+        if (context_it != module_contexts.end()) {
+            appendModuleTrayGeometry(geometry, document, module, context_it->second, layout);
+        }
     }
 
     for (const battery::CoolingPlateEntity& plate : document.coolingPlates()) {
@@ -310,7 +417,15 @@ GeometryBuffer BatteryGeometryGenerator::buildVisualGeometry(
         if (!busbar.visible) {
             continue;
         }
-        appendBusbarGeometry(geometry, document, busbar, document.worldBounds(busbar.id));
+        const auto* module = document.findModuleBoundary(busbar.parent_id);
+        if (module == nullptr) {
+            continue;
+        }
+        const auto context_it = module_contexts.find(module->id);
+        if (context_it == module_contexts.end()) {
+            continue;
+        }
+        appendBusbarGeometry(geometry, document, busbar, document.worldBounds(busbar.id), module, context_it->second, layout);
     }
 
     for (const battery::PackEnclosureEntity& enclosure : document.packEnclosures()) {
@@ -333,15 +448,14 @@ GeometryBuffer BatteryGeometryGenerator::buildVisualGeometry(
         }
 
         if (cell.form_factor == battery::CellFormFactor::Cylindrical) {
-            appendCylindricalCell(
-                geometry,
-                world_position,
+            const GeometryBuffer& cell_geometry = cachedCylindricalCellGeometry(
                 makeCellProfile(cell),
-                30,
+                24,
                 body_color,
                 {0.86f, 0.88f, 0.91f},
                 {0.95f, 0.92f, 0.77f}
             );
+            appendTranslatedGeometry(geometry, cell_geometry, world_position);
         } else {
             appendBox(geometry, world_position, {cell.width, cell.height, cell.depth}, body_color);
         }
