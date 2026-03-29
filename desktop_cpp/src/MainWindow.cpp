@@ -2336,20 +2336,27 @@ void MainWindow::loadSystemPresetCatalog()
     }
 
     m_systemPresetCatalog = result.payload.value("presets").toArray();
-    m_systemPresetCategoryCombo->clear();
-    m_systemPresetCategoryCombo->addItem("All Categories");
-    for (const QJsonValue& value : result.payload.value("categories").toArray()) {
-        m_systemPresetCategoryCombo->addItem(value.toString());
+    {
+        const QSignalBlocker categoryBlocker(m_systemPresetCategoryCombo);
+        m_systemPresetCategoryCombo->clear();
+        m_systemPresetCategoryCombo->addItem("All Categories");
+        for (const QJsonValue& value : result.payload.value("categories").toArray()) {
+            m_systemPresetCategoryCombo->addItem(value.toString());
+        }
     }
     rebuildSystemPresetOptions();
 
     const QString defaultPresetId = result.payload.value("default_preset_id").toString();
-    for (int index = 0; index < m_systemPresetCombo->count(); ++index) {
-        if (m_systemPresetCombo->itemData(index).toString() == defaultPresetId) {
-            m_systemPresetCombo->setCurrentIndex(index);
-            break;
+    {
+        const QSignalBlocker presetBlocker(m_systemPresetCombo);
+        for (int index = 0; index < m_systemPresetCombo->count(); ++index) {
+            if (m_systemPresetCombo->itemData(index).toString() == defaultPresetId) {
+                m_systemPresetCombo->setCurrentIndex(index);
+                break;
+            }
         }
     }
+    handleSystemPresetCategoryChanged(m_systemPresetCombo->currentIndex());
 }
 
 void MainWindow::rebuildSystemPresetOptions()
@@ -2359,13 +2366,16 @@ void MainWindow::rebuildSystemPresetOptions()
     }
 
     const QString selectedCategory = m_systemPresetCategoryCombo != nullptr ? m_systemPresetCategoryCombo->currentText() : QString();
-    m_systemPresetCombo->clear();
-    for (const QJsonValue& value : m_systemPresetCatalog) {
-        const QJsonObject preset = value.toObject();
-        if (!selectedCategory.isEmpty() && selectedCategory != "All Categories" && preset.value("category").toString() != selectedCategory) {
-            continue;
+    {
+        const QSignalBlocker presetBlocker(m_systemPresetCombo);
+        m_systemPresetCombo->clear();
+        for (const QJsonValue& value : m_systemPresetCatalog) {
+            const QJsonObject preset = value.toObject();
+            if (!selectedCategory.isEmpty() && selectedCategory != "All Categories" && preset.value("category").toString() != selectedCategory) {
+                continue;
+            }
+            m_systemPresetCombo->addItem(preset.value("display_name").toString(), preset.value("preset_id").toString());
         }
-        m_systemPresetCombo->addItem(preset.value("display_name").toString(), preset.value("preset_id").toString());
     }
 
     handleSystemPresetCategoryChanged(m_systemPresetCombo->currentIndex());
@@ -2374,6 +2384,7 @@ void MainWindow::rebuildSystemPresetOptions()
 void MainWindow::handleSystemPresetCategoryChanged(int)
 {
     if (sender() == m_systemPresetCategoryCombo) {
+        appendDesktopStartupLog("system preset category changed");
         rebuildSystemPresetOptions();
         return;
     }
@@ -2383,6 +2394,7 @@ void MainWindow::handleSystemPresetCategoryChanged(int)
     }
 
     const QString presetId = m_systemPresetCombo->currentData().toString();
+    appendDesktopStartupLog(QString("system preset selection update | preset_id=%1").arg(presetId));
     for (const QJsonValue& value : m_systemPresetCatalog) {
         const QJsonObject preset = value.toObject();
         if (preset.value("preset_id").toString() != presetId) {
@@ -2410,6 +2422,7 @@ void MainWindow::applySystemPreset(const QJsonObject& preset)
         return;
     }
 
+    appendDesktopStartupLog(QString("apply system preset begin | preset_id=%1").arg(preset.value("preset_id").toString()));
     m_activeSystemPreset = preset;
     const QJsonObject simulation = preset.value("simulation_defaults").toObject();
     applySimulationConfig(simulation);
@@ -2432,6 +2445,7 @@ void MainWindow::applySystemPreset(const QJsonObject& preset)
     if (m_summaryLabel != nullptr) {
         m_summaryLabel->setText(QString("Loaded battery system preset: %1").arg(preset.value("display_name").toString()));
     }
+    appendDesktopStartupLog("apply system preset complete");
 }
 
 void MainWindow::applySelectedSystemPreset()
