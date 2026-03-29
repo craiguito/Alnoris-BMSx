@@ -281,7 +281,7 @@ void appendModuleTrayGeometry(
         geometry,
         {
             cell_bounds.center.x,
-            cell_bounds.center.y - cell_bounds.size.y * 0.5f - tray_base_thickness * 0.5f + tray_wall_height * 0.5f,
+            cell_bounds.center.y - cell_bounds.size.y * 0.5f,
             cell_bounds.center.z
         },
         {cell_bounds.size.x + tray_margin_x * 2.0f, cell_bounds.size.z + tray_margin_z * 2.0f, 0.0f},
@@ -357,6 +357,7 @@ const GeometryBuffer& BatteryGeometryGenerator::cachedCylindricalCellGeometry(
 
     const auto existing = m_cylindricalCellCache.find(key);
     if (existing != m_cylindricalCellCache.end()) {
+        m_cacheStats.cylindrical_cell_hits += 1;
         return existing->second;
     }
 
@@ -364,6 +365,7 @@ const GeometryBuffer& BatteryGeometryGenerator::cachedCylindricalCellGeometry(
         key,
         buildCachedCylindricalCellGeometry(profile, segments, body_color, cap_color, insulator_color)
     );
+    m_cacheStats.cylindrical_cell_misses += 1;
     return inserted.first->second;
 }
 

@@ -105,7 +105,7 @@ void appendRing(GeometryBuffer& geometry, const Vec3& center, float outer_radius
 
 void appendOpenTopTray(
     GeometryBuffer& geometry,
-    const Vec3& center,
+    const Vec3& seating_plane_center,
     const Vec3& footprint,
     float base_thickness,
     float wall_thickness,
@@ -115,20 +115,44 @@ void appendOpenTopTray(
 {
     appendBox(
         geometry,
-        {center.x, center.y - wall_height * 0.5f, center.z},
+        {
+            seating_plane_center.x,
+            seating_plane_center.y - base_thickness * 0.5f,
+            seating_plane_center.z
+        },
         {footprint.x, base_thickness, footprint.z},
         cad::math::mix(color, {0.0f, 0.0f, 0.0f}, 0.04f)
     );
 
-    const float side_height = std::max(wall_height, base_thickness + 2.0f);
+    const float side_height = std::max(wall_height, 2.0f);
     const float half_width = footprint.x * 0.5f;
     const float half_depth = footprint.z * 0.5f;
-    const float wall_center_y = center.y - wall_height + side_height * 0.5f;
+    const float wall_center_y = seating_plane_center.y + side_height * 0.5f;
 
-    appendBox(geometry, {center.x - half_width + wall_thickness * 0.5f, wall_center_y, center.z}, {wall_thickness, side_height, footprint.z}, color);
-    appendBox(geometry, {center.x + half_width - wall_thickness * 0.5f, wall_center_y, center.z}, {wall_thickness, side_height, footprint.z}, color);
-    appendBox(geometry, {center.x, wall_center_y, center.z - half_depth + wall_thickness * 0.5f}, {footprint.x - wall_thickness * 2.0f, side_height, wall_thickness}, color);
-    appendBox(geometry, {center.x, wall_center_y, center.z + half_depth - wall_thickness * 0.5f}, {footprint.x - wall_thickness * 2.0f, side_height, wall_thickness}, color);
+    appendBox(
+        geometry,
+        {seating_plane_center.x - half_width + wall_thickness * 0.5f, wall_center_y, seating_plane_center.z},
+        {wall_thickness, side_height, footprint.z},
+        color
+    );
+    appendBox(
+        geometry,
+        {seating_plane_center.x + half_width - wall_thickness * 0.5f, wall_center_y, seating_plane_center.z},
+        {wall_thickness, side_height, footprint.z},
+        color
+    );
+    appendBox(
+        geometry,
+        {seating_plane_center.x, wall_center_y, seating_plane_center.z - half_depth + wall_thickness * 0.5f},
+        {footprint.x - wall_thickness * 2.0f, side_height, wall_thickness},
+        color
+    );
+    appendBox(
+        geometry,
+        {seating_plane_center.x, wall_center_y, seating_plane_center.z + half_depth - wall_thickness * 0.5f},
+        {footprint.x - wall_thickness * 2.0f, side_height, wall_thickness},
+        color
+    );
 }
 
 void appendOpenShell(

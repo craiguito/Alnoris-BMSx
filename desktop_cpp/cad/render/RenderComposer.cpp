@@ -402,8 +402,8 @@ RenderPacket RenderComposer::compose(
         return std::find(selected_subtree.begin(), selected_subtree.end(), id) != selected_subtree.end();
     };
 
-    const Vec3 grid_color{0.81f, 0.84f, 0.88f};
-    const Vec3 grid_axis_color{0.73f, 0.77f, 0.82f};
+    const Vec3 grid_color{0.86f, 0.88f, 0.91f};
+    const Vec3 grid_axis_color{0.79f, 0.82f, 0.86f};
     const Vec3 pack_structure_color{0.74f, 0.77f, 0.80f};
     const Vec3 module_structure_color{0.67f, 0.72f, 0.78f};
     const Vec3 group_structure_color{0.69f, 0.73f, 0.77f};
@@ -411,14 +411,14 @@ RenderPacket RenderComposer::compose(
     const Vec3 cooling_color{0.56f, 0.66f, 0.76f};
     const Vec3 busbar_color{0.72f, 0.48f, 0.24f};
     const Vec3 enclosure_color{0.80f, 0.82f, 0.84f};
-    const int grid_extent = 12;
+    const int grid_extent = 10;
     const float grid_step = 70.0f;
     for (int i = -grid_extent; i <= grid_extent; ++i) {
-        if ((i % 2) != 0) {
+        if ((i % 3) != 0) {
             continue;
         }
         const float offset = i * grid_step;
-        const Vec3 color = (i % 4) == 0 ? grid_axis_color : grid_color;
+        const Vec3 color = (i == 0) ? grid_axis_color : grid_color;
         packet.lines.push_back({{offset, -120.0f, -grid_extent * grid_step}, color});
         packet.lines.push_back({{offset, -120.0f, grid_extent * grid_step}, color});
         packet.lines.push_back({{-grid_extent * grid_step, -120.0f, offset}, color});
@@ -533,12 +533,12 @@ RenderPacket RenderComposer::compose(
         return a.depth < b.depth;
     });
 
-    packet.lines.push_back({{-220.0f, 0.0f, 0.0f}, {0.76f, 0.62f, 0.62f}});
-    packet.lines.push_back({{220.0f, 0.0f, 0.0f}, {0.76f, 0.62f, 0.62f}});
-    packet.lines.push_back({{0.0f, -120.0f, 0.0f}, {0.62f, 0.76f, 0.66f}});
-    packet.lines.push_back({{0.0f, 220.0f, 0.0f}, {0.62f, 0.76f, 0.66f}});
-    packet.lines.push_back({{0.0f, 0.0f, -220.0f}, {0.62f, 0.68f, 0.83f}});
-    packet.lines.push_back({{0.0f, 0.0f, 220.0f}, {0.62f, 0.68f, 0.83f}});
+    packet.lines.push_back({{-180.0f, 0.0f, 0.0f}, {0.79f, 0.72f, 0.72f}});
+    packet.lines.push_back({{180.0f, 0.0f, 0.0f}, {0.79f, 0.72f, 0.72f}});
+    packet.lines.push_back({{0.0f, -90.0f, 0.0f}, {0.71f, 0.79f, 0.73f}});
+    packet.lines.push_back({{0.0f, 180.0f, 0.0f}, {0.71f, 0.79f, 0.73f}});
+    packet.lines.push_back({{0.0f, 0.0f, -180.0f}, {0.71f, 0.75f, 0.82f}});
+    packet.lines.push_back({{0.0f, 0.0f, 180.0f}, {0.71f, 0.75f, 0.82f}});
 
     return packet;
 }

@@ -13,11 +13,19 @@ namespace cad::geometry {
 class BatteryGeometryGenerator
 {
 public:
+    struct CacheStats
+    {
+        std::size_t cylindrical_cell_hits = 0;
+        std::size_t cylindrical_cell_misses = 0;
+    };
+
     GeometryBuffer buildVisualGeometry(
         const core::CadDocument& document,
         const battery::BatteryVisualizationOverlay& overlay,
         const io::TriangleMesh* cell_mesh
     ) const;
+
+    [[nodiscard]] const CacheStats& cacheStats() const { return m_cacheStats; }
 
 private:
     GeometryBuffer buildCachedCylindricalCellGeometry(
@@ -37,6 +45,7 @@ private:
     ) const;
 
     mutable std::unordered_map<std::string, GeometryBuffer> m_cylindricalCellCache;
+    mutable CacheStats m_cacheStats;
 };
 
 } // namespace cad::geometry

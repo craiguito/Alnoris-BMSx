@@ -27,6 +27,8 @@ public:
         std::size_t packet_rebuild_count = 0;
         std::size_t triangle_count = 0;
         std::size_t line_count = 0;
+        std::size_t cylindrical_cell_cache_hits = 0;
+        std::size_t cylindrical_cell_cache_misses = 0;
     };
 
     CadEngine();

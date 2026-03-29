@@ -3,12 +3,12 @@
 #include <QMouseEvent>
 #include <QKeyEvent>
 #include <QPainter>
-#include <QPainterPath>
 #include <QLinearGradient>
 #include <QPaintEvent>
 #include <QResizeEvent>
 #include <QWheelEvent>
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 
 namespace {
@@ -322,62 +322,28 @@ void CadViewportWidget::paintEvent(QPaintEvent* event)
         return;
     }
 
-    std::vector<ProjectedTriangle> projectedTriangles;
-    projectedTriangles.reserve(frame.triangles.size() / 3);
-    for (std::size_t i = 0; i + 2 < frame.triangles.size(); i += 3) {
-        const ProjectedVertex a = projectPoint(frame.mvp, frame.triangles[i].position, width(), height());
-        const ProjectedVertex b = projectPoint(frame.mvp, frame.triangles[i + 1].position, width(), height());
-        const ProjectedVertex c = projectPoint(frame.mvp, frame.triangles[i + 2].position, width(), height());
-        if (!a.valid || !b.valid || !c.valid) {
-            continue;
-        }
-
-        const cad::math::Vec3 avgColor{
-            (frame.triangles[i].color.x + frame.triangles[i + 1].color.x + frame.triangles[i + 2].color.x) / 3.0f,
-            (frame.triangles[i].color.y + frame.triangles[i + 1].color.y + frame.triangles[i + 2].color.y) / 3.0f,
-            (frame.triangles[i].color.z + frame.triangles[i + 1].color.z + frame.triangles[i + 2].color.z) / 3.0f
-        };
-
-        projectedTriangles.push_back({
-            a.point,
-            b.point,
-            c.point,
-            toColor(avgColor),
-            (a.depth + b.depth + c.depth) / 3.0f
-        });
+    const std::size_t packet_build_count = m_engine.renderDiagnostics().packet_rebuild_count;
+    if (m_cachedPacketBuildCount != packet_build_count || m_cachedProjectionWidth != width() || m_cachedProjectionHeight != height()) {
+        rebuildScreenSpaceCache();
     }
 
-    std::sort(projectedTriangles.begin(), projectedTriangles.end(), [](const ProjectedTriangle& lhs, const ProjectedTriangle& rhs) {
-        return lhs.depth > rhs.depth;
-    });
-
     painter.setPen(Qt::NoPen);
-    for (const ProjectedTriangle& tri : projectedTriangles) {
+    for (const CachedScreenTriangle& tri : m_cachedTriangles) {
         const QPointF points[3] = {tri.a, tri.b, tri.c};
         painter.setBrush(tri.color);
         painter.drawConvexPolygon(points, 3);
     }
 
-    for (std::size_t i = 0; i + 1 < frame.lines.size(); i += 2) {
-        const ProjectedVertex a = projectPoint(frame.mvp, frame.lines[i].position, width(), height());
-        const ProjectedVertex b = projectPoint(frame.mvp, frame.lines[i + 1].position, width(), height());
-        if (!a.valid || !b.valid) {
-            continue;
-        }
-        painter.setPen(QPen(toColor(frame.lines[i].color), 0.7, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        painter.drawLine(a.point, b.point);
+    for (const CachedScreenLine& line : m_cachedLines) {
+        painter.setPen(QPen(line.color, line.width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.drawLine(line.a, line.b);
     }
 
-    if (!frame.selection_overlay_lines.empty()) {
+    if (!m_cachedSelectionLines.empty()) {
         painter.setRenderHint(QPainter::Antialiasing, true);
-        painter.setPen(QPen(QColor(31, 116, 247), 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        for (std::size_t i = 0; i + 1 < frame.selection_overlay_lines.size(); i += 2) {
-            const ProjectedVertex a = projectPoint(frame.mvp, frame.selection_overlay_lines[i].position, width(), height());
-            const ProjectedVertex b = projectPoint(frame.mvp, frame.selection_overlay_lines[i + 1].position, width(), height());
-            if (!a.valid || !b.valid) {
-                continue;
-            }
-            painter.drawLine(a.point, b.point);
+        for (const CachedScreenLine& line : m_cachedSelectionLines) {
+            painter.setPen(QPen(line.color, line.width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+            painter.drawLine(line.a, line.b);
         }
     }
 
@@ -404,15 +370,27 @@ void CadViewportWidget::paintEvent(QPaintEvent* event)
     painter.drawText(
         QRect(16, 32, width() - 32, 18),
         Qt::AlignLeft | Qt::AlignVCenter,
-        QString("Scene %1 tris  |  Geo %2 ms  |  Frame %3 ms")
+        QString("Scene %1 tris  |  Geo %2 ms  |  Frame %3 ms  |  Project %4 ms")
             .arg(static_cast<qlonglong>(m_engine.renderDiagnostics().triangle_count))
             .arg(m_engine.renderDiagnostics().last_geometry_build_ms, 0, 'f', 1)
             .arg(m_engine.renderDiagnostics().last_render_packet_ms, 0, 'f', 1)
+            .arg(m_lastProjectionBuildMs, 0, 'f', 1)
+    );
+    painter.drawText(
+        QRect(16, 50, width() - 32, 18),
+        Qt::AlignLeft | Qt::AlignVCenter,
+        QString("Cell cache %1 hits / %2 misses  |  Rebuilds geo %3 frame %4")
+            .arg(static_cast<qlonglong>(m_engine.renderDiagnostics().cylindrical_cell_cache_hits))
+            .arg(static_cast<qlonglong>(m_engine.renderDiagnostics().cylindrical_cell_cache_misses))
+            .arg(static_cast<qlonglong>(m_engine.renderDiagnostics().geometry_rebuild_count))
+            .arg(static_cast<qlonglong>(m_engine.renderDiagnostics().packet_rebuild_count))
     );
 }
 
 void CadViewportWidget::resizeEvent(QResizeEvent* event)
 {
+    m_cachedProjectionWidth = 0;
+    m_cachedProjectionHeight = 0;
     m_engine.setViewportSize(event->size().width(), event->size().height());
     QWidget::resizeEvent(event);
 }
@@ -525,4 +503,68 @@ void CadViewportWidget::keyPressEvent(QKeyEvent* event)
         break;
     }
     QWidget::keyPressEvent(event);
+}
+
+void CadViewportWidget::rebuildScreenSpaceCache()
+{
+    const auto start = std::chrono::steady_clock::now();
+    const cad::render::RenderPacket& frame = m_engine.renderPacket();
+
+    m_cachedTriangles.clear();
+    m_cachedLines.clear();
+    m_cachedSelectionLines.clear();
+
+    m_cachedTriangles.reserve(frame.triangles.size() / 3);
+    for (std::size_t i = 0; i + 2 < frame.triangles.size(); i += 3) {
+        const ProjectedVertex a = projectPoint(frame.mvp, frame.triangles[i].position, width(), height());
+        const ProjectedVertex b = projectPoint(frame.mvp, frame.triangles[i + 1].position, width(), height());
+        const ProjectedVertex c = projectPoint(frame.mvp, frame.triangles[i + 2].position, width(), height());
+        if (!a.valid || !b.valid || !c.valid) {
+            continue;
+        }
+
+        const cad::math::Vec3 avgColor{
+            (frame.triangles[i].color.x + frame.triangles[i + 1].color.x + frame.triangles[i + 2].color.x) / 3.0f,
+            (frame.triangles[i].color.y + frame.triangles[i + 1].color.y + frame.triangles[i + 2].color.y) / 3.0f,
+            (frame.triangles[i].color.z + frame.triangles[i + 1].color.z + frame.triangles[i + 2].color.z) / 3.0f
+        };
+
+        m_cachedTriangles.push_back({
+            a.point,
+            b.point,
+            c.point,
+            toColor(avgColor),
+            (a.depth + b.depth + c.depth) / 3.0f
+        });
+    }
+
+    std::sort(m_cachedTriangles.begin(), m_cachedTriangles.end(), [](const CachedScreenTriangle& lhs, const CachedScreenTriangle& rhs) {
+        return lhs.depth > rhs.depth;
+    });
+
+    m_cachedLines.reserve(frame.lines.size() / 2);
+    for (std::size_t i = 0; i + 1 < frame.lines.size(); i += 2) {
+        const ProjectedVertex a = projectPoint(frame.mvp, frame.lines[i].position, width(), height());
+        const ProjectedVertex b = projectPoint(frame.mvp, frame.lines[i + 1].position, width(), height());
+        if (!a.valid || !b.valid) {
+            continue;
+        }
+        m_cachedLines.push_back({a.point, b.point, toColor(frame.lines[i].color), 0.7f});
+    }
+
+    m_cachedSelectionLines.reserve(frame.selection_overlay_lines.size() / 2);
+    for (std::size_t i = 0; i + 1 < frame.selection_overlay_lines.size(); i += 2) {
+        const ProjectedVertex a = projectPoint(frame.mvp, frame.selection_overlay_lines[i].position, width(), height());
+        const ProjectedVertex b = projectPoint(frame.mvp, frame.selection_overlay_lines[i + 1].position, width(), height());
+        if (!a.valid || !b.valid) {
+            continue;
+        }
+        m_cachedSelectionLines.push_back({a.point, b.point, QColor(31, 116, 247), 1.8f});
+    }
+
+    const auto end = std::chrono::steady_clock::now();
+    m_lastProjectionBuildMs = std::chrono::duration<double, std::milli>(end - start).count();
+    m_cachedPacketBuildCount = m_engine.renderDiagnostics().packet_rebuild_count;
+    m_cachedProjectionWidth = width();
+    m_cachedProjectionHeight = height();
 }

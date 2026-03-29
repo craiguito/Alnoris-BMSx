@@ -46,7 +46,7 @@ void appendCylinder(GeometryBuffer& geometry, const math::Vec3& center, float ra
 void appendRing(GeometryBuffer& geometry, const math::Vec3& center, float outer_radius, float inner_radius, float height, int segments, const math::Vec3& color);
 void appendOpenTopTray(
     GeometryBuffer& geometry,
-    const math::Vec3& center,
+    const math::Vec3& seating_plane_center,
     const math::Vec3& footprint,
     float base_thickness,
     float wall_thickness,

@@ -7,6 +7,7 @@
 #include <QWidget>
 
 #include <optional>
+#include <vector>
 
 class QMouseEvent;
 class QPaintEvent;
@@ -58,6 +59,23 @@ protected:
     void keyPressEvent(QKeyEvent* event) override;
 
 private:
+    struct CachedScreenTriangle
+    {
+        QPointF a;
+        QPointF b;
+        QPointF c;
+        QColor color;
+        float depth = 0.0f;
+    };
+
+    struct CachedScreenLine
+    {
+        QPointF a;
+        QPointF b;
+        QColor color;
+        float width = 1.0f;
+    };
+
     enum class MoveAxis
     {
         FreeXZ,
@@ -68,6 +86,13 @@ private:
 
     cad::CadEngine m_engine;
     QColor m_backgroundColor;
+    std::vector<CachedScreenTriangle> m_cachedTriangles;
+    std::vector<CachedScreenLine> m_cachedLines;
+    std::vector<CachedScreenLine> m_cachedSelectionLines;
+    std::size_t m_cachedPacketBuildCount = 0;
+    int m_cachedProjectionWidth = 0;
+    int m_cachedProjectionHeight = 0;
+    double m_lastProjectionBuildMs = 0.0;
     QPoint m_pressMousePos;
     QPoint m_lastMousePos;
     bool m_dragging = false;
@@ -75,4 +100,6 @@ private:
     bool m_gridSnapEnabled = true;
     float m_gridSnapStep = 14.0f;
     MoveAxis m_moveAxis = MoveAxis::FreeXZ;
+
+    void rebuildScreenSpaceCache();
 };

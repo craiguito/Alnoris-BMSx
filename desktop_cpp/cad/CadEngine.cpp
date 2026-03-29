@@ -510,6 +510,9 @@ void CadEngine::rebuildVisualGeometry()
     const auto end = std::chrono::steady_clock::now();
     m_renderDiagnostics.last_geometry_build_ms = std::chrono::duration<double, std::milli>(end - start).count();
     m_renderDiagnostics.geometry_rebuild_count += 1;
+    const auto& cache_stats = m_geometryGenerator.cacheStats();
+    m_renderDiagnostics.cylindrical_cell_cache_hits = cache_stats.cylindrical_cell_hits;
+    m_renderDiagnostics.cylindrical_cell_cache_misses = cache_stats.cylindrical_cell_misses;
 }
 
 } // namespace cad
