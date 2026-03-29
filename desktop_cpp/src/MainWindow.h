@@ -111,6 +111,7 @@ private:
     void clearSimulationVisualization();
     void loadSystemPresetCatalog();
     void rebuildSystemPresetOptions();
+    void refreshSelectedSystemPresetDescription();
     void applySystemPreset(const QJsonObject& preset);
     void loadVirtualTestCatalog();
     void rebuildVirtualTestForm();

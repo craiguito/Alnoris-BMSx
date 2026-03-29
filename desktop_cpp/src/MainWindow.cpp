@@ -2356,7 +2356,7 @@ void MainWindow::loadSystemPresetCatalog()
             }
         }
     }
-    handleSystemPresetCategoryChanged(m_systemPresetCombo->currentIndex());
+    refreshSelectedSystemPresetDescription();
 }
 
 void MainWindow::rebuildSystemPresetOptions()
@@ -2378,7 +2378,7 @@ void MainWindow::rebuildSystemPresetOptions()
         }
     }
 
-    handleSystemPresetCategoryChanged(m_systemPresetCombo->currentIndex());
+    refreshSelectedSystemPresetDescription();
 }
 
 void MainWindow::handleSystemPresetCategoryChanged(int)
@@ -2389,6 +2389,11 @@ void MainWindow::handleSystemPresetCategoryChanged(int)
         return;
     }
 
+    refreshSelectedSystemPresetDescription();
+}
+
+void MainWindow::refreshSelectedSystemPresetDescription()
+{
     if (m_systemPresetDescription == nullptr || m_systemPresetCombo == nullptr) {
         return;
     }
