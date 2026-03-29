@@ -29,6 +29,83 @@ struct ProjectedTriangle
     float depth = 0.0f;
 };
 
+cad::math::Vec3 subtractVec(const cad::math::Vec3& a, const cad::math::Vec3& b)
+{
+    return {a.x - b.x, a.y - b.y, a.z - b.z};
+}
+
+cad::math::Vec3 crossVec(const cad::math::Vec3& a, const cad::math::Vec3& b)
+{
+    return {
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x
+    };
+}
+
+float dotVec(const cad::math::Vec3& a, const cad::math::Vec3& b)
+{
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+float lengthVec(const cad::math::Vec3& v)
+{
+    return std::sqrt(dotVec(v, v));
+}
+
+cad::math::Vec3 normalizeVec(const cad::math::Vec3& v)
+{
+    const float length = lengthVec(v);
+    if (length <= 0.0001f) {
+        return {0.0f, 1.0f, 0.0f};
+    }
+    return {v.x / length, v.y / length, v.z / length};
+}
+
+QColor shadedColor(
+    const cad::math::Vec3& a,
+    const cad::math::Vec3& b,
+    const cad::math::Vec3& c,
+    const cad::math::Vec3& base_color,
+    unsigned char layer
+)
+{
+    const cad::math::Vec3 edge_ab = subtractVec(b, a);
+    const cad::math::Vec3 edge_ac = subtractVec(c, a);
+    const cad::math::Vec3 normal = normalizeVec(crossVec(edge_ab, edge_ac));
+    const cad::math::Vec3 light_dir = normalizeVec({0.42f, 0.85f, 0.31f});
+    const float lambert = std::max(0.0f, dotVec(normal, light_dir));
+
+    float ambient = 0.54f;
+    float diffuse = 0.46f;
+    int alpha = 255;
+    if (layer == 0) {
+        ambient = 0.70f;
+        diffuse = 0.18f;
+        alpha = 52;
+    } else if (layer == 1) {
+        ambient = 0.63f;
+        diffuse = 0.26f;
+        alpha = 138;
+    } else if (layer == 2) {
+        ambient = 0.56f;
+        diffuse = 0.42f;
+        alpha = 245;
+    } else if (layer == 3) {
+        ambient = 0.58f;
+        diffuse = 0.38f;
+        alpha = 235;
+    }
+
+    const float shade = std::clamp(ambient + diffuse * lambert, 0.0f, 1.15f);
+    return QColor::fromRgbF(
+        std::clamp(base_color.x * shade, 0.0f, 1.0f),
+        std::clamp(base_color.y * shade, 0.0f, 1.0f),
+        std::clamp(base_color.z * shade, 0.0f, 1.0f),
+        alpha / 255.0f
+    );
+}
+
 ProjectedVertex projectPoint(const std::array<float, 16>& mvp, const cad::math::Vec3& p, int width, int height)
 {
     const float x = p.x;
@@ -533,7 +610,13 @@ void CadViewportWidget::rebuildScreenSpaceCache()
             a.point,
             b.point,
             c.point,
-            toColor(avgColor),
+            shadedColor(
+                frame.triangles[i].position,
+                frame.triangles[i + 1].position,
+                frame.triangles[i + 2].position,
+                avgColor,
+                frame.triangles[i].layer
+            ),
             (a.depth + b.depth + c.depth) / 3.0f,
             frame.triangles[i].layer
         });
@@ -553,7 +636,15 @@ void CadViewportWidget::rebuildScreenSpaceCache()
         if (!a.valid || !b.valid) {
             continue;
         }
-        m_cachedLines.push_back({a.point, b.point, toColor(frame.lines[i].color), 0.7f});
+        QColor color = toColor(frame.lines[i].color);
+        if (frame.lines[i].layer == 0) {
+            color.setAlpha(70);
+        } else if (frame.lines[i].layer == 1) {
+            color.setAlpha(115);
+        } else {
+            color.setAlpha(170);
+        }
+        m_cachedLines.push_back({a.point, b.point, color, frame.lines[i].layer == 0 ? 0.5f : 0.7f});
     }
 
     m_cachedSelectionLines.reserve(frame.selection_overlay_lines.size() / 2);

@@ -206,6 +206,13 @@ void appendCylindricalCell(
 )
 {
     const float half_body_height = profile.body_height * 0.5f;
+    if (segments <= 8) {
+        appendCylinder(geometry, center, profile.body_radius, profile.body_height, segments, body_color, layer);
+        const Vec3 top_cap_center{center.x, center.y + half_body_height - profile.cap_height * 0.5f, center.z};
+        appendCylinder(geometry, top_cap_center, profile.cap_radius, profile.cap_height, segments, cap_color, layer);
+        return;
+    }
+
     appendCylinder(geometry, center, profile.body_radius, profile.body_height, segments, body_color, layer);
 
     const Vec3 top_cap_center{center.x, center.y + half_body_height - profile.cap_height * 0.5f, center.z};
