@@ -624,3 +624,47 @@ This pass focuses on readability inside the software-rendered CAD viewport rathe
 - TODO: improve silhouette outlining in a future GPU-backed renderer
 - TODO: support alternate viewport visual styles for thermal/result review
 - TODO: revisit lighting/material polish later once the OpenGL/Vulkan backend matures
+
+## Parametric Battery Geometry Pass
+
+This pass moves the CAD visuals away from placeholder primitives living directly inside the renderer and toward a procedural battery-geometry layer.
+
+### New geometry generation layer
+
+- Added `cad/geometry/` as a standalone CAD-core layer for procedural shape generation.
+- `ParametricPrimitives` now provides reusable low-level building blocks such as:
+  - boxes
+  - cylinders
+  - rings
+  - open-top trays
+  - open-shell enclosures
+- `BatteryGeometryGenerator` now converts battery document/entity state into renderable procedural geometry without introducing Qt into the CAD core.
+
+### Components now procedurally modeled
+
+- Cylindrical cells now render with:
+  - body can
+  - top cap
+  - bottom cap
+  - insulator ring
+  - positive terminal nub
+- Module boundaries now contribute tray/support geometry rather than only structural framing.
+- Busbars are now generated as role-aware conductive rails with simple connection tabs derived from module cell topology.
+- Cooling plates now render as fuller base plates with subtle inset lane features.
+- Pack enclosures now render as open shell geometry with floor and side walls instead of only abstract bounds.
+
+### Architecture impact
+
+- `CadDocument` still owns battery entities, parameters, and identity.
+- `PackLayoutGenerator` still owns document regeneration and layout topology.
+- `BatteryGeometryGenerator` now owns the procedural shape logic.
+- `RenderComposer` remains responsible for packet composition, selection overlays, and picking, but no longer owns most of the battery-shape modeling logic.
+
+### Remaining future work
+
+- TODO: add richer prismatic and pouch cell procedural generators
+- TODO: expose more geometric detail parameters in the desktop inspector
+- TODO: improve series-link busbar topology generation beyond first-pass rail-and-tab logic
+- TODO: add tray ribs / fastening details behind a controlled detail level
+- TODO: add richer procedural cooling channel features without cluttering the viewport
+- TODO: support alternate procedural detail levels / LOD

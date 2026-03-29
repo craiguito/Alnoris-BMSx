@@ -1,0 +1,353 @@
+#include "BatteryGeometryGenerator.h"
+
+#include <algorithm>
+
+namespace cad::geometry {
+namespace {
+
+using cad::math::Vec3;
+
+Vec3 temperatureColor(double temp_c)
+{
+    const float normalized = cad::math::clamp(static_cast<float>((temp_c - 20.0) / 28.0), 0.0f, 1.0f);
+    return cad::math::mix({0.28f, 0.73f, 1.0f}, {1.0f, 0.42f, 0.25f}, normalized);
+}
+
+Vec3 gradientColor(double value, double min_value, double max_value)
+{
+    if (max_value <= min_value) {
+        return {0.70f, 0.74f, 0.79f};
+    }
+
+    const float normalized = cad::math::clamp(static_cast<float>((value - min_value) / (max_value - min_value)), 0.0f, 1.0f);
+    if (normalized < 0.5f) {
+        return cad::math::mix({0.14f, 0.45f, 0.94f}, {0.97f, 0.84f, 0.26f}, normalized / 0.5f);
+    }
+    return cad::math::mix({0.97f, 0.84f, 0.26f}, {0.95f, 0.32f, 0.25f}, (normalized - 0.5f) / 0.5f);
+}
+
+Vec3 overlayCellColor(const battery::BatteryVisualizationOverlay& overlay, const battery::CellEntity& cell)
+{
+    switch (overlay.active_metric) {
+    case battery::BatteryVisualizationOverlay::Metric::CoreTemperature:
+        if (const auto it = overlay.cell_core_temperature_c.find(cell.id); it != overlay.cell_core_temperature_c.end()) {
+            return temperatureColor(it->second);
+        }
+        break;
+    case battery::BatteryVisualizationOverlay::Metric::SurfaceTemperature:
+        if (const auto it = overlay.cell_surface_temperature_c.find(cell.id); it != overlay.cell_surface_temperature_c.end()) {
+            return temperatureColor(it->second);
+        }
+        break;
+    case battery::BatteryVisualizationOverlay::Metric::Soc:
+        if (const auto it = overlay.cell_soc.find(cell.id); it != overlay.cell_soc.end()) {
+            return gradientColor(it->second, 0.0, 1.0);
+        }
+        break;
+    case battery::BatteryVisualizationOverlay::Metric::Voltage:
+        if (const auto it = overlay.cell_voltage_v.find(cell.id); it != overlay.cell_voltage_v.end()) {
+            return gradientColor(it->second, 2.8, 4.25);
+        }
+        break;
+    case battery::BatteryVisualizationOverlay::Metric::DiffusionStress:
+        if (const auto it = overlay.cell_diffusion_stress.find(cell.id); it != overlay.cell_diffusion_stress.end()) {
+            return gradientColor(it->second, 0.0, 1.0);
+        }
+        break;
+    case battery::BatteryVisualizationOverlay::Metric::EffectiveResistance:
+    default:
+        if (const auto it = overlay.cell_effective_resistance_ohm.find(cell.id); it != overlay.cell_effective_resistance_ohm.end()) {
+            return gradientColor(it->second, 0.0, 0.2);
+        }
+        break;
+    }
+
+    if (const auto it = overlay.cell_core_temperature_c.find(cell.id); it != overlay.cell_core_temperature_c.end()) {
+        return temperatureColor(it->second);
+    }
+    return {0.73f, 0.70f, 0.66f};
+}
+
+void appendMesh(GeometryBuffer& geometry, const io::TriangleMesh& mesh, const Vec3& offset, const Vec3& color)
+{
+    for (std::size_t i = 0; i + 2 < mesh.vertices.size(); i += 3) {
+        geometry.triangles.push_back({
+            cad::math::add(mesh.vertices[i], offset),
+            cad::math::add(mesh.vertices[i + 1], offset),
+            cad::math::add(mesh.vertices[i + 2], offset),
+            color
+        });
+    }
+}
+
+std::vector<const battery::CellEntity*> collectModuleCells(const core::CadDocument& document, core::EntityId module_id)
+{
+    std::vector<const battery::CellEntity*> cells;
+    for (const core::EntityId entity_id : document.subtreeIds(module_id)) {
+        if (const auto* cell = document.findCell(entity_id); cell != nullptr && cell->visible) {
+            cells.push_back(cell);
+        }
+    }
+    return cells;
+}
+
+battery::BoundingBox boundsFromCells(const core::CadDocument& document, const std::vector<const battery::CellEntity*>& cells)
+{
+    if (cells.empty()) {
+        return {};
+    }
+
+    Vec3 min_point{};
+    Vec3 max_point{};
+    bool initialized = false;
+    for (const battery::CellEntity* cell : cells) {
+        const battery::BoundingBox world_bounds = document.worldBounds(cell->id);
+        const Vec3 half{world_bounds.size.x * 0.5f, world_bounds.size.y * 0.5f, world_bounds.size.z * 0.5f};
+        const Vec3 local_min{
+            world_bounds.center.x - half.x,
+            world_bounds.center.y - half.y,
+            world_bounds.center.z - half.z
+        };
+        const Vec3 local_max{
+            world_bounds.center.x + half.x,
+            world_bounds.center.y + half.y,
+            world_bounds.center.z + half.z
+        };
+        if (!initialized) {
+            min_point = local_min;
+            max_point = local_max;
+            initialized = true;
+            continue;
+        }
+        min_point.x = std::min(min_point.x, local_min.x);
+        min_point.y = std::min(min_point.y, local_min.y);
+        min_point.z = std::min(min_point.z, local_min.z);
+        max_point.x = std::max(max_point.x, local_max.x);
+        max_point.y = std::max(max_point.y, local_max.y);
+        max_point.z = std::max(max_point.z, local_max.z);
+    }
+
+    return {
+        {(min_point.x + max_point.x) * 0.5f, (min_point.y + max_point.y) * 0.5f, (min_point.z + max_point.z) * 0.5f},
+        {max_point.x - min_point.x, max_point.y - min_point.y, max_point.z - min_point.z}
+    };
+}
+
+CylindricalCellProfile makeCellProfile(const battery::CellEntity& cell)
+{
+    CylindricalCellProfile profile;
+    profile.body_radius = cell.radius;
+    profile.body_height = cell.height;
+    profile.cap_height = std::max(4.0f, cell.height * 0.028f);
+    profile.cap_radius = cell.radius * 0.93f;
+    profile.terminal_radius = cell.radius * 0.34f;
+    profile.terminal_height = std::max(2.0f, cell.height * 0.014f);
+    profile.insulator_outer_radius = cell.radius * 0.62f;
+    profile.insulator_inner_radius = cell.radius * 0.36f;
+    profile.insulator_height = std::max(1.2f, cell.height * 0.007f);
+    profile.bottom_cap_height = std::max(2.0f, cell.height * 0.012f);
+
+    if (cell.cell_type == "21700") {
+        profile.cap_height *= 1.08f;
+        profile.terminal_radius *= 1.10f;
+    }
+    return profile;
+}
+
+void appendCoolingFeatures(GeometryBuffer& geometry, const battery::BoundingBox& bounds, const battery::PackLayoutConfig& config)
+{
+    const float inset_depth = std::min(config.cooling_channel_thickness * 0.3f, 5.0f);
+    const float lane_width = std::max(18.0f, bounds.size.z * 0.14f);
+    const float offset = bounds.size.z * 0.22f;
+    const Vec3 feature_color{0.50f, 0.60f, 0.71f};
+
+    appendBox(
+        geometry,
+        {bounds.center.x, bounds.center.y + bounds.size.y * 0.5f - inset_depth * 0.5f, bounds.center.z - offset},
+        {bounds.size.x * 0.84f, inset_depth, lane_width},
+        feature_color
+    );
+    appendBox(
+        geometry,
+        {bounds.center.x, bounds.center.y + bounds.size.y * 0.5f - inset_depth * 0.5f, bounds.center.z + offset},
+        {bounds.size.x * 0.84f, inset_depth, lane_width},
+        feature_color
+    );
+}
+
+void appendBusbarGeometry(
+    GeometryBuffer& geometry,
+    const core::CadDocument& document,
+    const battery::BusbarEntity& busbar,
+    const battery::BoundingBox& bounds
+)
+{
+    const Vec3 copper_color{0.72f, 0.48f, 0.24f};
+    appendBox(geometry, bounds.center, {bounds.size.x * 0.92f, bounds.size.y, bounds.size.z}, copper_color);
+
+    const auto* module = document.findModuleBoundary(busbar.parent_id);
+    if (module == nullptr) {
+        return;
+    }
+
+    const std::vector<const battery::CellEntity*> module_cells = collectModuleCells(document, module->id);
+    const battery::PackLayoutConfig& layout = document.metadata().layout_config;
+    const float tab_depth = std::max(layout.busbar_tab_depth, bounds.size.z * 1.5f);
+    const float tab_width = std::max(layout.busbar_tab_width, bounds.size.x / std::max(1, module->series_span * 3));
+    const float group_z = busbar.role == battery::BusbarRole::Negative ? -1.0f : 1.0f;
+    std::vector<int> series_indices;
+    for (const battery::CellEntity* cell : module_cells) {
+        if (std::find(series_indices.begin(), series_indices.end(), cell->series_index) == series_indices.end()) {
+            series_indices.push_back(cell->series_index);
+        }
+    }
+
+    for (const int series_index : series_indices) {
+        std::vector<const battery::CellEntity*> group_cells;
+        for (const battery::CellEntity* cell : module_cells) {
+            if (cell->series_index == series_index) {
+                group_cells.push_back(cell);
+            }
+        }
+        const battery::BoundingBox group_bounds = boundsFromCells(document, group_cells);
+        const Vec3 tab_center{
+            group_bounds.center.x,
+            bounds.center.y,
+            bounds.center.z + group_z * (tab_depth * 0.5f + std::max(4.0f, bounds.size.z * 0.2f))
+        };
+        appendBox(geometry, tab_center, {tab_width, bounds.size.y, tab_depth}, cad::math::mix(copper_color, {1.0f, 1.0f, 1.0f}, 0.05f));
+    }
+}
+
+void appendModuleTrayGeometry(
+    GeometryBuffer& geometry,
+    const core::CadDocument& document,
+    const battery::ModuleBoundaryEntity& module,
+    const battery::PackLayoutConfig& config
+)
+{
+    const std::vector<const battery::CellEntity*> module_cells = collectModuleCells(document, module.id);
+    if (module_cells.empty()) {
+        return;
+    }
+
+    const battery::BoundingBox cell_bounds = boundsFromCells(document, module_cells);
+    const float tray_margin_x = std::max(config.module_tray_margin_x, config.x_spacing * 0.18f);
+    const float tray_margin_z = std::max(config.module_tray_margin_z, config.z_spacing * 0.16f);
+    const float tray_base_thickness = std::max(8.0f, config.cooling_channel_thickness * 0.34f);
+    const float tray_wall_thickness = std::max(5.0f, config.enclosure_wall_thickness * 0.72f);
+    const float tray_wall_height = std::max(config.module_tray_wall_height, config.cell_height * 0.10f);
+    const Vec3 tray_color{0.60f, 0.63f, 0.67f};
+
+    appendOpenTopTray(
+        geometry,
+        {cell_bounds.center.x, cell_bounds.center.y - cell_bounds.size.y * 0.5f - tray_base_thickness * 0.1f, cell_bounds.center.z},
+        {cell_bounds.size.x + tray_margin_x * 2.0f, cell_bounds.size.z + tray_margin_z * 2.0f, 0.0f},
+        tray_base_thickness,
+        tray_wall_thickness,
+        tray_wall_height,
+        tray_color
+    );
+}
+
+void appendEnclosureGeometry(
+    GeometryBuffer& geometry,
+    const battery::PackEnclosureEntity& enclosure,
+    const battery::PackLayoutConfig& config
+)
+{
+    const Vec3 enclosure_color{0.79f, 0.81f, 0.84f};
+    const float floor_thickness = std::max(config.enclosure_floor_thickness, enclosure.wall_thickness * 1.15f);
+    const float wall_height = enclosure.size.y * 0.72f;
+    appendOpenShell(
+        geometry,
+        enclosure.center,
+        enclosure.size,
+        enclosure.wall_thickness,
+        floor_thickness,
+        wall_height,
+        enclosure_color
+    );
+}
+
+} // namespace
+
+GeometryBuffer BatteryGeometryGenerator::buildVisualGeometry(
+    const core::CadDocument& document,
+    const battery::BatteryVisualizationOverlay& overlay,
+    const io::TriangleMesh* cell_mesh
+) const
+{
+    GeometryBuffer geometry;
+    const battery::PackLayoutConfig& layout = document.metadata().layout_config;
+
+    for (const battery::ModuleBoundaryEntity& module : document.modules()) {
+        if (!module.visible) {
+            continue;
+        }
+        appendModuleTrayGeometry(geometry, document, module, layout);
+    }
+
+    for (const battery::CoolingPlateEntity& plate : document.coolingPlates()) {
+        if (!plate.visible) {
+            continue;
+        }
+        const battery::BoundingBox bounds = document.worldBounds(plate.id);
+        appendBox(
+            geometry,
+            bounds.center,
+            {
+                bounds.size.x + layout.cooling_plate_margin_x * 2.0f,
+                bounds.size.y,
+                bounds.size.z + layout.cooling_plate_margin_z * 2.0f
+            },
+            {0.56f, 0.66f, 0.76f}
+        );
+        appendCoolingFeatures(geometry, bounds, layout);
+    }
+
+    for (const battery::BusbarEntity& busbar : document.busbars()) {
+        if (!busbar.visible) {
+            continue;
+        }
+        appendBusbarGeometry(geometry, document, busbar, document.worldBounds(busbar.id));
+    }
+
+    for (const battery::PackEnclosureEntity& enclosure : document.packEnclosures()) {
+        if (!enclosure.visible) {
+            continue;
+        }
+        appendEnclosureGeometry(geometry, enclosure, layout);
+    }
+
+    for (const battery::CellEntity& cell : document.cells()) {
+        if (!cell.visible) {
+            continue;
+        }
+
+        const Vec3 world_position = document.worldPosition(cell.id);
+        const Vec3 body_color = overlayCellColor(overlay, cell);
+        if (cell_mesh != nullptr && !cell_mesh->vertices.empty()) {
+            appendMesh(geometry, *cell_mesh, world_position, body_color);
+            continue;
+        }
+
+        if (cell.form_factor == battery::CellFormFactor::Cylindrical) {
+            appendCylindricalCell(
+                geometry,
+                world_position,
+                makeCellProfile(cell),
+                30,
+                body_color,
+                {0.86f, 0.88f, 0.91f},
+                {0.95f, 0.92f, 0.77f}
+            );
+        } else {
+            appendBox(geometry, world_position, {cell.width, cell.height, cell.depth}, body_color);
+        }
+    }
+
+    return geometry;
+}
+
+} // namespace cad::geometry

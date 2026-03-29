@@ -1,5 +1,7 @@
 #include "RenderComposer.h"
 
+#include "../geometry/BatteryGeometryGenerator.h"
+
 #include <algorithm>
 
 namespace cad::render {
@@ -17,6 +19,19 @@ void appendCornerBox(
     const Vec3& color,
     float corner_fraction = 0.22f
 );
+
+void appendGeneratedGeometry(RenderPacket& packet, const geometry::GeometryBuffer& geometry)
+{
+    for (const geometry::ColoredTriangle& triangle : geometry.triangles) {
+        packet.triangles.push_back({triangle.a, triangle.color});
+        packet.triangles.push_back({triangle.b, triangle.color});
+        packet.triangles.push_back({triangle.c, triangle.color});
+    }
+    for (const geometry::ColoredLine& line : geometry.lines) {
+        packet.lines.push_back({line.a, line.color});
+        packet.lines.push_back({line.b, line.color});
+    }
+}
 
 Vec3 temperatureColor(double temp_c)
 {
@@ -397,6 +412,9 @@ RenderPacket RenderComposer::compose(
         packet.lines.push_back({{grid_extent * grid_step, -120.0f, offset}, color});
     }
 
+    const geometry::BatteryGeometryGenerator geometry_generator;
+    appendGeneratedGeometry(packet, geometry_generator.buildVisualGeometry(document, overlay, cell_mesh));
+
     for (const battery::BatteryPackEntity& pack : document.packs()) {
         if (!pack.visible) {
             continue;
@@ -433,7 +451,6 @@ RenderPacket RenderComposer::compose(
             continue;
         }
         const battery::BoundingBox bounds = document.worldBounds(plate.id);
-        appendBox(packet.triangles, bounds.center, bounds.size, cooling_color);
         appendBoxPickable(packet.pickables, plate.id, 300, mvp, bounds.center, bounds.size, viewport_width, viewport_height);
         if (isSelectedOrDescendant(plate.id)) {
             appendWireBox(packet.selection_overlay_lines, bounds.center, bounds.size, selected_overlay_color);
@@ -444,7 +461,6 @@ RenderPacket RenderComposer::compose(
             continue;
         }
         const battery::BoundingBox bounds = document.worldBounds(busbar.id);
-        appendBox(packet.triangles, bounds.center, bounds.size, busbar_color);
         appendBoxPickable(packet.pickables, busbar.id, 400, mvp, bounds.center, bounds.size, viewport_width, viewport_height);
         if (isSelectedOrDescendant(busbar.id)) {
             appendWireBox(packet.selection_overlay_lines, bounds.center, bounds.size, selected_overlay_color);
@@ -465,33 +481,15 @@ RenderPacket RenderComposer::compose(
         if (!cell.visible) {
             continue;
         }
-        const Vec3 color = overlayCellColor(overlay, cell);
         const Vec3 world_position = document.worldPosition(cell.id);
-        if (cell_mesh != nullptr && !cell_mesh->vertices.empty()) {
-            appendMesh(packet.triangles, *cell_mesh, world_position, color);
+        if (cell_mesh != nullptr && !cell_mesh->vertices.empty() && isSelectedOrDescendant(cell.id)) {
+            appendMeshBoundsWireframe(packet.selection_overlay_lines, *cell_mesh, world_position, selected_overlay_color);
+        } else if (cell.form_factor == battery::CellFormFactor::Cylindrical) {
             if (isSelectedOrDescendant(cell.id)) {
-                appendMeshBoundsWireframe(packet.selection_overlay_lines, *cell_mesh, world_position, selected_overlay_color);
+                appendWireCylinder(packet.selection_overlay_lines, world_position, cell.radius + 1.6f, cell.height + 3.0f, 28, selected_overlay_color);
             }
-        } else {
-            if (cell.form_factor == battery::CellFormFactor::Cylindrical) {
-                appendCylinder(packet.triangles, world_position, cell.radius, cell.height, 28, color);
-                appendCylinder(
-                    packet.triangles,
-                    {world_position.x, world_position.y + (cell.height * 0.52f), world_position.z},
-                    cell.radius * 0.34f,
-                    10.0f,
-                    24,
-                    Vec3{0.84f, 0.90f, 0.96f}
-                );
-                if (isSelectedOrDescendant(cell.id)) {
-                    appendWireCylinder(packet.selection_overlay_lines, world_position, cell.radius + 1.6f, cell.height + 3.0f, 28, selected_overlay_color);
-                }
-            } else {
-                appendBox(packet.triangles, world_position, {cell.width, cell.height, cell.depth}, color);
-                if (isSelectedOrDescendant(cell.id)) {
-                    appendWireBox(packet.selection_overlay_lines, world_position, {cell.width + 2.0f, cell.height + 2.0f, cell.depth + 2.0f}, selected_overlay_color);
-                }
-            }
+        } else if (isSelectedOrDescendant(cell.id)) {
+            appendWireBox(packet.selection_overlay_lines, world_position, {cell.width + 2.0f, cell.height + 2.0f, cell.depth + 2.0f}, selected_overlay_color);
         }
 
         if (cell.form_factor == battery::CellFormFactor::Cylindrical) {

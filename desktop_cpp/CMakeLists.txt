@@ -28,6 +28,10 @@ qt_add_executable(alnoris_desktop WIN32
     cad/commands/ICommand.h
     cad/edit/CadEditService.cpp
     cad/edit/CadEditService.h
+    cad/geometry/BatteryGeometryGenerator.cpp
+    cad/geometry/BatteryGeometryGenerator.h
+    cad/geometry/ParametricPrimitives.cpp
+    cad/geometry/ParametricPrimitives.h
     cad/core/CadDocument.cpp
     cad/core/CadDocument.h
     cad/core/EntityId.h

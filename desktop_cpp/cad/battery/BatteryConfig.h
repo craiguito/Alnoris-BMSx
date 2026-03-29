@@ -26,8 +26,16 @@ struct PackLayoutConfig
     float z_spacing = 114.0f;
     float module_gap_x = 64.0f;
     float busbar_thickness = 12.0f;
+    float busbar_tab_width = 22.0f;
+    float busbar_tab_depth = 28.0f;
     float cooling_channel_thickness = 24.0f;
+    float cooling_plate_margin_x = 16.0f;
+    float cooling_plate_margin_z = 18.0f;
     float enclosure_wall_thickness = 8.0f;
+    float enclosure_floor_thickness = 10.0f;
+    float module_tray_wall_height = 24.0f;
+    float module_tray_margin_x = 24.0f;
+    float module_tray_margin_z = 22.0f;
 };
 
 struct ElectricalConfig
