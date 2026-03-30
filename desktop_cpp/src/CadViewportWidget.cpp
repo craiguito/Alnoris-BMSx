@@ -85,15 +85,25 @@ float triangleLayerAlpha(unsigned char layer)
 {
     switch (layer) {
     case 0:
-        return 0.20f;
+        return 0.0f;
     case 1:
-        return 0.54f;
+        return 0.15f;
     case 3:
-        return 0.92f;
+        return 1.0f;
     case 2:
     default:
-        return 0.96f;
+        return 1.0f;
     }
+}
+
+bool shouldRenderTriangleLayer(unsigned char layer)
+{
+    return triangleLayerAlpha(layer) > 0.001f;
+}
+
+bool isOpaqueTriangleLayer(unsigned char layer)
+{
+    return triangleLayerAlpha(layer) >= 0.999f;
 }
 
 float lineLayerAlpha(unsigned char layer)
@@ -187,6 +197,66 @@ std::vector<GpuTriangleVertex> buildTriangleVertices(const cad::geometry::Geomet
     std::vector<GpuTriangleVertex> vertices;
     vertices.reserve(geometry.triangles.size() * 3);
     for (const cad::geometry::ColoredTriangle& triangle : geometry.triangles) {
+        const unsigned char layer = static_cast<unsigned char>(triangle.layer);
+        if (!shouldRenderTriangleLayer(layer) || !isOpaqueTriangleLayer(layer)) {
+            continue;
+        }
+        const Vec3 edge_ab = subtractVec(triangle.b, triangle.a);
+        const Vec3 edge_ac = subtractVec(triangle.c, triangle.a);
+        const Vec3 normal = normalizeVec(crossVec(edge_ab, edge_ac));
+        const float alpha = triangleLayerAlpha(layer);
+        vertices.push_back(makeTriangleVertex(triangle.a, triangle.color, normal, alpha));
+        vertices.push_back(makeTriangleVertex(triangle.b, triangle.color, normal, alpha));
+        vertices.push_back(makeTriangleVertex(triangle.c, triangle.color, normal, alpha));
+    }
+    return vertices;
+}
+
+float clipDepthForPoint(const std::array<float, 16>& mvp, const Vec3& point)
+{
+    cad::math::Mat4 matrix{};
+    matrix.m = mvp;
+    const cad::math::Vec4 clip = cad::math::multiply(matrix, cad::math::Vec4{point.x, point.y, point.z, 1.0f});
+    if (std::abs(clip.w) <= 0.0001f) {
+        return clip.z;
+    }
+    return clip.z / clip.w;
+}
+
+std::vector<GpuTriangleVertex> buildTransparentTriangleVertices(
+    const cad::geometry::GeometryBuffer& geometry,
+    const std::array<float, 16>& mvp
+)
+{
+    struct TransparentTriangle
+    {
+        cad::geometry::ColoredTriangle triangle{};
+        float depth = 0.0f;
+    };
+
+    std::vector<TransparentTriangle> sorted;
+    sorted.reserve(geometry.triangles.size());
+    for (const cad::geometry::ColoredTriangle& triangle : geometry.triangles) {
+        const unsigned char layer = static_cast<unsigned char>(triangle.layer);
+        if (!shouldRenderTriangleLayer(layer) || isOpaqueTriangleLayer(layer)) {
+            continue;
+        }
+        const Vec3 centroid{
+            (triangle.a.x + triangle.b.x + triangle.c.x) / 3.0f,
+            (triangle.a.y + triangle.b.y + triangle.c.y) / 3.0f,
+            (triangle.a.z + triangle.b.z + triangle.c.z) / 3.0f
+        };
+        sorted.push_back({triangle, clipDepthForPoint(mvp, centroid)});
+    }
+
+    std::sort(sorted.begin(), sorted.end(), [](const TransparentTriangle& a, const TransparentTriangle& b) {
+        return a.depth > b.depth;
+    });
+
+    std::vector<GpuTriangleVertex> vertices;
+    vertices.reserve(sorted.size() * 3);
+    for (const TransparentTriangle& entry : sorted) {
+        const cad::geometry::ColoredTriangle& triangle = entry.triangle;
         const Vec3 edge_ab = subtractVec(triangle.b, triangle.a);
         const Vec3 edge_ac = subtractVec(triangle.c, triangle.a);
         const Vec3 normal = normalizeVec(crossVec(edge_ab, edge_ac));
@@ -301,7 +371,8 @@ void main()
 CadViewportWidget::CadViewportWidget(QWidget* parent)
     : QOpenGLWidget(parent)
     , m_backgroundColor(198, 205, 214)
-    , m_triangleBuffer(QOpenGLBuffer::VertexBuffer)
+    , m_opaqueTriangleBuffer(QOpenGLBuffer::VertexBuffer)
+    , m_translucentTriangleBuffer(QOpenGLBuffer::VertexBuffer)
     , m_sceneLineBuffer(QOpenGLBuffer::VertexBuffer)
     , m_overlayLineBuffer(QOpenGLBuffer::VertexBuffer)
     , m_selectionLineBuffer(QOpenGLBuffer::VertexBuffer)
@@ -546,25 +617,48 @@ void CadViewportWidget::paintGL()
         m_vao.bind();
     }
 
-    if (m_triangleProgram != nullptr && m_triangleVertexCount > 0) {
+    if (m_triangleProgram != nullptr) {
         m_triangleProgram->bind();
         glUniformMatrix4fv(m_triangleProgram->uniformLocation("uMvp"), 1, GL_TRUE, frame.mvp.data());
 
-        m_triangleBuffer.bind();
-        m_triangleProgram->enableAttributeArray(0);
-        m_triangleProgram->enableAttributeArray(1);
-        m_triangleProgram->enableAttributeArray(2);
-        m_triangleProgram->enableAttributeArray(3);
-        m_triangleProgram->setAttributeBuffer(0, GL_FLOAT, GpuVertexView::PositionOffset, 3, GpuVertexView::Stride);
-        m_triangleProgram->setAttributeBuffer(1, GL_FLOAT, GpuVertexView::ColorOffset, 3, GpuVertexView::Stride);
-        m_triangleProgram->setAttributeBuffer(2, GL_FLOAT, GpuVertexView::NormalOffset, 3, GpuVertexView::Stride);
-        m_triangleProgram->setAttributeBuffer(3, GL_FLOAT, GpuVertexView::AlphaOffset, 1, GpuVertexView::Stride);
-        glDrawArrays(GL_TRIANGLES, 0, m_triangleVertexCount);
+        if (m_opaqueTriangleVertexCount > 0) {
+            glDisable(GL_BLEND);
+            glDepthMask(GL_TRUE);
+            m_opaqueTriangleBuffer.bind();
+            m_triangleProgram->enableAttributeArray(0);
+            m_triangleProgram->enableAttributeArray(1);
+            m_triangleProgram->enableAttributeArray(2);
+            m_triangleProgram->enableAttributeArray(3);
+            m_triangleProgram->setAttributeBuffer(0, GL_FLOAT, GpuVertexView::PositionOffset, 3, GpuVertexView::Stride);
+            m_triangleProgram->setAttributeBuffer(1, GL_FLOAT, GpuVertexView::ColorOffset, 3, GpuVertexView::Stride);
+            m_triangleProgram->setAttributeBuffer(2, GL_FLOAT, GpuVertexView::NormalOffset, 3, GpuVertexView::Stride);
+            m_triangleProgram->setAttributeBuffer(3, GL_FLOAT, GpuVertexView::AlphaOffset, 1, GpuVertexView::Stride);
+            glDrawArrays(GL_TRIANGLES, 0, m_opaqueTriangleVertexCount);
+            m_opaqueTriangleBuffer.release();
+        }
+
+        if (m_translucentTriangleVertexCount > 0) {
+            glEnable(GL_BLEND);
+            glDepthMask(GL_FALSE);
+            m_translucentTriangleBuffer.bind();
+            m_triangleProgram->enableAttributeArray(0);
+            m_triangleProgram->enableAttributeArray(1);
+            m_triangleProgram->enableAttributeArray(2);
+            m_triangleProgram->enableAttributeArray(3);
+            m_triangleProgram->setAttributeBuffer(0, GL_FLOAT, GpuVertexView::PositionOffset, 3, GpuVertexView::Stride);
+            m_triangleProgram->setAttributeBuffer(1, GL_FLOAT, GpuVertexView::ColorOffset, 3, GpuVertexView::Stride);
+            m_triangleProgram->setAttributeBuffer(2, GL_FLOAT, GpuVertexView::NormalOffset, 3, GpuVertexView::Stride);
+            m_triangleProgram->setAttributeBuffer(3, GL_FLOAT, GpuVertexView::AlphaOffset, 1, GpuVertexView::Stride);
+            glDrawArrays(GL_TRIANGLES, 0, m_translucentTriangleVertexCount);
+            m_translucentTriangleBuffer.release();
+        }
+
+        glDepthMask(GL_TRUE);
+        glEnable(GL_BLEND);
         m_triangleProgram->disableAttributeArray(0);
         m_triangleProgram->disableAttributeArray(1);
         m_triangleProgram->disableAttributeArray(2);
         m_triangleProgram->disableAttributeArray(3);
-        m_triangleBuffer.release();
         m_triangleProgram->release();
     }
 
@@ -613,7 +707,9 @@ void CadViewportWidget::paintGL()
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);
 
-    if (m_triangleVertexCount == 0 && m_overlayLineVertexCount == 0 && m_sceneLineVertexCount == 0) {
+    if ((m_opaqueTriangleVertexCount + m_translucentTriangleVertexCount) == 0
+        && m_overlayLineVertexCount == 0
+        && m_sceneLineVertexCount == 0) {
         painter.setPen(QColor(90, 102, 116));
         painter.drawText(rect(), Qt::AlignCenter, "CAD viewport has no scene geometry");
     }
@@ -771,8 +867,11 @@ void CadViewportWidget::keyPressEvent(QKeyEvent* event)
 
 void CadViewportWidget::destroyGlResources()
 {
-    if (m_triangleBuffer.isCreated()) {
-        m_triangleBuffer.destroy();
+    if (m_opaqueTriangleBuffer.isCreated()) {
+        m_opaqueTriangleBuffer.destroy();
+    }
+    if (m_translucentTriangleBuffer.isCreated()) {
+        m_translucentTriangleBuffer.destroy();
     }
     if (m_sceneLineBuffer.isCreated()) {
         m_sceneLineBuffer.destroy();
@@ -800,8 +899,11 @@ void CadViewportWidget::ensureGpuResources()
         m_vao.create();
     }
 
-    if (!m_triangleBuffer.isCreated()) {
-        m_triangleBuffer.create();
+    if (!m_opaqueTriangleBuffer.isCreated()) {
+        m_opaqueTriangleBuffer.create();
+    }
+    if (!m_translucentTriangleBuffer.isCreated()) {
+        m_translucentTriangleBuffer.create();
     }
     if (!m_sceneLineBuffer.isCreated()) {
         m_sceneLineBuffer.create();
@@ -830,15 +932,20 @@ void CadViewportWidget::syncGpuBuffers()
     bool uploaded = false;
 
     if (m_uploadedGeometryRevision != m_engine.renderDiagnostics().geometry_rebuild_count) {
-        uploadSceneGeometry();
+        uploadOpaqueSceneGeometry();
         m_uploadedGeometryRevision = m_engine.renderDiagnostics().geometry_rebuild_count;
         uploaded = true;
     }
 
-    if (m_uploadedPacketRevision != m_engine.renderDiagnostics().packet_rebuild_count) {
+    const bool packetRevisionChanged = m_uploadedPacketRevision != m_engine.renderDiagnostics().packet_rebuild_count;
+    if (packetRevisionChanged) {
         uploadDynamicLines();
         m_uploadedPacketRevision = m_engine.renderDiagnostics().packet_rebuild_count;
         uploaded = true;
+    }
+
+    if (uploaded || packetRevisionChanged) {
+        uploadTranslucentSceneGeometry();
     }
 
     if (uploaded) {
@@ -849,17 +956,17 @@ void CadViewportWidget::syncGpuBuffers()
     }
 }
 
-void CadViewportWidget::uploadSceneGeometry()
+void CadViewportWidget::uploadOpaqueSceneGeometry()
 {
     const std::vector<GpuTriangleVertex> triangleVertices = buildTriangleVertices(m_engine.visualGeometry());
-    m_triangleVertexCount = static_cast<int>(triangleVertices.size());
-    m_triangleBuffer.bind();
-    m_triangleBuffer.setUsagePattern(QOpenGLBuffer::StaticDraw);
-    m_triangleBuffer.allocate(
+    m_opaqueTriangleVertexCount = static_cast<int>(triangleVertices.size());
+    m_opaqueTriangleBuffer.bind();
+    m_opaqueTriangleBuffer.setUsagePattern(QOpenGLBuffer::StaticDraw);
+    m_opaqueTriangleBuffer.allocate(
         triangleVertices.empty() ? nullptr : triangleVertices.data(),
         static_cast<int>(triangleVertices.size() * sizeof(GpuTriangleVertex))
     );
-    m_triangleBuffer.release();
+    m_opaqueTriangleBuffer.release();
 
     const std::vector<GpuLineVertex> sceneLineVertices = buildSceneLineVertices(m_engine.visualGeometry());
     m_sceneLineVertexCount = static_cast<int>(sceneLineVertices.size());
@@ -870,6 +977,20 @@ void CadViewportWidget::uploadSceneGeometry()
         static_cast<int>(sceneLineVertices.size() * sizeof(GpuLineVertex))
     );
     m_sceneLineBuffer.release();
+}
+
+void CadViewportWidget::uploadTranslucentSceneGeometry()
+{
+    const std::vector<GpuTriangleVertex> triangleVertices =
+        buildTransparentTriangleVertices(m_engine.visualGeometry(), m_engine.renderPacket().mvp);
+    m_translucentTriangleVertexCount = static_cast<int>(triangleVertices.size());
+    m_translucentTriangleBuffer.bind();
+    m_translucentTriangleBuffer.setUsagePattern(QOpenGLBuffer::DynamicDraw);
+    m_translucentTriangleBuffer.allocate(
+        triangleVertices.empty() ? nullptr : triangleVertices.data(),
+        static_cast<int>(triangleVertices.size() * sizeof(GpuTriangleVertex))
+    );
+    m_translucentTriangleBuffer.release();
 }
 
 void CadViewportWidget::uploadDynamicLines()

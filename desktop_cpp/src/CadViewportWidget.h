@@ -77,13 +77,15 @@ private:
     std::unique_ptr<QOpenGLShaderProgram> m_triangleProgram;
     std::unique_ptr<QOpenGLShaderProgram> m_lineProgram;
     QOpenGLVertexArrayObject m_vao;
-    QOpenGLBuffer m_triangleBuffer;
+    QOpenGLBuffer m_opaqueTriangleBuffer;
+    QOpenGLBuffer m_translucentTriangleBuffer;
     QOpenGLBuffer m_sceneLineBuffer;
     QOpenGLBuffer m_overlayLineBuffer;
     QOpenGLBuffer m_selectionLineBuffer;
     std::size_t m_uploadedGeometryRevision = 0;
     std::size_t m_uploadedPacketRevision = 0;
-    int m_triangleVertexCount = 0;
+    int m_opaqueTriangleVertexCount = 0;
+    int m_translucentTriangleVertexCount = 0;
     int m_sceneLineVertexCount = 0;
     int m_overlayLineVertexCount = 0;
     int m_selectionLineVertexCount = 0;
@@ -100,6 +102,7 @@ private:
     void destroyGlResources();
     void ensureGpuResources();
     void syncGpuBuffers();
-    void uploadSceneGeometry();
+    void uploadOpaqueSceneGeometry();
+    void uploadTranslucentSceneGeometry();
     void uploadDynamicLines();
 };
