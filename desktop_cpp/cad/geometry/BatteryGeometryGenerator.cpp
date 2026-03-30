@@ -297,8 +297,8 @@ void appendModuleTrayGeometry(
     const float tray_wall_thickness = config.module_tray_wall_thickness;
     const float tray_wall_height = config.module_tray_wall_height;
     const float seating_plane_y = cell_bounds.center.y - cell_bounds.size.y * 0.5f - config.cell_seating_offset;
-    const Vec3 tray_color{0.60f, 0.63f, 0.67f};
-    const Vec3 support_pad_color{0.68f, 0.71f, 0.75f};
+    const Vec3 tray_color{0.40f, 0.45f, 0.52f};
+    const Vec3 support_pad_color{0.32f, 0.36f, 0.41f};
 
     appendOpenTopTray(
         geometry,
@@ -324,9 +324,9 @@ void appendModuleTrayGeometry(
                 cell_bounds.center.z
             },
             {
-                cell_bounds.size.x + std::max(1.0f, config.busbar_overlap_width),
+                cell_bounds.size.x + 2.0f,
                 config.cell_seating_offset,
-                cell_bounds.size.z + std::max(1.0f, config.busbar_overlap_width)
+                cell_bounds.size.z + 2.0f
             },
             support_pad_color,
             SurfaceLayer::Support
@@ -456,7 +456,7 @@ GeometryBuffer BatteryGeometryGenerator::buildVisualGeometry(
             geometry,
             bounds.center,
             bounds.size,
-            {0.56f, 0.66f, 0.76f},
+            {0.42f, 0.54f, 0.66f},
             SurfaceLayer::Support
         );
         if (!large_pack_mode) {

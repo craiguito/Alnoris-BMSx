@@ -218,17 +218,6 @@ void appendCylindricalCell(
     const Vec3 top_cap_center{center.x, center.y + half_body_height + profile.top_cap_shoulder_height * 0.5f, center.z};
     appendCylinder(geometry, top_cap_center, profile.top_cap_outer_radius, profile.top_cap_shoulder_height, segments, cap_color, layer);
 
-    const Vec3 bottom_cap_center{center.x, center.y - half_body_height + profile.bottom_cap_height * 0.5f, center.z};
-    appendCylinder(
-        geometry,
-        bottom_cap_center,
-        profile.body_radius * 0.96f,
-        profile.bottom_cap_height,
-        segments,
-        cad::math::mix(cap_color, {0.0f, 0.0f, 0.0f}, 0.08f),
-        layer
-    );
-
     const float shoulder_top_y = center.y + half_body_height + profile.top_cap_shoulder_height;
     appendRing(
         geometry,

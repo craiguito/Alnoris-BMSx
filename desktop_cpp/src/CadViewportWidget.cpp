@@ -87,7 +87,7 @@ float triangleLayerAlpha(unsigned char layer)
     case 0:
         return 0.0f;
     case 1:
-        return 0.15f;
+        return 1.0f;
     case 3:
         return 1.0f;
     case 2:
