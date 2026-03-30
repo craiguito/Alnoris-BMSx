@@ -50,6 +50,13 @@ struct GpuLineVertex
     float alpha = 1.0f;
 };
 
+struct ProjectedVertex
+{
+    QPointF point;
+    float depth = 0.0f;
+    bool valid = false;
+};
+
 Vec3 subtractVec(const Vec3& a, const Vec3& b)
 {
     return {a.x - b.x, a.y - b.y, a.z - b.z};
@@ -123,6 +130,59 @@ float lineLayerAlpha(unsigned char layer)
 QColor hudTextColor()
 {
     return QColor(92, 102, 114);
+}
+
+QColor toColor(const Vec3& color)
+{
+    return QColor::fromRgbF(
+        std::clamp(color.x, 0.0f, 1.0f),
+        std::clamp(color.y, 0.0f, 1.0f),
+        std::clamp(color.z, 0.0f, 1.0f)
+    );
+}
+
+QColor shadedColor(
+    const Vec3& a,
+    const Vec3& b,
+    const Vec3& c,
+    const Vec3& base_color,
+    unsigned char layer
+)
+{
+    const Vec3 edge_ab = subtractVec(b, a);
+    const Vec3 edge_ac = subtractVec(c, a);
+    const Vec3 normal = normalizeVec(crossVec(edge_ab, edge_ac));
+    const Vec3 light_dir = normalizeVec({0.42f, 0.85f, 0.31f});
+    const float lambert = std::max(0.0f, dotVec(normal, light_dir));
+
+    float ambient = 0.54f;
+    float diffuse = 0.46f;
+    int alpha = 255;
+    if (layer == 0) {
+        ambient = 0.70f;
+        diffuse = 0.18f;
+        alpha = 52;
+    } else if (layer == 1) {
+        ambient = 0.63f;
+        diffuse = 0.26f;
+        alpha = 180;
+    } else if (layer == 2) {
+        ambient = 0.56f;
+        diffuse = 0.42f;
+        alpha = 245;
+    } else if (layer == 3) {
+        ambient = 0.58f;
+        diffuse = 0.38f;
+        alpha = 235;
+    }
+
+    const float shade = std::clamp(ambient + diffuse * lambert, 0.0f, 1.15f);
+    return QColor::fromRgbF(
+        std::clamp(base_color.x * shade, 0.0f, 1.0f),
+        std::clamp(base_color.y * shade, 0.0f, 1.0f),
+        std::clamp(base_color.z * shade, 0.0f, 1.0f),
+        alpha / 255.0f
+    );
 }
 
 void drawSelectionOverlay(QPainter& painter, const cad::render::ScreenPickable& pickable)
@@ -223,6 +283,32 @@ float clipDepthForPoint(const std::array<float, 16>& mvp, const Vec3& point)
         return clip.z;
     }
     return clip.z / clip.w;
+}
+
+ProjectedVertex projectToScreen(const std::array<float, 16>& mvp, const Vec3& p, int width, int height)
+{
+    const float x = p.x;
+    const float y = p.y;
+    const float z = p.z;
+    const float w = 1.0f;
+
+    const float clipX = (mvp[0] * x) + (mvp[1] * y) + (mvp[2] * z) + (mvp[3] * w);
+    const float clipY = (mvp[4] * x) + (mvp[5] * y) + (mvp[6] * z) + (mvp[7] * w);
+    const float clipZ = (mvp[8] * x) + (mvp[9] * y) + (mvp[10] * z) + (mvp[11] * w);
+    const float clipW = (mvp[12] * x) + (mvp[13] * y) + (mvp[14] * z) + (mvp[15] * w);
+
+    if (clipW <= 0.0001f) {
+        return {};
+    }
+
+    const float ndcX = clipX / clipW;
+    const float ndcY = clipY / clipW;
+    const float ndcZ = clipZ / clipW;
+    return {
+        QPointF((ndcX * 0.5f + 0.5f) * width, (1.0f - (ndcY * 0.5f + 0.5f)) * height),
+        ndcZ,
+        true
+    };
 }
 
 std::vector<GpuTriangleVertex> buildTransparentTriangleVertices(
@@ -657,11 +743,94 @@ void CadViewportWidget::resizeGL(int w, int h)
 {
     m_engine.setViewportSize(w, h);
     m_sceneFramebuffer.reset();
+    m_cachedProjectionWidth = 0;
+    m_cachedProjectionHeight = 0;
 }
 
 void CadViewportWidget::paintGL()
 {
     ensureGpuResources();
+    const cad::render::RenderPacket& frame = m_engine.renderPacket();
+    const bool softwareFallback = m_depthBits <= 0;
+
+    if (softwareFallback) {
+        const std::size_t geometryRevision = m_engine.renderDiagnostics().geometry_rebuild_count;
+        const std::size_t packetRevision = m_engine.renderDiagnostics().packet_rebuild_count;
+        if (m_cachedSoftwareGeometryRevision != geometryRevision
+            || m_cachedSoftwarePacketRevision != packetRevision
+            || m_cachedProjectionWidth != width()
+            || m_cachedProjectionHeight != height()) {
+            rebuildSoftwareFallbackCache();
+        }
+
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.fillRect(rect(), m_backgroundColor);
+
+        if (m_cachedTriangles.empty() && m_cachedLines.empty()) {
+            painter.setPen(QColor(90, 102, 116));
+            painter.drawText(rect(), Qt::AlignCenter, "CAD viewport has no scene geometry");
+        } else {
+            painter.setPen(Qt::NoPen);
+            for (const CachedScreenTriangle& tri : m_cachedTriangles) {
+                const QPointF points[3] = {tri.a, tri.b, tri.c};
+                painter.setBrush(tri.color);
+                painter.drawConvexPolygon(points, 3);
+            }
+
+            for (const CachedScreenLine& line : m_cachedLines) {
+                painter.setPen(QPen(line.color, line.width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+                painter.drawLine(line.a, line.b);
+            }
+
+            for (const CachedScreenLine& line : m_cachedSelectionLines) {
+                painter.setPen(QPen(line.color, line.width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+                painter.drawLine(line.a, line.b);
+            }
+        }
+
+        const cad::core::EntityId selectedId = m_engine.selectedEntity();
+        if (selectedId.isValid()) {
+            const auto selectedPickable = std::find_if(
+                frame.pickables.rbegin(),
+                frame.pickables.rend(),
+                [selectedId](const cad::render::ScreenPickable& pickable) { return pickable.entity_id == selectedId; }
+            );
+            if (selectedPickable != frame.pickables.rend()) {
+                drawSelectionOverlay(painter, *selectedPickable);
+            }
+        }
+
+        painter.setPen(hudTextColor());
+        painter.drawText(
+            QRect(16, 12, width() - 32, 20),
+            Qt::AlignLeft | Qt::AlignVCenter,
+            QString("Battery CAD viewport  |  Software fallback  |  Shift-drag move  |  G snap %1  |  Axis %2")
+                .arg(m_gridSnapEnabled ? "on" : "off")
+                .arg(m_moveAxis == MoveAxis::X ? "X" : m_moveAxis == MoveAxis::Y ? "Y" : m_moveAxis == MoveAxis::Z ? "Z" : "XZ")
+        );
+        painter.drawText(
+            QRect(16, 32, width() - 32, 18),
+            Qt::AlignLeft | Qt::AlignVCenter,
+            QString("Scene %1 tris  |  Geo %2 ms  |  Packet %3 ms  |  Project %4 ms")
+                .arg(static_cast<qlonglong>(m_engine.renderDiagnostics().triangle_count))
+                .arg(m_engine.renderDiagnostics().last_geometry_build_ms, 0, 'f', 1)
+                .arg(m_engine.renderDiagnostics().last_render_packet_ms, 0, 'f', 1)
+                .arg(m_lastProjectionBuildMs, 0, 'f', 1)
+        );
+        painter.drawText(
+            QRect(16, 50, width() - 32, 18),
+            Qt::AlignLeft | Qt::AlignVCenter,
+            QString("Cell cache %1 hits / %2 misses  |  Rebuilds geo %3 packet %4  |  Depth %5")
+                .arg(static_cast<qlonglong>(m_engine.renderDiagnostics().cylindrical_cell_cache_hits))
+                .arg(static_cast<qlonglong>(m_engine.renderDiagnostics().cylindrical_cell_cache_misses))
+                .arg(static_cast<qlonglong>(m_engine.renderDiagnostics().geometry_rebuild_count))
+                .arg(static_cast<qlonglong>(m_engine.renderDiagnostics().packet_rebuild_count))
+                .arg(m_depthBits)
+        );
+        return;
+    }
+
     ensureSceneFramebuffer();
     syncGpuBuffers();
 
@@ -685,9 +854,6 @@ void CadViewportWidget::paintGL()
     );
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    const cad::render::RenderPacket& frame = m_engine.renderPacket();
-    const bool sortedTriangleFallback = m_depthBits <= 0;
-
     if (m_vao.isCreated()) {
         m_vao.bind();
     }
@@ -696,23 +862,7 @@ void CadViewportWidget::paintGL()
         m_triangleProgram->bind();
         glUniformMatrix4fv(m_triangleProgram->uniformLocation("uMvp"), 1, GL_TRUE, frame.mvp.data());
 
-        if (sortedTriangleFallback) {
-            glDisable(GL_DEPTH_TEST);
-            glDisable(GL_BLEND);
-            if (m_translucentTriangleVertexCount > 0) {
-                m_translucentTriangleBuffer.bind();
-                m_triangleProgram->enableAttributeArray(0);
-                m_triangleProgram->enableAttributeArray(1);
-                m_triangleProgram->enableAttributeArray(2);
-                m_triangleProgram->enableAttributeArray(3);
-                m_triangleProgram->setAttributeBuffer(0, GL_FLOAT, GpuVertexView::PositionOffset, 3, GpuVertexView::Stride);
-                m_triangleProgram->setAttributeBuffer(1, GL_FLOAT, GpuVertexView::ColorOffset, 3, GpuVertexView::Stride);
-                m_triangleProgram->setAttributeBuffer(2, GL_FLOAT, GpuVertexView::NormalOffset, 3, GpuVertexView::Stride);
-                m_triangleProgram->setAttributeBuffer(3, GL_FLOAT, GpuVertexView::AlphaOffset, 1, GpuVertexView::Stride);
-                glDrawArrays(GL_TRIANGLES, 0, m_translucentTriangleVertexCount);
-                m_translucentTriangleBuffer.release();
-            }
-        } else if (m_opaqueTriangleVertexCount > 0) {
+        if (m_opaqueTriangleVertexCount > 0) {
             glDisable(GL_BLEND);
             glDepthMask(GL_TRUE);
             m_opaqueTriangleBuffer.bind();
@@ -781,9 +931,7 @@ void CadViewportWidget::paintGL()
             buffer.release();
         };
 
-        if (!sortedTriangleFallback) {
-            drawLineBuffer(m_sceneLineBuffer, m_sceneLineVertexCount, true, 1.0f);
-        }
+        drawLineBuffer(m_sceneLineBuffer, m_sceneLineVertexCount, true, 1.0f);
         drawLineBuffer(m_overlayLineBuffer, m_overlayLineVertexCount, true, 1.0f);
         drawLineBuffer(m_selectionLineBuffer, m_selectionLineVertexCount, false, 2.0f);
         glEnable(GL_DEPTH_TEST);
@@ -1071,6 +1219,65 @@ void CadViewportWidget::ensureSceneFramebuffer()
         m_sceneFramebuffer.reset();
         m_depthBits = 0;
     }
+}
+
+void CadViewportWidget::rebuildSoftwareFallbackCache()
+{
+    const auto start = std::chrono::steady_clock::now();
+    const cad::render::RenderPacket& frame = m_engine.renderPacket();
+    const cad::geometry::GeometryBuffer& geometry = m_engine.visualGeometry();
+
+    m_cachedTriangles.clear();
+    m_cachedLines.clear();
+    m_cachedSelectionLines.clear();
+
+    m_cachedTriangles.reserve(geometry.triangles.size());
+    for (const cad::geometry::ColoredTriangle& triangle : geometry.triangles) {
+        const unsigned char layer = static_cast<unsigned char>(triangle.layer);
+        if (!shouldRenderTriangleLayer(layer)) {
+            continue;
+        }
+
+        const ProjectedVertex a = projectToScreen(frame.mvp, triangle.a, width(), height());
+        const ProjectedVertex b = projectToScreen(frame.mvp, triangle.b, width(), height());
+        const ProjectedVertex c = projectToScreen(frame.mvp, triangle.c, width(), height());
+        if (!a.valid || !b.valid || !c.valid) {
+            continue;
+        }
+
+        m_cachedTriangles.push_back({
+            a.point,
+            b.point,
+            c.point,
+            shadedColor(triangle.a, triangle.b, triangle.c, triangle.color, layer),
+            (a.depth + b.depth + c.depth) / 3.0f,
+            layer
+        });
+    }
+
+    std::sort(m_cachedTriangles.begin(), m_cachedTriangles.end(), [](const CachedScreenTriangle& lhs, const CachedScreenTriangle& rhs) {
+        if (lhs.layer != rhs.layer) {
+            return lhs.layer < rhs.layer;
+        }
+        return lhs.depth > rhs.depth;
+    });
+
+    m_cachedSelectionLines.reserve(frame.selection_overlay_lines.size() / 2);
+    for (std::size_t i = 0; i + 1 < frame.selection_overlay_lines.size(); i += 2) {
+        const ProjectedVertex a = projectToScreen(frame.mvp, frame.selection_overlay_lines[i].position, width(), height());
+        const ProjectedVertex b = projectToScreen(frame.mvp, frame.selection_overlay_lines[i + 1].position, width(), height());
+        if (!a.valid || !b.valid) {
+            continue;
+        }
+        m_cachedSelectionLines.push_back({a.point, b.point, QColor(31, 116, 247), 1.8f});
+    }
+
+    const auto end = std::chrono::steady_clock::now();
+    m_lastProjectionBuildMs = std::chrono::duration<double, std::milli>(end - start).count();
+    m_cachedSoftwareGeometryRevision = m_engine.renderDiagnostics().geometry_rebuild_count;
+    m_cachedSoftwarePacketRevision = m_engine.renderDiagnostics().packet_rebuild_count;
+    m_cachedProjectionWidth = width();
+    m_cachedProjectionHeight = height();
 }
 
 void CadViewportWidget::syncGpuBuffers()

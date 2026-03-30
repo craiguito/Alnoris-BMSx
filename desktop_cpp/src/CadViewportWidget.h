@@ -10,10 +10,12 @@
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLWidget>
 #include <QPoint>
+#include <QPointF>
 #include <QSurfaceFormat>
 
 #include <memory>
 #include <optional>
+#include <vector>
 
 class QKeyEvent;
 class QMouseEvent;
@@ -66,6 +68,24 @@ protected:
     void keyPressEvent(QKeyEvent* event) override;
 
 private:
+    struct CachedScreenTriangle
+    {
+        QPointF a;
+        QPointF b;
+        QPointF c;
+        QColor color;
+        float depth = 0.0f;
+        unsigned char layer = 0;
+    };
+
+    struct CachedScreenLine
+    {
+        QPointF a;
+        QPointF b;
+        QColor color;
+        float width = 1.0f;
+    };
+
     enum class MoveAxis
     {
         FreeXZ,
@@ -93,6 +113,14 @@ private:
     int m_overlayLineVertexCount = 0;
     int m_selectionLineVertexCount = 0;
     int m_depthBits = 0;
+    std::vector<CachedScreenTriangle> m_cachedTriangles;
+    std::vector<CachedScreenLine> m_cachedLines;
+    std::vector<CachedScreenLine> m_cachedSelectionLines;
+    std::size_t m_cachedSoftwareGeometryRevision = 0;
+    std::size_t m_cachedSoftwarePacketRevision = 0;
+    int m_cachedProjectionWidth = 0;
+    int m_cachedProjectionHeight = 0;
+    double m_lastProjectionBuildMs = 0.0;
     double m_lastBufferUploadMs = 0.0;
     double m_lastGpuDrawMs = 0.0;
     QPoint m_pressMousePos;
@@ -106,6 +134,7 @@ private:
     void destroyGlResources();
     void ensureGpuResources();
     void ensureSceneFramebuffer();
+    void rebuildSoftwareFallbackCache();
     void syncGpuBuffers();
     void uploadOpaqueSceneGeometry();
     void uploadTranslucentSceneGeometry();
