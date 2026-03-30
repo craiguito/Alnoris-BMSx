@@ -67,16 +67,16 @@ void appendCylinder(GeometryBuffer& geometry, const Vec3& center, float radius, 
         appendTriangle(
             geometry,
             top_center,
-            cad::math::add(top_center, p1),
             cad::math::add(top_center, p0),
+            cad::math::add(top_center, p1),
             cad::math::mix(color, {1.0f, 1.0f, 1.0f}, 0.18f),
             layer
         );
         appendTriangle(
             geometry,
             bottom_center,
-            cad::math::add(bottom_center, p0),
             cad::math::add(bottom_center, p1),
+            cad::math::add(bottom_center, p0),
             cad::math::mix(color, {0.0f, 0.0f, 0.0f}, 0.14f),
             layer
         );
@@ -99,8 +99,8 @@ void appendRing(GeometryBuffer& geometry, const Vec3& center, float outer_radius
         const Vec3 inner_bottom0{inner_top0.x, center.y - half_height, inner_top0.z};
         const Vec3 inner_bottom1{inner_top1.x, center.y - half_height, inner_top1.z};
 
-        appendQuad(geometry, outer_top0, outer_top1, inner_top1, inner_top0, color, layer);
-        appendQuad(geometry, outer_bottom1, outer_bottom0, inner_bottom0, inner_bottom1, cad::math::mix(color, {0.0f, 0.0f, 0.0f}, 0.08f), layer);
+        appendQuad(geometry, outer_top0, inner_top0, inner_top1, outer_top1, color, layer);
+        appendQuad(geometry, outer_bottom1, inner_bottom1, inner_bottom0, outer_bottom0, cad::math::mix(color, {0.0f, 0.0f, 0.0f}, 0.08f), layer);
         appendQuad(geometry, outer_top0, outer_bottom0, outer_bottom1, outer_top1, cad::math::mix(color, {1.0f, 1.0f, 1.0f}, 0.03f), layer);
         appendQuad(geometry, inner_top1, inner_bottom1, inner_bottom0, inner_top0, cad::math::mix(color, {0.0f, 0.0f, 0.0f}, 0.08f), layer);
     }
