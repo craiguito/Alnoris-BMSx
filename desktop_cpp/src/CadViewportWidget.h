@@ -4,6 +4,7 @@
 
 #include <QColor>
 #include <QOpenGLBuffer>
+#include <QOpenGLFramebufferObject>
 #include <QOpenGLFunctions>
 #include <QOpenGLShaderProgram>
 #include <QOpenGLVertexArrayObject>
@@ -77,6 +78,7 @@ private:
     QColor m_backgroundColor;
     std::unique_ptr<QOpenGLShaderProgram> m_triangleProgram;
     std::unique_ptr<QOpenGLShaderProgram> m_lineProgram;
+    std::unique_ptr<QOpenGLFramebufferObject> m_sceneFramebuffer;
     QOpenGLVertexArrayObject m_vao;
     QOpenGLBuffer m_opaqueTriangleBuffer;
     QOpenGLBuffer m_translucentTriangleBuffer;
@@ -90,6 +92,7 @@ private:
     int m_sceneLineVertexCount = 0;
     int m_overlayLineVertexCount = 0;
     int m_selectionLineVertexCount = 0;
+    int m_depthBits = 0;
     double m_lastBufferUploadMs = 0.0;
     double m_lastGpuDrawMs = 0.0;
     QPoint m_pressMousePos;
@@ -102,6 +105,7 @@ private:
 
     void destroyGlResources();
     void ensureGpuResources();
+    void ensureSceneFramebuffer();
     void syncGpuBuffers();
     void uploadOpaqueSceneGeometry();
     void uploadTranslucentSceneGeometry();

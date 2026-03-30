@@ -425,7 +425,7 @@ GeometryBuffer BatteryGeometryGenerator::buildVisualGeometry(
     GeometryBuffer geometry;
     const battery::PackLayoutConfig& layout = document.metadata().layout_config;
     const int cell_count = static_cast<int>(document.cells().size());
-    const int cylindrical_segments = cell_count > 300 ? 6 : (cell_count > 150 ? 8 : 14);
+    const int cylindrical_segments = cell_count > 300 ? 10 : (cell_count > 150 ? 12 : 18);
     const bool large_pack_mode = cell_count > 200;
     std::unordered_map<core::EntityId, ModuleGeometryContext, core::EntityIdHash> module_contexts;
     module_contexts.reserve(document.modules().size());

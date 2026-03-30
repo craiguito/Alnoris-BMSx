@@ -7,6 +7,7 @@
 #include <QFileInfo>
 #include <QMessageBox>
 #include <QString>
+#include <QSurfaceFormat>
 #include <QTextStream>
 #include <QTimer>
 
@@ -31,6 +32,18 @@ void appendStartupLog(const QString& line)
 
 int main(int argc, char* argv[])
 {
+    QCoreApplication::setAttribute(Qt::AA_UseDesktopOpenGL);
+    QSurfaceFormat format;
+    format.setRenderableType(QSurfaceFormat::OpenGL);
+    format.setVersion(3, 3);
+    format.setProfile(QSurfaceFormat::CoreProfile);
+    format.setDepthBufferSize(24);
+    format.setStencilBufferSize(8);
+    format.setAlphaBufferSize(8);
+    format.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
+    format.setSamples(4);
+    QSurfaceFormat::setDefaultFormat(format);
+
     QApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("Alnoris Battery Simulator"));
     appendStartupLog(QString("startup begin | app_dir=%1 | cwd=%2 | project_root=%3")
