@@ -1,40 +1,59 @@
 #include "CadViewportWidget.h"
 
-#include <QMouseEvent>
 #include <QKeyEvent>
+#include <QMouseEvent>
 #include <QPainter>
-#include <QLinearGradient>
-#include <QPaintEvent>
-#include <QResizeEvent>
 #include <QWheelEvent>
+
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
+#include <cstddef>
+#include <vector>
 
 namespace {
 
-struct ProjectedVertex
+using cad::math::Vec3;
+
+struct GpuVertexView
 {
-    QPointF point;
-    float depth = 0.0f;
-    bool valid = false;
+    static constexpr int PositionOffset = 0;
+    static constexpr int ColorOffset = sizeof(float) * 3;
+    static constexpr int NormalOffset = sizeof(float) * 6;
+    static constexpr int AlphaOffset = sizeof(float) * 9;
+    static constexpr int Stride = sizeof(float) * 10;
 };
 
-struct ProjectedTriangle
+struct GpuLineView
 {
-    QPointF a;
-    QPointF b;
-    QPointF c;
-    QColor color;
-    float depth = 0.0f;
+    static constexpr int PositionOffset = 0;
+    static constexpr int ColorOffset = sizeof(float) * 3;
+    static constexpr int AlphaOffset = sizeof(float) * 6;
+    static constexpr int Stride = sizeof(float) * 7;
 };
 
-cad::math::Vec3 subtractVec(const cad::math::Vec3& a, const cad::math::Vec3& b)
+struct GpuTriangleVertex
+{
+    float position[3]{};
+    float color[3]{};
+    float normal[3]{};
+    float alpha = 1.0f;
+};
+
+struct GpuLineVertex
+{
+    float position[3]{};
+    float color[3]{};
+    float alpha = 1.0f;
+};
+
+Vec3 subtractVec(const Vec3& a, const Vec3& b)
 {
     return {a.x - b.x, a.y - b.y, a.z - b.z};
 }
 
-cad::math::Vec3 crossVec(const cad::math::Vec3& a, const cad::math::Vec3& b)
+Vec3 crossVec(const Vec3& a, const Vec3& b)
 {
     return {
         a.y * b.z - a.z * b.y,
@@ -43,17 +62,17 @@ cad::math::Vec3 crossVec(const cad::math::Vec3& a, const cad::math::Vec3& b)
     };
 }
 
-float dotVec(const cad::math::Vec3& a, const cad::math::Vec3& b)
+float dotVec(const Vec3& a, const Vec3& b)
 {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
-float lengthVec(const cad::math::Vec3& v)
+float lengthVec(const Vec3& v)
 {
     return std::sqrt(dotVec(v, v));
 }
 
-cad::math::Vec3 normalizeVec(const cad::math::Vec3& v)
+Vec3 normalizeVec(const Vec3& v)
 {
     const float length = lengthVec(v);
     if (length <= 0.0001f) {
@@ -62,83 +81,36 @@ cad::math::Vec3 normalizeVec(const cad::math::Vec3& v)
     return {v.x / length, v.y / length, v.z / length};
 }
 
-QColor shadedColor(
-    const cad::math::Vec3& a,
-    const cad::math::Vec3& b,
-    const cad::math::Vec3& c,
-    const cad::math::Vec3& base_color,
-    unsigned char layer
-)
+float triangleLayerAlpha(unsigned char layer)
 {
-    const cad::math::Vec3 edge_ab = subtractVec(b, a);
-    const cad::math::Vec3 edge_ac = subtractVec(c, a);
-    const cad::math::Vec3 normal = normalizeVec(crossVec(edge_ab, edge_ac));
-    const cad::math::Vec3 light_dir = normalizeVec({0.42f, 0.85f, 0.31f});
-    const float lambert = std::max(0.0f, dotVec(normal, light_dir));
-
-    float ambient = 0.54f;
-    float diffuse = 0.46f;
-    int alpha = 255;
-    if (layer == 0) {
-        ambient = 0.70f;
-        diffuse = 0.18f;
-        alpha = 52;
-    } else if (layer == 1) {
-        ambient = 0.63f;
-        diffuse = 0.26f;
-        alpha = 138;
-    } else if (layer == 2) {
-        ambient = 0.56f;
-        diffuse = 0.42f;
-        alpha = 245;
-    } else if (layer == 3) {
-        ambient = 0.58f;
-        diffuse = 0.38f;
-        alpha = 235;
+    switch (layer) {
+    case 0:
+        return 0.20f;
+    case 1:
+        return 0.54f;
+    case 3:
+        return 0.92f;
+    case 2:
+    default:
+        return 0.96f;
     }
-
-    const float shade = std::clamp(ambient + diffuse * lambert, 0.0f, 1.15f);
-    return QColor::fromRgbF(
-        std::clamp(base_color.x * shade, 0.0f, 1.0f),
-        std::clamp(base_color.y * shade, 0.0f, 1.0f),
-        std::clamp(base_color.z * shade, 0.0f, 1.0f),
-        alpha / 255.0f
-    );
 }
 
-ProjectedVertex projectPoint(const std::array<float, 16>& mvp, const cad::math::Vec3& p, int width, int height)
+float lineLayerAlpha(unsigned char layer)
 {
-    const float x = p.x;
-    const float y = p.y;
-    const float z = p.z;
-    const float w = 1.0f;
-
-    const float clipX = (mvp[0] * x) + (mvp[1] * y) + (mvp[2] * z) + (mvp[3] * w);
-    const float clipY = (mvp[4] * x) + (mvp[5] * y) + (mvp[6] * z) + (mvp[7] * w);
-    const float clipZ = (mvp[8] * x) + (mvp[9] * y) + (mvp[10] * z) + (mvp[11] * w);
-    const float clipW = (mvp[12] * x) + (mvp[13] * y) + (mvp[14] * z) + (mvp[15] * w);
-
-    if (clipW <= 0.0001f) {
-        return {};
+    switch (layer) {
+    case 0:
+        return 0.28f;
+    case 1:
+        return 0.48f;
+    default:
+        return 0.78f;
     }
-
-    const float ndcX = clipX / clipW;
-    const float ndcY = clipY / clipW;
-    const float ndcZ = clipZ / clipW;
-    return {
-        QPointF((ndcX * 0.5f + 0.5f) * width, (1.0f - (ndcY * 0.5f + 0.5f)) * height),
-        ndcZ,
-        true
-    };
 }
 
-QColor toColor(const cad::math::Vec3& color)
+QColor hudTextColor()
 {
-    return QColor::fromRgbF(
-        std::clamp(color.x, 0.0f, 1.0f),
-        std::clamp(color.y, 0.0f, 1.0f),
-        std::clamp(color.z, 0.0f, 1.0f)
-    );
+    return QColor(92, 102, 114);
 }
 
 void drawSelectionOverlay(QPainter& painter, const cad::render::ScreenPickable& pickable)
@@ -176,19 +148,177 @@ float snapCoordinate(float value, float step)
     return std::round(value / step) * step;
 }
 
+GpuTriangleVertex makeTriangleVertex(
+    const Vec3& position,
+    const Vec3& color,
+    const Vec3& normal,
+    float alpha
+)
+{
+    GpuTriangleVertex vertex;
+    vertex.position[0] = position.x;
+    vertex.position[1] = position.y;
+    vertex.position[2] = position.z;
+    vertex.color[0] = color.x;
+    vertex.color[1] = color.y;
+    vertex.color[2] = color.z;
+    vertex.normal[0] = normal.x;
+    vertex.normal[1] = normal.y;
+    vertex.normal[2] = normal.z;
+    vertex.alpha = alpha;
+    return vertex;
+}
+
+GpuLineVertex makeLineVertex(const Vec3& position, const Vec3& color, float alpha)
+{
+    GpuLineVertex vertex;
+    vertex.position[0] = position.x;
+    vertex.position[1] = position.y;
+    vertex.position[2] = position.z;
+    vertex.color[0] = color.x;
+    vertex.color[1] = color.y;
+    vertex.color[2] = color.z;
+    vertex.alpha = alpha;
+    return vertex;
+}
+
+std::vector<GpuTriangleVertex> buildTriangleVertices(const cad::geometry::GeometryBuffer& geometry)
+{
+    std::vector<GpuTriangleVertex> vertices;
+    vertices.reserve(geometry.triangles.size() * 3);
+    for (const cad::geometry::ColoredTriangle& triangle : geometry.triangles) {
+        const Vec3 edge_ab = subtractVec(triangle.b, triangle.a);
+        const Vec3 edge_ac = subtractVec(triangle.c, triangle.a);
+        const Vec3 normal = normalizeVec(crossVec(edge_ab, edge_ac));
+        const float alpha = triangleLayerAlpha(static_cast<unsigned char>(triangle.layer));
+        vertices.push_back(makeTriangleVertex(triangle.a, triangle.color, normal, alpha));
+        vertices.push_back(makeTriangleVertex(triangle.b, triangle.color, normal, alpha));
+        vertices.push_back(makeTriangleVertex(triangle.c, triangle.color, normal, alpha));
+    }
+    return vertices;
+}
+
+std::vector<GpuLineVertex> buildSceneLineVertices(const cad::geometry::GeometryBuffer& geometry)
+{
+    std::vector<GpuLineVertex> vertices;
+    vertices.reserve(geometry.lines.size() * 2);
+    for (const cad::geometry::ColoredLine& line : geometry.lines) {
+        const float alpha = lineLayerAlpha(static_cast<unsigned char>(line.layer));
+        vertices.push_back(makeLineVertex(line.a, line.color, alpha));
+        vertices.push_back(makeLineVertex(line.b, line.color, alpha));
+    }
+    return vertices;
+}
+
+std::vector<GpuLineVertex> buildPacketLineVertices(
+    const std::vector<cad::render::RenderVertex>& vertices_in,
+    float forced_alpha = -1.0f
+)
+{
+    std::vector<GpuLineVertex> vertices;
+    vertices.reserve(vertices_in.size());
+    for (const cad::render::RenderVertex& vertex : vertices_in) {
+        const float alpha = forced_alpha >= 0.0f ? forced_alpha : lineLayerAlpha(vertex.layer);
+        vertices.push_back(makeLineVertex(vertex.position, vertex.color, alpha));
+    }
+    return vertices;
+}
+
+constexpr const char* kTriangleVertexShader = R"(
+#version 330 core
+layout(location = 0) in vec3 aPosition;
+layout(location = 1) in vec3 aColor;
+layout(location = 2) in vec3 aNormal;
+layout(location = 3) in float aAlpha;
+
+uniform mat4 uMvp;
+
+out vec3 vColor;
+out vec3 vNormal;
+out float vAlpha;
+
+void main()
+{
+    gl_Position = uMvp * vec4(aPosition, 1.0);
+    vColor = aColor;
+    vNormal = aNormal;
+    vAlpha = aAlpha;
+}
+)";
+
+constexpr const char* kTriangleFragmentShader = R"(
+#version 330 core
+in vec3 vColor;
+in vec3 vNormal;
+in float vAlpha;
+
+out vec4 fragColor;
+
+void main()
+{
+    vec3 normal = normalize(vNormal);
+    vec3 lightDir = normalize(vec3(0.42, 0.85, 0.31));
+    float lambert = max(dot(normal, lightDir), 0.0);
+    float shade = clamp(0.56 + 0.44 * lambert, 0.0, 1.15);
+    fragColor = vec4(clamp(vColor * shade, 0.0, 1.0), vAlpha);
+}
+)";
+
+constexpr const char* kLineVertexShader = R"(
+#version 330 core
+layout(location = 0) in vec3 aPosition;
+layout(location = 1) in vec3 aColor;
+layout(location = 2) in float aAlpha;
+
+uniform mat4 uMvp;
+
+out vec3 vColor;
+out float vAlpha;
+
+void main()
+{
+    gl_Position = uMvp * vec4(aPosition, 1.0);
+    vColor = aColor;
+    vAlpha = aAlpha;
+}
+)";
+
+constexpr const char* kLineFragmentShader = R"(
+#version 330 core
+in vec3 vColor;
+in float vAlpha;
+
+out vec4 fragColor;
+
+void main()
+{
+    fragColor = vec4(vColor, vAlpha);
+}
+)";
+
 } // namespace
 
 CadViewportWidget::CadViewportWidget(QWidget* parent)
-    : QWidget(parent)
+    : QOpenGLWidget(parent)
     , m_backgroundColor(198, 205, 214)
+    , m_triangleBuffer(QOpenGLBuffer::VertexBuffer)
+    , m_sceneLineBuffer(QOpenGLBuffer::VertexBuffer)
+    , m_overlayLineBuffer(QOpenGLBuffer::VertexBuffer)
+    , m_selectionLineBuffer(QOpenGLBuffer::VertexBuffer)
 {
     setMinimumHeight(540);
     setMouseTracking(true);
     setFocusPolicy(Qt::StrongFocus);
-    setAutoFillBackground(true);
-    QPalette pal = palette();
-    pal.setColor(QPalette::Window, m_backgroundColor);
-    setPalette(pal);
+    setUpdateBehavior(QOpenGLWidget::PartialUpdate);
+}
+
+CadViewportWidget::~CadViewportWidget()
+{
+    if (context() != nullptr) {
+        makeCurrent();
+        destroyGlResources();
+        doneCurrent();
+    }
 }
 
 bool CadViewportWidget::setCellMeshPath(const QString& path)
@@ -201,9 +331,6 @@ bool CadViewportWidget::setCellMeshPath(const QString& path)
 void CadViewportWidget::setBackgroundColor(const QColor& color)
 {
     m_backgroundColor = color;
-    QPalette pal = palette();
-    pal.setColor(QPalette::Window, m_backgroundColor);
-    setPalette(pal);
     update();
 }
 
@@ -381,47 +508,114 @@ bool CadViewportWidget::resetSelectedLabelToGenerated()
     return changed;
 }
 
-void CadViewportWidget::paintEvent(QPaintEvent* event)
+void CadViewportWidget::initializeGL()
 {
-    Q_UNUSED(event);
+    initializeOpenGLFunctions();
+    ensureGpuResources();
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+}
+
+void CadViewportWidget::resizeGL(int w, int h)
+{
+    m_engine.setViewportSize(w, h);
+}
+
+void CadViewportWidget::paintGL()
+{
+    ensureGpuResources();
+    syncGpuBuffers();
+
+    const auto drawStart = std::chrono::steady_clock::now();
+
+    glViewport(0, 0, width(), height());
+    glClearColor(
+        static_cast<float>(m_backgroundColor.redF()),
+        static_cast<float>(m_backgroundColor.greenF()),
+        static_cast<float>(m_backgroundColor.blueF()),
+        1.0f
+    );
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    const cad::render::RenderPacket& frame = m_engine.renderPacket();
+
+    if (m_vao.isCreated()) {
+        m_vao.bind();
+    }
+
+    if (m_triangleProgram != nullptr && m_triangleVertexCount > 0) {
+        m_triangleProgram->bind();
+        glUniformMatrix4fv(m_triangleProgram->uniformLocation("uMvp"), 1, GL_TRUE, frame.mvp.data());
+
+        m_triangleBuffer.bind();
+        m_triangleProgram->enableAttributeArray(0);
+        m_triangleProgram->enableAttributeArray(1);
+        m_triangleProgram->enableAttributeArray(2);
+        m_triangleProgram->enableAttributeArray(3);
+        m_triangleProgram->setAttributeBuffer(0, GL_FLOAT, GpuVertexView::PositionOffset, 3, GpuVertexView::Stride);
+        m_triangleProgram->setAttributeBuffer(1, GL_FLOAT, GpuVertexView::ColorOffset, 3, GpuVertexView::Stride);
+        m_triangleProgram->setAttributeBuffer(2, GL_FLOAT, GpuVertexView::NormalOffset, 3, GpuVertexView::Stride);
+        m_triangleProgram->setAttributeBuffer(3, GL_FLOAT, GpuVertexView::AlphaOffset, 1, GpuVertexView::Stride);
+        glDrawArrays(GL_TRIANGLES, 0, m_triangleVertexCount);
+        m_triangleProgram->disableAttributeArray(0);
+        m_triangleProgram->disableAttributeArray(1);
+        m_triangleProgram->disableAttributeArray(2);
+        m_triangleProgram->disableAttributeArray(3);
+        m_triangleBuffer.release();
+        m_triangleProgram->release();
+    }
+
+    if (m_lineProgram != nullptr) {
+        m_lineProgram->bind();
+        glUniformMatrix4fv(m_lineProgram->uniformLocation("uMvp"), 1, GL_TRUE, frame.mvp.data());
+
+        const auto drawLineBuffer = [this](QOpenGLBuffer& buffer, int vertex_count, bool depth_test, float width) {
+            if (vertex_count <= 0) {
+                return;
+            }
+            if (depth_test) {
+                glEnable(GL_DEPTH_TEST);
+            } else {
+                glDisable(GL_DEPTH_TEST);
+            }
+            glLineWidth(width);
+            buffer.bind();
+            m_lineProgram->enableAttributeArray(0);
+            m_lineProgram->enableAttributeArray(1);
+            m_lineProgram->enableAttributeArray(2);
+            m_lineProgram->setAttributeBuffer(0, GL_FLOAT, GpuLineView::PositionOffset, 3, GpuLineView::Stride);
+            m_lineProgram->setAttributeBuffer(1, GL_FLOAT, GpuLineView::ColorOffset, 3, GpuLineView::Stride);
+            m_lineProgram->setAttributeBuffer(2, GL_FLOAT, GpuLineView::AlphaOffset, 1, GpuLineView::Stride);
+            glDrawArrays(GL_LINES, 0, vertex_count);
+            m_lineProgram->disableAttributeArray(0);
+            m_lineProgram->disableAttributeArray(1);
+            m_lineProgram->disableAttributeArray(2);
+            buffer.release();
+        };
+
+        drawLineBuffer(m_sceneLineBuffer, m_sceneLineVertexCount, true, 1.0f);
+        drawLineBuffer(m_overlayLineBuffer, m_overlayLineVertexCount, true, 1.0f);
+        drawLineBuffer(m_selectionLineBuffer, m_selectionLineVertexCount, false, 2.0f);
+        glEnable(GL_DEPTH_TEST);
+        m_lineProgram->release();
+    }
+
+    if (m_vao.isCreated()) {
+        m_vao.release();
+    }
+
+    const auto drawEnd = std::chrono::steady_clock::now();
+    m_lastGpuDrawMs = std::chrono::duration<double, std::milli>(drawEnd - drawStart).count();
 
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);
-    QLinearGradient backgroundGradient(0.0, 0.0, 0.0, static_cast<qreal>(height()));
-    backgroundGradient.setColorAt(0.0, m_backgroundColor.lighter(103));
-    backgroundGradient.setColorAt(1.0, m_backgroundColor.darker(101));
-    painter.fillRect(rect(), backgroundGradient);
 
-    const cad::render::RenderPacket& frame = m_engine.renderPacket();
-    if (frame.triangles.empty() && frame.lines.empty()) {
+    if (m_triangleVertexCount == 0 && m_overlayLineVertexCount == 0 && m_sceneLineVertexCount == 0) {
         painter.setPen(QColor(90, 102, 116));
         painter.drawText(rect(), Qt::AlignCenter, "CAD viewport has no scene geometry");
-        return;
-    }
-
-    const std::size_t packet_build_count = m_engine.renderDiagnostics().packet_rebuild_count;
-    if (m_cachedPacketBuildCount != packet_build_count || m_cachedProjectionWidth != width() || m_cachedProjectionHeight != height()) {
-        rebuildScreenSpaceCache();
-    }
-
-    painter.setPen(Qt::NoPen);
-    for (const CachedScreenTriangle& tri : m_cachedTriangles) {
-        const QPointF points[3] = {tri.a, tri.b, tri.c};
-        painter.setBrush(tri.color);
-        painter.drawConvexPolygon(points, 3);
-    }
-
-    for (const CachedScreenLine& line : m_cachedLines) {
-        painter.setPen(QPen(line.color, line.width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        painter.drawLine(line.a, line.b);
-    }
-
-    if (!m_cachedSelectionLines.empty()) {
-        painter.setRenderHint(QPainter::Antialiasing, true);
-        for (const CachedScreenLine& line : m_cachedSelectionLines) {
-            painter.setPen(QPen(line.color, line.width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-            painter.drawLine(line.a, line.b);
-        }
     }
 
     const cad::core::EntityId selectedId = m_engine.selectedEntity();
@@ -436,40 +630,33 @@ void CadViewportWidget::paintEvent(QPaintEvent* event)
         }
     }
 
-    painter.setPen(QColor(92, 102, 114));
+    painter.setPen(hudTextColor());
     painter.drawText(
         QRect(16, 12, width() - 32, 20),
         Qt::AlignLeft | Qt::AlignVCenter,
-        QString("Battery CAD viewport  |  Shift-drag move  |  G snap %1  |  Axis %2")
+        QString("Battery CAD viewport  |  GPU-backed  |  Shift-drag move  |  G snap %1  |  Axis %2")
             .arg(m_gridSnapEnabled ? "on" : "off")
             .arg(m_moveAxis == MoveAxis::X ? "X" : m_moveAxis == MoveAxis::Y ? "Y" : m_moveAxis == MoveAxis::Z ? "Z" : "XZ")
     );
     painter.drawText(
         QRect(16, 32, width() - 32, 18),
         Qt::AlignLeft | Qt::AlignVCenter,
-        QString("Scene %1 tris  |  Geo %2 ms  |  Frame %3 ms  |  Project %4 ms")
+        QString("Scene %1 tris  |  Geo %2 ms  |  Packet %3 ms  |  Upload %4 ms  |  GPU draw %5 ms")
             .arg(static_cast<qlonglong>(m_engine.renderDiagnostics().triangle_count))
             .arg(m_engine.renderDiagnostics().last_geometry_build_ms, 0, 'f', 1)
             .arg(m_engine.renderDiagnostics().last_render_packet_ms, 0, 'f', 1)
-            .arg(m_lastProjectionBuildMs, 0, 'f', 1)
+            .arg(m_lastBufferUploadMs, 0, 'f', 1)
+            .arg(m_lastGpuDrawMs, 0, 'f', 1)
     );
     painter.drawText(
         QRect(16, 50, width() - 32, 18),
         Qt::AlignLeft | Qt::AlignVCenter,
-        QString("Cell cache %1 hits / %2 misses  |  Rebuilds geo %3 frame %4")
+        QString("Cell cache %1 hits / %2 misses  |  Rebuilds geo %3 packet %4")
             .arg(static_cast<qlonglong>(m_engine.renderDiagnostics().cylindrical_cell_cache_hits))
             .arg(static_cast<qlonglong>(m_engine.renderDiagnostics().cylindrical_cell_cache_misses))
             .arg(static_cast<qlonglong>(m_engine.renderDiagnostics().geometry_rebuild_count))
             .arg(static_cast<qlonglong>(m_engine.renderDiagnostics().packet_rebuild_count))
     );
-}
-
-void CadViewportWidget::resizeEvent(QResizeEvent* event)
-{
-    m_cachedProjectionWidth = 0;
-    m_cachedProjectionHeight = 0;
-    m_engine.setViewportSize(event->size().width(), event->size().height());
-    QWidget::resizeEvent(event);
 }
 
 void CadViewportWidget::mousePressEvent(QMouseEvent* event)
@@ -480,7 +667,7 @@ void CadViewportWidget::mousePressEvent(QMouseEvent* event)
         m_pressMousePos = event->pos();
         m_lastMousePos = event->pos();
     }
-    QWidget::mousePressEvent(event);
+    QOpenGLWidget::mousePressEvent(event);
 }
 
 void CadViewportWidget::mouseMoveEvent(QMouseEvent* event)
@@ -526,7 +713,7 @@ void CadViewportWidget::mouseMoveEvent(QMouseEvent* event)
         m_lastMousePos = event->pos();
         update();
     }
-    QWidget::mouseMoveEvent(event);
+    QOpenGLWidget::mouseMoveEvent(event);
 }
 
 void CadViewportWidget::mouseReleaseEvent(QMouseEvent* event)
@@ -543,7 +730,7 @@ void CadViewportWidget::mouseReleaseEvent(QMouseEvent* event)
     }
     m_dragging = false;
     m_moveDragging = false;
-    QWidget::mouseReleaseEvent(event);
+    QOpenGLWidget::mouseReleaseEvent(event);
 }
 
 void CadViewportWidget::wheelEvent(QWheelEvent* event)
@@ -579,87 +766,133 @@ void CadViewportWidget::keyPressEvent(QKeyEvent* event)
     default:
         break;
     }
-    QWidget::keyPressEvent(event);
+    QOpenGLWidget::keyPressEvent(event);
 }
 
-void CadViewportWidget::rebuildScreenSpaceCache()
+void CadViewportWidget::destroyGlResources()
+{
+    if (m_triangleBuffer.isCreated()) {
+        m_triangleBuffer.destroy();
+    }
+    if (m_sceneLineBuffer.isCreated()) {
+        m_sceneLineBuffer.destroy();
+    }
+    if (m_overlayLineBuffer.isCreated()) {
+        m_overlayLineBuffer.destroy();
+    }
+    if (m_selectionLineBuffer.isCreated()) {
+        m_selectionLineBuffer.destroy();
+    }
+    if (m_vao.isCreated()) {
+        m_vao.destroy();
+    }
+    m_triangleProgram.reset();
+    m_lineProgram.reset();
+}
+
+void CadViewportWidget::ensureGpuResources()
+{
+    if (m_triangleProgram != nullptr && m_lineProgram != nullptr) {
+        return;
+    }
+
+    if (!m_vao.isCreated()) {
+        m_vao.create();
+    }
+
+    if (!m_triangleBuffer.isCreated()) {
+        m_triangleBuffer.create();
+    }
+    if (!m_sceneLineBuffer.isCreated()) {
+        m_sceneLineBuffer.create();
+    }
+    if (!m_overlayLineBuffer.isCreated()) {
+        m_overlayLineBuffer.create();
+    }
+    if (!m_selectionLineBuffer.isCreated()) {
+        m_selectionLineBuffer.create();
+    }
+
+    m_triangleProgram = std::make_unique<QOpenGLShaderProgram>();
+    m_triangleProgram->addShaderFromSourceCode(QOpenGLShader::Vertex, kTriangleVertexShader);
+    m_triangleProgram->addShaderFromSourceCode(QOpenGLShader::Fragment, kTriangleFragmentShader);
+    m_triangleProgram->link();
+
+    m_lineProgram = std::make_unique<QOpenGLShaderProgram>();
+    m_lineProgram->addShaderFromSourceCode(QOpenGLShader::Vertex, kLineVertexShader);
+    m_lineProgram->addShaderFromSourceCode(QOpenGLShader::Fragment, kLineFragmentShader);
+    m_lineProgram->link();
+}
+
+void CadViewportWidget::syncGpuBuffers()
 {
     const auto start = std::chrono::steady_clock::now();
+    bool uploaded = false;
+
+    if (m_uploadedGeometryRevision != m_engine.renderDiagnostics().geometry_rebuild_count) {
+        uploadSceneGeometry();
+        m_uploadedGeometryRevision = m_engine.renderDiagnostics().geometry_rebuild_count;
+        uploaded = true;
+    }
+
+    if (m_uploadedPacketRevision != m_engine.renderDiagnostics().packet_rebuild_count) {
+        uploadDynamicLines();
+        m_uploadedPacketRevision = m_engine.renderDiagnostics().packet_rebuild_count;
+        uploaded = true;
+    }
+
+    if (uploaded) {
+        const auto end = std::chrono::steady_clock::now();
+        m_lastBufferUploadMs = std::chrono::duration<double, std::milli>(end - start).count();
+    } else {
+        m_lastBufferUploadMs = 0.0;
+    }
+}
+
+void CadViewportWidget::uploadSceneGeometry()
+{
+    const std::vector<GpuTriangleVertex> triangleVertices = buildTriangleVertices(m_engine.visualGeometry());
+    m_triangleVertexCount = static_cast<int>(triangleVertices.size());
+    m_triangleBuffer.bind();
+    m_triangleBuffer.setUsagePattern(QOpenGLBuffer::StaticDraw);
+    m_triangleBuffer.allocate(
+        triangleVertices.empty() ? nullptr : triangleVertices.data(),
+        static_cast<int>(triangleVertices.size() * sizeof(GpuTriangleVertex))
+    );
+    m_triangleBuffer.release();
+
+    const std::vector<GpuLineVertex> sceneLineVertices = buildSceneLineVertices(m_engine.visualGeometry());
+    m_sceneLineVertexCount = static_cast<int>(sceneLineVertices.size());
+    m_sceneLineBuffer.bind();
+    m_sceneLineBuffer.setUsagePattern(QOpenGLBuffer::StaticDraw);
+    m_sceneLineBuffer.allocate(
+        sceneLineVertices.empty() ? nullptr : sceneLineVertices.data(),
+        static_cast<int>(sceneLineVertices.size() * sizeof(GpuLineVertex))
+    );
+    m_sceneLineBuffer.release();
+}
+
+void CadViewportWidget::uploadDynamicLines()
+{
     const cad::render::RenderPacket& frame = m_engine.renderPacket();
 
-    m_cachedTriangles.clear();
-    m_cachedLines.clear();
-    m_cachedSelectionLines.clear();
+    const std::vector<GpuLineVertex> overlayLineVertices = buildPacketLineVertices(frame.lines);
+    m_overlayLineVertexCount = static_cast<int>(overlayLineVertices.size());
+    m_overlayLineBuffer.bind();
+    m_overlayLineBuffer.setUsagePattern(QOpenGLBuffer::DynamicDraw);
+    m_overlayLineBuffer.allocate(
+        overlayLineVertices.empty() ? nullptr : overlayLineVertices.data(),
+        static_cast<int>(overlayLineVertices.size() * sizeof(GpuLineVertex))
+    );
+    m_overlayLineBuffer.release();
 
-    m_cachedTriangles.reserve(frame.triangles.size() / 3);
-    for (std::size_t i = 0; i + 2 < frame.triangles.size(); i += 3) {
-        const ProjectedVertex a = projectPoint(frame.mvp, frame.triangles[i].position, width(), height());
-        const ProjectedVertex b = projectPoint(frame.mvp, frame.triangles[i + 1].position, width(), height());
-        const ProjectedVertex c = projectPoint(frame.mvp, frame.triangles[i + 2].position, width(), height());
-        if (!a.valid || !b.valid || !c.valid) {
-            continue;
-        }
-
-        const cad::math::Vec3 avgColor{
-            (frame.triangles[i].color.x + frame.triangles[i + 1].color.x + frame.triangles[i + 2].color.x) / 3.0f,
-            (frame.triangles[i].color.y + frame.triangles[i + 1].color.y + frame.triangles[i + 2].color.y) / 3.0f,
-            (frame.triangles[i].color.z + frame.triangles[i + 1].color.z + frame.triangles[i + 2].color.z) / 3.0f
-        };
-
-        m_cachedTriangles.push_back({
-            a.point,
-            b.point,
-            c.point,
-            shadedColor(
-                frame.triangles[i].position,
-                frame.triangles[i + 1].position,
-                frame.triangles[i + 2].position,
-                avgColor,
-                frame.triangles[i].layer
-            ),
-            (a.depth + b.depth + c.depth) / 3.0f,
-            frame.triangles[i].layer
-        });
-    }
-
-    std::sort(m_cachedTriangles.begin(), m_cachedTriangles.end(), [](const CachedScreenTriangle& lhs, const CachedScreenTriangle& rhs) {
-        if (lhs.layer != rhs.layer) {
-            return lhs.layer < rhs.layer;
-        }
-        return lhs.depth > rhs.depth;
-    });
-
-    m_cachedLines.reserve(frame.lines.size() / 2);
-    for (std::size_t i = 0; i + 1 < frame.lines.size(); i += 2) {
-        const ProjectedVertex a = projectPoint(frame.mvp, frame.lines[i].position, width(), height());
-        const ProjectedVertex b = projectPoint(frame.mvp, frame.lines[i + 1].position, width(), height());
-        if (!a.valid || !b.valid) {
-            continue;
-        }
-        QColor color = toColor(frame.lines[i].color);
-        if (frame.lines[i].layer == 0) {
-            color.setAlpha(70);
-        } else if (frame.lines[i].layer == 1) {
-            color.setAlpha(115);
-        } else {
-            color.setAlpha(170);
-        }
-        m_cachedLines.push_back({a.point, b.point, color, frame.lines[i].layer == 0 ? 0.5f : 0.7f});
-    }
-
-    m_cachedSelectionLines.reserve(frame.selection_overlay_lines.size() / 2);
-    for (std::size_t i = 0; i + 1 < frame.selection_overlay_lines.size(); i += 2) {
-        const ProjectedVertex a = projectPoint(frame.mvp, frame.selection_overlay_lines[i].position, width(), height());
-        const ProjectedVertex b = projectPoint(frame.mvp, frame.selection_overlay_lines[i + 1].position, width(), height());
-        if (!a.valid || !b.valid) {
-            continue;
-        }
-        m_cachedSelectionLines.push_back({a.point, b.point, QColor(31, 116, 247), 1.8f});
-    }
-
-    const auto end = std::chrono::steady_clock::now();
-    m_lastProjectionBuildMs = std::chrono::duration<double, std::milli>(end - start).count();
-    m_cachedPacketBuildCount = m_engine.renderDiagnostics().packet_rebuild_count;
-    m_cachedProjectionWidth = width();
-    m_cachedProjectionHeight = height();
+    const std::vector<GpuLineVertex> selectionLineVertices = buildPacketLineVertices(frame.selection_overlay_lines, 0.98f);
+    m_selectionLineVertexCount = static_cast<int>(selectionLineVertices.size());
+    m_selectionLineBuffer.bind();
+    m_selectionLineBuffer.setUsagePattern(QOpenGLBuffer::DynamicDraw);
+    m_selectionLineBuffer.allocate(
+        selectionLineVertices.empty() ? nullptr : selectionLineVertices.data(),
+        static_cast<int>(selectionLineVertices.size() * sizeof(GpuLineVertex))
+    );
+    m_selectionLineBuffer.release();
 }

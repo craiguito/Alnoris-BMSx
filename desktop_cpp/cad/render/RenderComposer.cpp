@@ -20,21 +20,6 @@ void appendCornerBox(
     float corner_fraction = 0.22f
 );
 
-void appendGeneratedGeometry(RenderPacket& packet, const geometry::GeometryBuffer& geometry)
-{
-    for (const geometry::ColoredTriangle& triangle : geometry.triangles) {
-        const unsigned char layer = static_cast<unsigned char>(triangle.layer);
-        packet.triangles.push_back({triangle.a, triangle.color, layer});
-        packet.triangles.push_back({triangle.b, triangle.color, layer});
-        packet.triangles.push_back({triangle.c, triangle.color, layer});
-    }
-    for (const geometry::ColoredLine& line : geometry.lines) {
-        const unsigned char layer = static_cast<unsigned char>(line.layer);
-        packet.lines.push_back({line.a, line.color, layer});
-        packet.lines.push_back({line.b, line.color, layer});
-    }
-}
-
 Vec3 temperatureColor(double temp_c)
 {
     const float normalized = cad::math::clamp(static_cast<float>((temp_c - 20.0) / 28.0), 0.0f, 1.0f);
@@ -380,9 +365,10 @@ RenderPacket RenderComposer::compose(
     int viewport_height
 ) const
 {
+    (void)scene_geometry;
+    (void)cell_mesh;
     RenderPacket packet;
-    packet.triangles.reserve(scene_geometry.triangles.size() * 3);
-    packet.lines.reserve(scene_geometry.lines.size() * 2 + 128);
+    packet.lines.reserve(128);
     packet.selection_overlay_lines.reserve(256);
     packet.pickables.reserve(
         document.cells().size()
@@ -426,8 +412,6 @@ RenderPacket RenderComposer::compose(
         packet.lines.push_back({{-grid_extent * grid_step, -120.0f, offset}, color, 0});
         packet.lines.push_back({{grid_extent * grid_step, -120.0f, offset}, color, 0});
     }
-
-    appendGeneratedGeometry(packet, scene_geometry);
 
     for (const battery::BatteryPackEntity& pack : document.packs()) {
         if (!pack.visible) {

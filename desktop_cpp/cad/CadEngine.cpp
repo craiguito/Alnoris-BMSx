@@ -402,6 +402,11 @@ const render::RenderPacket& CadEngine::renderPacket() const
     return m_renderPacket;
 }
 
+const geometry::GeometryBuffer& CadEngine::visualGeometry() const
+{
+    return m_visualGeometry;
+}
+
 core::EntityId CadEngine::selectedEntity() const
 {
     return m_document.selection().primary;
@@ -490,8 +495,10 @@ void CadEngine::rebuildRenderPacket()
     const auto end = std::chrono::steady_clock::now();
     m_renderDiagnostics.last_render_packet_ms = std::chrono::duration<double, std::milli>(end - start).count();
     m_renderDiagnostics.packet_rebuild_count += 1;
-    m_renderDiagnostics.triangle_count = m_renderPacket.triangles.size() / 3;
-    m_renderDiagnostics.line_count = m_renderPacket.lines.size() / 2;
+    m_renderDiagnostics.line_count =
+        m_visualGeometry.lines.size()
+        + (m_renderPacket.lines.size() / 2)
+        + (m_renderPacket.selection_overlay_lines.size() / 2);
 }
 
 void CadEngine::refreshDocumentView(bool rebuild_visualization)
@@ -514,6 +521,8 @@ void CadEngine::rebuildVisualGeometry()
     const auto end = std::chrono::steady_clock::now();
     m_renderDiagnostics.last_geometry_build_ms = std::chrono::duration<double, std::milli>(end - start).count();
     m_renderDiagnostics.geometry_rebuild_count += 1;
+    m_renderDiagnostics.triangle_count = m_visualGeometry.triangles.size();
+    m_renderDiagnostics.line_count = m_visualGeometry.lines.size();
     const auto& cache_stats = m_geometryGenerator.cacheStats();
     m_renderDiagnostics.cylindrical_cell_cache_hits = cache_stats.cylindrical_cell_hits;
     m_renderDiagnostics.cylindrical_cell_cache_misses = cache_stats.cylindrical_cell_misses;

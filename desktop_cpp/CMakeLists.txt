@@ -8,7 +8,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets OpenGL OpenGLWidgets)
 
 qt_add_executable(alnoris_desktop WIN32
     cad/CadEngine.cpp
@@ -70,6 +70,8 @@ target_link_libraries(alnoris_desktop
     PRIVATE
         Qt6::Core
         Qt6::Gui
+        Qt6::OpenGL
+        Qt6::OpenGLWidgets
         Qt6::Widgets
 )
 

@@ -87,6 +87,7 @@ public:
     [[nodiscard]] core::EntityId hitTestEntity(float x, float y) const;
 
     [[nodiscard]] const render::RenderPacket& renderPacket() const;
+    [[nodiscard]] const geometry::GeometryBuffer& visualGeometry() const;
     [[nodiscard]] core::EntityId selectedEntity() const;
     [[nodiscard]] const core::CadDocument& document() const;
     [[nodiscard]] std::optional<battery::EntityRecord> snapshotEntity(core::EntityId entity_id) const;
