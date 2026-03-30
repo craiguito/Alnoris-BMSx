@@ -9,6 +9,7 @@
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLWidget>
 #include <QPoint>
+#include <QSurfaceFormat>
 
 #include <memory>
 #include <optional>

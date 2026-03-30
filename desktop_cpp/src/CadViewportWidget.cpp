@@ -377,10 +377,21 @@ CadViewportWidget::CadViewportWidget(QWidget* parent)
     , m_overlayLineBuffer(QOpenGLBuffer::VertexBuffer)
     , m_selectionLineBuffer(QOpenGLBuffer::VertexBuffer)
 {
+    QSurfaceFormat format;
+    format.setRenderableType(QSurfaceFormat::OpenGL);
+    format.setVersion(3, 3);
+    format.setProfile(QSurfaceFormat::CoreProfile);
+    format.setDepthBufferSize(24);
+    format.setStencilBufferSize(8);
+    format.setAlphaBufferSize(8);
+    format.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
+    format.setSamples(4);
+    setFormat(format);
+
     setMinimumHeight(540);
     setMouseTracking(true);
     setFocusPolicy(Qt::StrongFocus);
-    setUpdateBehavior(QOpenGLWidget::PartialUpdate);
+    setUpdateBehavior(QOpenGLWidget::NoPartialUpdate);
 }
 
 CadViewportWidget::~CadViewportWidget()
@@ -587,6 +598,7 @@ void CadViewportWidget::initializeGL()
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
     glDisable(GL_CULL_FACE);
 }
 
