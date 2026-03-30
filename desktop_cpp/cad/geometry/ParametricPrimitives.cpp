@@ -66,19 +66,21 @@ void appendCylinder(GeometryBuffer& geometry, const Vec3& center, float radius, 
             side_color,
             layer
         );
+        // Top faces must wind CCW when viewed from +Y; bottom faces must wind
+        // CCW when viewed from -Y so GL_CCW + back-face culling sees a closed solid.
         appendTriangle(
             geometry,
             top_center,
-            cad::math::add(top_center, p0),
             cad::math::add(top_center, p1),
+            cad::math::add(top_center, p0),
             cad::math::mix(color, {1.0f, 1.0f, 1.0f}, 0.18f),
             layer
         );
         appendTriangle(
             geometry,
             bottom_center,
-            cad::math::add(bottom_center, p1),
             cad::math::add(bottom_center, p0),
+            cad::math::add(bottom_center, p1),
             cad::math::mix(color, {0.0f, 0.0f, 0.0f}, 0.14f),
             layer
         );
@@ -221,16 +223,6 @@ void appendCylindricalCell(
     appendCylinder(geometry, top_cap_center, profile.top_cap_outer_radius, profile.top_cap_shoulder_height, segments, cap_color, layer);
 
     const float shoulder_top_y = center.y + half_body_height + profile.top_cap_shoulder_height;
-    appendRing(
-        geometry,
-        {center.x, shoulder_top_y - profile.top_cap_shoulder_height * 0.15f, center.z},
-        std::min(profile.top_cap_outer_radius, profile.body_radius * 0.98f),
-        std::min(profile.top_cap_inner_radius, profile.top_cap_outer_radius - 0.5f),
-        std::max(0.2f, profile.top_cap_shoulder_height * 0.35f),
-        segments,
-        cad::math::mix(cap_color, {0.0f, 0.0f, 0.0f}, 0.10f),
-        layer
-    );
 
     const float ring_y = shoulder_top_y + profile.insulator_height * 0.5f;
     appendRing(

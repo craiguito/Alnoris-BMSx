@@ -7,7 +7,7 @@ namespace cad::camera {
 void Camera::orbit(float delta_yaw_deg, float delta_pitch_deg)
 {
     m_yawDeg += delta_yaw_deg;
-    m_pitchDeg = math::clamp(m_pitchDeg + delta_pitch_deg, -80.0f, 18.0f);
+    m_pitchDeg = math::clamp(m_pitchDeg + delta_pitch_deg, -72.0f, -4.0f);
 }
 
 void Camera::zoom(float delta)
@@ -21,15 +21,16 @@ void Camera::fitToBounds(const math::Vec3& center, const math::Vec3& size)
     const float half_x = std::max(10.0f, size.x * 0.5f);
     const float half_y = std::max(10.0f, size.y * 0.5f);
     const float half_z = std::max(10.0f, size.z * 0.5f);
+    const float max_dim = std::max({size.x, size.y, size.z, 10.0f});
     const float radius = std::sqrt(half_x * half_x + half_y * half_y + half_z * half_z);
     const bool elongated_x = size.x > size.z * 1.8f;
     if (elongated_x) {
-        m_target.y += size.y * 0.10f;
+        m_target.y += size.y * 0.05f;
     }
-    m_distance = std::max(180.0f, radius * (elongated_x ? 1.58f : 2.55f));
-    m_zoom = elongated_x ? 1.08f : 1.0f;
-    m_yawDeg = elongated_x ? -44.0f : -32.0f;
-    m_pitchDeg = elongated_x ? -28.0f : -18.0f;
+    m_distance = std::max(220.0f, radius * (elongated_x ? 2.05f : 2.45f) + max_dim * 0.18f);
+    m_zoom = elongated_x ? 0.94f : 1.0f;
+    m_yawDeg = elongated_x ? -36.0f : -32.0f;
+    m_pitchDeg = elongated_x ? -20.0f : -18.0f;
 }
 
 math::Mat4 Camera::viewMatrix() const

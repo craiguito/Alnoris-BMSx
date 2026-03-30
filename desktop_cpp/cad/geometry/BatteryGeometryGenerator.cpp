@@ -222,71 +222,16 @@ void appendBusbarGeometry(
     const battery::PackLayoutConfig& layout
 )
 {
+    (void)document;
+    (void)busbar;
+    (void)module;
+    (void)module_context;
+    (void)layout;
     const Vec3 copper_color{0.72f, 0.48f, 0.24f};
+    // Recovery path: keep each busbar entity as one coherent solid instead of
+    // layering bridge tabs on top of the same span. The document/layout logic
+    // still controls placement, but the rendered result stays mechanically legible.
     appendBox(geometry, bounds.center, bounds.size, copper_color, SurfaceLayer::Busbar);
-
-    if (module == nullptr || module_context.cells.empty()) {
-        return;
-    }
-
-    const float tab_width = std::min(
-        std::max(layout.busbar_tab_width, layout.busbar_overlap_width),
-        std::max(6.0f, bounds.size.x / std::max(1, module->series_span * 2))
-    );
-    std::vector<int> series_indices;
-    for (const battery::CellEntity* cell : module_context.cells) {
-        if (std::find(series_indices.begin(), series_indices.end(), cell->series_index) == series_indices.end()) {
-            series_indices.push_back(cell->series_index);
-        }
-    }
-
-    for (const int series_index : series_indices) {
-        std::vector<const battery::CellEntity*> group_cells;
-        for (const battery::CellEntity* cell : module_context.cells) {
-            if (cell->series_index == series_index) {
-                group_cells.push_back(cell);
-            }
-        }
-        const battery::BoundingBox group_bounds = boundsFromCells(document, group_cells);
-        const float target_z = group_bounds.center.z;
-        const float rail_min_z = bounds.center.z - bounds.size.z * 0.5f;
-        const float rail_max_z = bounds.center.z + bounds.size.z * 0.5f;
-        const float overlap_half_depth = std::max(layout.busbar_overlap_width * 0.5f, bounds.size.z * 0.25f);
-
-        float bridge_min_z = 0.0f;
-        float bridge_max_z = 0.0f;
-        bool needs_bridge = false;
-
-        if (target_z < rail_min_z - 0.5f) {
-            bridge_min_z = target_z - overlap_half_depth;
-            bridge_max_z = rail_min_z;
-            needs_bridge = true;
-        } else if (target_z > rail_max_z + 0.5f) {
-            bridge_min_z = rail_max_z;
-            bridge_max_z = target_z + overlap_half_depth;
-            needs_bridge = true;
-        }
-
-        if (!needs_bridge) {
-            continue;
-        }
-
-        appendBox(
-            geometry,
-            {
-                group_bounds.center.x,
-                bounds.center.y,
-                (bridge_min_z + bridge_max_z) * 0.5f
-            },
-            {
-                tab_width,
-                bounds.size.y,
-                std::max(layout.busbar_tab_depth, bridge_max_z - bridge_min_z)
-            },
-            cad::math::mix(copper_color, {1.0f, 1.0f, 1.0f}, 0.05f),
-            SurfaceLayer::Busbar
-        );
-    }
 }
 
 void appendModuleTrayGeometry(
@@ -437,7 +382,7 @@ GeometryBuffer BatteryGeometryGenerator::buildVisualGeometry(
     GeometryBuffer geometry;
     const battery::PackLayoutConfig& layout = document.metadata().layout_config;
     const int cell_count = static_cast<int>(document.cells().size());
-    const int cylindrical_segments = cell_count > 300 ? 10 : (cell_count > 150 ? 12 : 18);
+    const int cylindrical_segments = cell_count > 300 ? 8 : (cell_count > 150 ? 10 : 14);
     const bool large_pack_mode = cell_count > 200;
     std::unordered_map<core::EntityId, ModuleGeometryContext, core::EntityIdHash> module_contexts;
     module_contexts.reserve(document.modules().size());

@@ -1287,21 +1287,22 @@ void CadViewportWidget::syncGpuBuffers()
 {
     const auto start = std::chrono::steady_clock::now();
     bool uploaded = false;
+    const bool geometryRevisionChanged = m_uploadedGeometryRevision != m_engine.renderDiagnostics().geometry_rebuild_count;
+    const bool packetRevisionChanged = m_uploadedPacketRevision != m_engine.renderDiagnostics().packet_rebuild_count;
 
-    if (m_uploadedGeometryRevision != m_engine.renderDiagnostics().geometry_rebuild_count) {
+    if (geometryRevisionChanged) {
         uploadOpaqueSceneGeometry();
         m_uploadedGeometryRevision = m_engine.renderDiagnostics().geometry_rebuild_count;
         uploaded = true;
     }
 
-    const bool packetRevisionChanged = m_uploadedPacketRevision != m_engine.renderDiagnostics().packet_rebuild_count;
     if (packetRevisionChanged) {
         uploadDynamicLines();
         m_uploadedPacketRevision = m_engine.renderDiagnostics().packet_rebuild_count;
         uploaded = true;
     }
 
-    if (uploaded || packetRevisionChanged) {
+    if (geometryRevisionChanged || (packetRevisionChanged && m_translucentTriangleVertexCount > 0)) {
         uploadTranslucentSceneGeometry();
     }
 
