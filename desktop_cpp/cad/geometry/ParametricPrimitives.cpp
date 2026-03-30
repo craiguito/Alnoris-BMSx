@@ -33,12 +33,12 @@ void appendBox(GeometryBuffer& geometry, const Vec3& center, const Vec3& size, c
     const Vec3 p110{center.x + half.x, center.y + half.y, center.z - half.z};
     const Vec3 p111{center.x + half.x, center.y + half.y, center.z + half.z};
 
-    appendQuad(geometry, p000, p100, p110, p010, color, layer);
-    appendQuad(geometry, p101, p001, p011, p111, color, layer);
-    appendQuad(geometry, p001, p000, p010, p011, color, layer);
-    appendQuad(geometry, p100, p101, p111, p110, color, layer);
-    appendQuad(geometry, p010, p110, p111, p011, cad::math::mix(color, {1.0f, 1.0f, 1.0f}, 0.07f), layer);
-    appendQuad(geometry, p001, p101, p100, p000, cad::math::mix(color, {0.0f, 0.0f, 0.0f}, 0.14f), layer);
+    appendQuad(geometry, p000, p010, p110, p100, color, layer);
+    appendQuad(geometry, p101, p111, p011, p001, color, layer);
+    appendQuad(geometry, p001, p011, p010, p000, color, layer);
+    appendQuad(geometry, p100, p110, p111, p101, color, layer);
+    appendQuad(geometry, p010, p011, p111, p110, cad::math::mix(color, {1.0f, 1.0f, 1.0f}, 0.07f), layer);
+    appendQuad(geometry, p001, p000, p100, p101, cad::math::mix(color, {0.0f, 0.0f, 0.0f}, 0.14f), layer);
 }
 
 void appendCylinder(GeometryBuffer& geometry, const Vec3& center, float radius, float height, int segments, const Vec3& color, SurfaceLayer layer)
@@ -58,9 +58,9 @@ void appendCylinder(GeometryBuffer& geometry, const Vec3& center, float radius, 
         appendQuad(
             geometry,
             cad::math::add(top_center, p0),
-            cad::math::add(top_center, p1),
-            cad::math::add(bottom_center, p1),
             cad::math::add(bottom_center, p0),
+            cad::math::add(bottom_center, p1),
+            cad::math::add(top_center, p1),
             side_color,
             layer
         );
