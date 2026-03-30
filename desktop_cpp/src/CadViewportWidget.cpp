@@ -737,12 +737,14 @@ void CadViewportWidget::initializeGL()
     GLint depthBits = 0;
     glGetIntegerv(GL_DEPTH_BITS, &depthBits);
     m_depthBits = static_cast<int>(depthBits);
+    m_sceneDepthAvailable = false;
 }
 
 void CadViewportWidget::resizeGL(int w, int h)
 {
     m_engine.setViewportSize(w, h);
     m_sceneFramebuffer.reset();
+    m_sceneDepthAvailable = false;
     m_cachedProjectionWidth = 0;
     m_cachedProjectionHeight = 0;
 }
@@ -750,8 +752,9 @@ void CadViewportWidget::resizeGL(int w, int h)
 void CadViewportWidget::paintGL()
 {
     ensureGpuResources();
+    ensureSceneFramebuffer();
     const cad::render::RenderPacket& frame = m_engine.renderPacket();
-    const bool softwareFallback = m_depthBits <= 0;
+    const bool softwareFallback = !m_sceneDepthAvailable;
 
     if (softwareFallback) {
         const std::size_t geometryRevision = m_engine.renderDiagnostics().geometry_rebuild_count;
@@ -831,7 +834,6 @@ void CadViewportWidget::paintGL()
         return;
     }
 
-    ensureSceneFramebuffer();
     syncGpuBuffers();
 
     const auto drawStart = std::chrono::steady_clock::now();
@@ -1010,13 +1012,13 @@ void CadViewportWidget::paintGL()
     painter.drawText(
         QRect(16, 50, width() - 32, 18),
         Qt::AlignLeft | Qt::AlignVCenter,
-        QString("Cell cache %1 hits / %2 misses  |  Rebuilds geo %3 packet %4  |  Depth %5")
-            .arg(static_cast<qlonglong>(m_engine.renderDiagnostics().cylindrical_cell_cache_hits))
-            .arg(static_cast<qlonglong>(m_engine.renderDiagnostics().cylindrical_cell_cache_misses))
-            .arg(static_cast<qlonglong>(m_engine.renderDiagnostics().geometry_rebuild_count))
-            .arg(static_cast<qlonglong>(m_engine.renderDiagnostics().packet_rebuild_count))
-            .arg(m_depthBits)
-    );
+            QString("Cell cache %1 hits / %2 misses  |  Rebuilds geo %3 packet %4  |  Depth %5")
+                .arg(static_cast<qlonglong>(m_engine.renderDiagnostics().cylindrical_cell_cache_hits))
+                .arg(static_cast<qlonglong>(m_engine.renderDiagnostics().cylindrical_cell_cache_misses))
+                .arg(static_cast<qlonglong>(m_engine.renderDiagnostics().geometry_rebuild_count))
+                .arg(static_cast<qlonglong>(m_engine.renderDiagnostics().packet_rebuild_count))
+                .arg(m_sceneDepthAvailable ? m_depthBits : 0)
+        );
 }
 
 void CadViewportWidget::mousePressEvent(QMouseEvent* event)
@@ -1210,13 +1212,11 @@ void CadViewportWidget::ensureSceneFramebuffer()
 
     m_sceneFramebuffer = std::make_unique<QOpenGLFramebufferObject>(desiredSize, framebufferFormat);
     if (m_sceneFramebuffer != nullptr && m_sceneFramebuffer->isValid()) {
-        m_sceneFramebuffer->bind();
-        GLint depthBits = 0;
-        glGetIntegerv(GL_DEPTH_BITS, &depthBits);
-        m_depthBits = static_cast<int>(depthBits);
-        m_sceneFramebuffer->release();
+        m_sceneDepthAvailable = true;
+        m_depthBits = 24;
     } else {
         m_sceneFramebuffer.reset();
+        m_sceneDepthAvailable = false;
         m_depthBits = 0;
     }
 }
@@ -1312,9 +1312,6 @@ void CadViewportWidget::syncGpuBuffers()
 
 void CadViewportWidget::uploadOpaqueSceneGeometry()
 {
-    if (m_depthBits <= 0) {
-        m_opaqueTriangleVertexCount = 0;
-    } else {
     const std::vector<GpuTriangleVertex> triangleVertices = buildTriangleVertices(m_engine.visualGeometry());
     m_opaqueTriangleVertexCount = static_cast<int>(triangleVertices.size());
     m_opaqueTriangleBuffer.bind();
@@ -1324,7 +1321,6 @@ void CadViewportWidget::uploadOpaqueSceneGeometry()
         static_cast<int>(triangleVertices.size() * sizeof(GpuTriangleVertex))
     );
     m_opaqueTriangleBuffer.release();
-    }
 
     const std::vector<GpuLineVertex> sceneLineVertices = buildSceneLineVertices(m_engine.visualGeometry());
     m_sceneLineVertexCount = static_cast<int>(sceneLineVertices.size());
@@ -1339,9 +1335,8 @@ void CadViewportWidget::uploadOpaqueSceneGeometry()
 
 void CadViewportWidget::uploadTranslucentSceneGeometry()
 {
-    const std::vector<GpuTriangleVertex> triangleVertices = m_depthBits <= 0
-        ? buildSortedTriangleVertices(m_engine.visualGeometry(), m_engine.renderPacket().mvp)
-        : buildTransparentTriangleVertices(m_engine.visualGeometry(), m_engine.renderPacket().mvp);
+    const std::vector<GpuTriangleVertex> triangleVertices =
+        buildTransparentTriangleVertices(m_engine.visualGeometry(), m_engine.renderPacket().mvp);
     m_translucentTriangleVertexCount = static_cast<int>(triangleVertices.size());
     m_translucentTriangleBuffer.bind();
     m_translucentTriangleBuffer.setUsagePattern(QOpenGLBuffer::DynamicDraw);

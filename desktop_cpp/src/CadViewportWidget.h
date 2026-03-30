@@ -113,6 +113,7 @@ private:
     int m_overlayLineVertexCount = 0;
     int m_selectionLineVertexCount = 0;
     int m_depthBits = 0;
+    bool m_sceneDepthAvailable = false;
     std::vector<CachedScreenTriangle> m_cachedTriangles;
     std::vector<CachedScreenLine> m_cachedLines;
     std::vector<CachedScreenLine> m_cachedSelectionLines;
