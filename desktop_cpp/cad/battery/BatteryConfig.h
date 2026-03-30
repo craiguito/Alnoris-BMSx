@@ -54,7 +54,7 @@ struct PackLayoutConfig
     float module_tray_base_thickness = 3.0f;
     float module_tray_wall_thickness = 2.5f;
     float module_tray_wall_height = 6.0f;
-    float cell_seating_offset = 1.0f;
+    float cell_seating_offset = 0.35f;
     float support_rib_thickness = 2.0f;
     float support_rib_height = 4.0f;
     float module_tray_margin_x = 8.0f;
