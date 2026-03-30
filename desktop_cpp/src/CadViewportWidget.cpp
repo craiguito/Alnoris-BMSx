@@ -460,16 +460,10 @@ out vec4 fragColor;
 void main()
 {
     vec3 normal = normalize(vNormal);
-    if (!gl_FrontFacing) {
-        normal = -normal;
-    }
     vec3 lightDir = normalize(vec3(0.42, 0.85, 0.31));
     float lambert = max(dot(normal, lightDir), 0.0);
     float topBias = clamp(normal.y * 0.5 + 0.5, 0.0, 1.0);
     float shade = clamp(0.74 + 0.14 * lambert + 0.10 * topBias, 0.0, 1.08);
-    if (!gl_FrontFacing) {
-        shade *= 0.86;
-    }
     fragColor = vec4(clamp(vColor * shade, 0.0, 1.0), vAlpha);
 }
 )";

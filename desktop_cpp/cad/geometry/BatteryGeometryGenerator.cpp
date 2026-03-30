@@ -249,29 +249,41 @@ void appendBusbarGeometry(
         }
         const battery::BoundingBox group_bounds = boundsFromCells(document, group_cells);
         const float target_z = group_bounds.center.z;
-        const float bridge_depth = std::max(
-            layout.busbar_tab_depth,
-            std::abs(bounds.center.z - target_z) + layout.busbar_overlap_width
-        );
-        const Vec3 tab_center{
-            group_bounds.center.x,
-            bounds.center.y,
-            (bounds.center.z + target_z) * 0.5f
-        };
-        if (bridge_depth > bounds.size.z + 0.5f) {
-            appendBox(
-                geometry,
-                tab_center,
-                {tab_width, bounds.size.y, bridge_depth},
-                cad::math::mix(copper_color, {1.0f, 1.0f, 1.0f}, 0.05f),
-                SurfaceLayer::Busbar
-            );
+        const float rail_min_z = bounds.center.z - bounds.size.z * 0.5f;
+        const float rail_max_z = bounds.center.z + bounds.size.z * 0.5f;
+        const float overlap_half_depth = std::max(layout.busbar_overlap_width * 0.5f, bounds.size.z * 0.25f);
+
+        float bridge_min_z = 0.0f;
+        float bridge_max_z = 0.0f;
+        bool needs_bridge = false;
+
+        if (target_z < rail_min_z - 0.5f) {
+            bridge_min_z = target_z - overlap_half_depth;
+            bridge_max_z = rail_min_z;
+            needs_bridge = true;
+        } else if (target_z > rail_max_z + 0.5f) {
+            bridge_min_z = rail_max_z;
+            bridge_max_z = target_z + overlap_half_depth;
+            needs_bridge = true;
         }
+
+        if (!needs_bridge) {
+            continue;
+        }
+
         appendBox(
             geometry,
-            {group_bounds.center.x, bounds.center.y, target_z},
-            {tab_width, bounds.size.y, std::max(layout.busbar_overlap_width, bounds.size.z)},
-            cad::math::mix(copper_color, {1.0f, 1.0f, 1.0f}, 0.10f),
+            {
+                group_bounds.center.x,
+                bounds.center.y,
+                (bridge_min_z + bridge_max_z) * 0.5f
+            },
+            {
+                tab_width,
+                bounds.size.y,
+                std::max(layout.busbar_tab_depth, bridge_max_z - bridge_min_z)
+            },
+            cad::math::mix(copper_color, {1.0f, 1.0f, 1.0f}, 0.05f),
             SurfaceLayer::Busbar
         );
     }

@@ -8,6 +8,8 @@ namespace {
 
 using cad::math::Vec3;
 
+// All solid primitives in this file use CCW winding when viewed from outside
+// so they remain compatible with GL_CCW + back-face culling in the viewport.
 void appendTriangle(GeometryBuffer& geometry, const Vec3& a, const Vec3& b, const Vec3& c, const Vec3& color, SurfaceLayer layer)
 {
     geometry.triangles.push_back({a, b, c, color, layer});
@@ -58,9 +60,9 @@ void appendCylinder(GeometryBuffer& geometry, const Vec3& center, float radius, 
         appendQuad(
             geometry,
             cad::math::add(top_center, p0),
-            cad::math::add(bottom_center, p0),
-            cad::math::add(bottom_center, p1),
             cad::math::add(top_center, p1),
+            cad::math::add(bottom_center, p1),
+            cad::math::add(bottom_center, p0),
             side_color,
             layer
         );
@@ -101,8 +103,8 @@ void appendRing(GeometryBuffer& geometry, const Vec3& center, float outer_radius
 
         appendQuad(geometry, outer_top0, inner_top0, inner_top1, outer_top1, color, layer);
         appendQuad(geometry, outer_bottom1, inner_bottom1, inner_bottom0, outer_bottom0, cad::math::mix(color, {0.0f, 0.0f, 0.0f}, 0.08f), layer);
-        appendQuad(geometry, outer_top0, outer_bottom0, outer_bottom1, outer_top1, cad::math::mix(color, {1.0f, 1.0f, 1.0f}, 0.03f), layer);
-        appendQuad(geometry, inner_top1, inner_bottom1, inner_bottom0, inner_top0, cad::math::mix(color, {0.0f, 0.0f, 0.0f}, 0.08f), layer);
+        appendQuad(geometry, outer_top0, outer_top1, outer_bottom1, outer_bottom0, cad::math::mix(color, {1.0f, 1.0f, 1.0f}, 0.03f), layer);
+        appendQuad(geometry, inner_top0, inner_bottom0, inner_bottom1, inner_top1, cad::math::mix(color, {0.0f, 0.0f, 0.0f}, 0.08f), layer);
     }
 }
 
