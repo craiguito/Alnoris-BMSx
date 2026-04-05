@@ -17,7 +17,7 @@ class FaultEffects:
     capacity_multiplier: float = 1.0
     heat_multiplier: float = 1.0
     cooling_multiplier: float = 1.0
-    soc_offset: float = 0.0
+    reported_soc_offset: float = 0.0
     flags: tuple[str, ...] = ()
 
 
@@ -34,7 +34,7 @@ def effects_for_group(faults: FaultConfig, group_index: int, time_s: int) -> Fau
     capacity_multiplier = 1.0
     heat_multiplier = 1.0
     cooling_multiplier = 1.0
-    soc_offset = 0.0
+    reported_soc_offset = 0.0
     flags: list[str] = []
 
     for fault in faults.faults:
@@ -50,13 +50,25 @@ def effects_for_group(faults: FaultConfig, group_index: int, time_s: int) -> Fau
         elif fault.fault_type == "cooling_loss_group":
             cooling_multiplier *= fault.factor
         elif fault.fault_type == "stuck_high_soc_group":
-            soc_offset += fault.factor
+            reported_soc_offset += fault.factor
 
     return FaultEffects(
         resistance_multiplier=resistance_multiplier,
         capacity_multiplier=capacity_multiplier,
         heat_multiplier=heat_multiplier,
         cooling_multiplier=cooling_multiplier,
-        soc_offset=soc_offset,
+        reported_soc_offset=reported_soc_offset,
         flags=tuple(flags),
     )
+
+
+def reported_soc_for_group(faults: FaultConfig, group_index: int, true_soc: float, time_s: int) -> float:
+    """Return the BMS-reported SOC for a group without changing physical SOC.
+
+    Reporting faults such as ``stuck_high_soc_group`` bias the surfaced SOC
+    signal, but the simulator's electrochemical state remains anchored to the
+    true SOC value.
+    """
+
+    effects = effects_for_group(faults, group_index, time_s)
+    return min(max(true_soc + effects.reported_soc_offset, 0.0), 1.0)

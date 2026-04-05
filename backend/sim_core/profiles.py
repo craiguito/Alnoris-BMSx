@@ -1,6 +1,14 @@
 from __future__ import annotations
 
+from bisect import bisect_right
+from functools import lru_cache
+
 from .types import CurrentProfile
+
+
+@lru_cache(maxsize=128)
+def _profile_timestamps(points: tuple[object, ...]) -> tuple[int, ...]:
+    return tuple(point.time_s for point in points)
 
 
 def current_for_time(profile: CurrentProfile | None, fallback_current_a: float, time_s: int) -> float:
@@ -9,9 +17,8 @@ def current_for_time(profile: CurrentProfile | None, fallback_current_a: float, 
     if profile is None or not profile.points:
         return fallback_current_a
 
-    active_current = profile.points[0].current_a
-    for point in profile.points:
-        if point.time_s > time_s:
-            break
-        active_current = point.current_a
-    return active_current
+    timestamps = _profile_timestamps(profile.points)
+    index = bisect_right(timestamps, time_s) - 1
+    if index < 0:
+        return profile.points[0].current_a
+    return profile.points[index].current_a

@@ -858,6 +858,8 @@ void CadViewportWidget::paintGL()
         1.0f
     );
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
 
     if (m_vao.isCreated()) {
         m_vao.bind();
@@ -1041,22 +1043,51 @@ void CadViewportWidget::mouseMoveEvent(QMouseEvent* event)
         const QPoint delta = event->pos() - m_lastMousePos;
         if (m_moveDragging) {
             cad::math::Vec3 moveDelta{};
-            const float moveScale = 0.8f;
-            switch (m_moveAxis) {
-            case MoveAxis::X:
-                moveDelta.x = static_cast<float>(delta.x()) * moveScale;
-                break;
-            case MoveAxis::Y:
-                moveDelta.y = static_cast<float>(-delta.y()) * moveScale;
-                break;
-            case MoveAxis::Z:
-                moveDelta.z = static_cast<float>(delta.y()) * moveScale;
-                break;
-            case MoveAxis::FreeXZ:
-            default:
-                moveDelta.x = static_cast<float>(delta.x()) * moveScale;
-                moveDelta.z = static_cast<float>(delta.y()) * moveScale;
-                break;
+
+            cad::math::Vec3 currentPos = m_engine.document().worldPosition(m_engine.selectedEntity());
+            const std::array<float, 16>& mvp = m_engine.renderPacket().mvp;
+            ProjectedVertex pCenter = projectToScreen(mvp, currentPos, width(), height());
+
+            if (pCenter.valid) {
+                auto getScreenDir = [&](const cad::math::Vec3& axis) -> QPointF {
+                    ProjectedVertex pAxis = projectToScreen(
+                        mvp,
+                        {currentPos.x + axis.x, currentPos.y + axis.y, currentPos.z + axis.z},
+                        width(),
+                        height()
+                    );
+                    if (!pAxis.valid) {
+                        return QPointF(0, 0);
+                    }
+                    return pAxis.point - pCenter.point;
+                };
+
+                QPointF dirX = getScreenDir({1.0f, 0.0f, 0.0f});
+                QPointF dirY = getScreenDir({0.0f, 1.0f, 0.0f});
+                QPointF dirZ = getScreenDir({0.0f, 0.0f, 1.0f});
+
+                if (m_moveAxis == MoveAxis::X) {
+                    float magSq = static_cast<float>(dirX.x() * dirX.x() + dirX.y() * dirX.y());
+                    if (magSq > 0.0001f) {
+                        moveDelta.x = static_cast<float>((delta.x() * dirX.x() + delta.y() * dirX.y()) / magSq);
+                    }
+                } else if (m_moveAxis == MoveAxis::Y) {
+                    float magSq = static_cast<float>(dirY.x() * dirY.x() + dirY.y() * dirY.y());
+                    if (magSq > 0.0001f) {
+                        moveDelta.y = static_cast<float>((delta.x() * dirY.x() - delta.y() * dirY.y()) / magSq);
+                    }
+                } else if (m_moveAxis == MoveAxis::Z) {
+                    float magSq = static_cast<float>(dirZ.x() * dirZ.x() + dirZ.y() * dirZ.y());
+                    if (magSq > 0.0001f) {
+                        moveDelta.z = static_cast<float>((delta.x() * dirZ.x() + delta.y() * dirZ.y()) / magSq);
+                    }
+                } else if (m_moveAxis == MoveAxis::FreeXZ) {
+                    float det = static_cast<float>(dirX.x() * dirZ.y() - dirX.y() * dirZ.x());
+                    if (std::abs(det) > 0.0001f) {
+                        moveDelta.x = static_cast<float>((delta.x() * dirZ.y() - delta.y() * dirZ.x()) / det);
+                        moveDelta.z = static_cast<float>((dirX.x() * delta.y() - dirX.y() * delta.x()) / det);
+                    }
+                }
             }
             if (m_gridSnapEnabled) {
                 const cad::core::EntityId selectedId = m_engine.selectedEntity();
@@ -1208,10 +1239,9 @@ void CadViewportWidget::ensureSceneFramebuffer()
     }
 
     QOpenGLFramebufferObjectFormat framebufferFormat;
-    framebufferFormat.setAttachment(QOpenGLFramebufferObject::CombinedDepthStencil);
-    framebufferFormat.setInternalTextureFormat(GL_RGBA8);
+    framebufferFormat.setAttachment(QOpenGLFramebufferObject::Depth);
     framebufferFormat.setMipmap(false);
-    framebufferFormat.setSamples(0);
+    framebufferFormat.setSamples(4);
 
     m_sceneFramebuffer = std::make_unique<QOpenGLFramebufferObject>(desiredSize, framebufferFormat);
     if (m_sceneFramebuffer != nullptr && m_sceneFramebuffer->isValid()) {

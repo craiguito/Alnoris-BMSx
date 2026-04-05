@@ -19,7 +19,7 @@ from .types import (
     SimulationResult,
     ThermalZoneConfig,
 )
-from .validation import validate_simulation_config
+from .validation import require_integral_seconds, validate_simulation_config
 
 
 def _result_metric(result: SimulationResult, key: str) -> float:
@@ -70,7 +70,7 @@ def run_virtual_test(test_id: str, parameters: dict[str, Any], base_config: Simu
             base_config,
             discharge_current_a=float(p["current_a"]),
             duration_s=int(p["max_duration_s"]),
-            time_step_s=max(1, int(p["time_step_s"])),
+            time_step_s=require_integral_seconds(p["time_step_s"], "time_step_s"),
             initial_soc=float(p["initial_soc"]),
             ambient_temp_c=float(p["ambient_temp_c"]),
             current_profile=None,
@@ -87,7 +87,7 @@ def run_virtual_test(test_id: str, parameters: dict[str, Any], base_config: Simu
             base_config,
             discharge_current_a=-abs(float(p["current_a"])),
             duration_s=int(p["max_duration_s"]),
-            time_step_s=max(1, int(p["time_step_s"])),
+            time_step_s=require_integral_seconds(p["time_step_s"], "time_step_s"),
             initial_soc=float(p["initial_soc"]),
             ambient_temp_c=float(p["ambient_temp_c"]),
             current_profile=_profile((0, -abs(float(p["current_a"])))),
@@ -112,7 +112,7 @@ def run_virtual_test(test_id: str, parameters: dict[str, Any], base_config: Simu
         primary_result = _run(_with_base(
             base_config,
             duration_s=max(time_s, 1),
-            time_step_s=max(1, int(p["time_step_s"])),
+            time_step_s=require_integral_seconds(p["time_step_s"], "time_step_s"),
             initial_soc=float(p["initial_soc"]),
             ambient_temp_c=float(p["ambient_temp_c"]),
             current_profile=_profile(*profile_points),
@@ -132,7 +132,7 @@ def run_virtual_test(test_id: str, parameters: dict[str, Any], base_config: Simu
         primary_result = _run(_with_base(
             base_config,
             duration_s=int(preload_duration_s + float(p["rest_duration_s"])),
-            time_step_s=max(1, int(p["time_step_s"])),
+            time_step_s=require_integral_seconds(p["time_step_s"], "time_step_s"),
             initial_soc=float(p["initial_soc"]),
             ambient_temp_c=float(p["ambient_temp_c"]),
             current_profile=_profile(*profile_points),
@@ -150,7 +150,7 @@ def run_virtual_test(test_id: str, parameters: dict[str, Any], base_config: Simu
                 base_config,
                 discharge_current_a=current_a,
                 duration_s=int(p["max_duration_s"]),
-                time_step_s=max(1, int(p["time_step_s"])),
+                time_step_s=require_integral_seconds(p["time_step_s"], "time_step_s"),
                 initial_soc=float(p["initial_soc"]),
                 ambient_temp_c=float(p["ambient_temp_c"]),
                 current_profile=None,
@@ -179,7 +179,7 @@ def run_virtual_test(test_id: str, parameters: dict[str, Any], base_config: Simu
             base_config,
             discharge_current_a=float(p["current_a"]),
             duration_s=int(p["duration_s"]),
-            time_step_s=max(1, int(p["time_step_s"])),
+            time_step_s=require_integral_seconds(p["time_step_s"], "time_step_s"),
             initial_soc=float(p["initial_soc"]),
             ambient_temp_c=float(p["ambient_temp_c"]),
         ))
@@ -193,7 +193,7 @@ def run_virtual_test(test_id: str, parameters: dict[str, Any], base_config: Simu
             base_config,
             discharge_current_a=0.0,
             duration_s=int(p["storage_duration_s"]),
-            time_step_s=max(1, int(p["time_step_s"])),
+            time_step_s=require_integral_seconds(p["time_step_s"], "time_step_s"),
             initial_soc=float(p["initial_soc"]),
             ambient_temp_c=float(p["ambient_temp_c"]),
             current_profile=None,

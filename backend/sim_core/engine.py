@@ -8,6 +8,7 @@ for early-stage design work. The simulator uses ECM dynamics rather than full
 electrochemical or distributed thermal physics.
 """
 
+from dataclasses import dataclass
 from statistics import mean
 
 from .chemistry import apply_chemistry_defaults
@@ -21,22 +22,21 @@ from .physics.electrical import (
     compute_power_w,
     compute_reversible_heat_w,
     compute_terminal_voltage,
+    current_direction_resistance_multiplier,
     diffusion_stress_resistance_multiplier,
     effective_r0_ohm,
     interconnect_resistance_ohm,
+    soc_resistance_multiplier,
     step_electrical_state,
     temperature_adjusted_resistance_ohm,
-    soc_resistance_multiplier,
-    current_direction_resistance_multiplier,
     validate_electrical_model,
 )
-from .physics.faults import effects_for_group
+from .physics.faults import effects_for_group, reported_soc_for_group
 from .physics.pack import build_group_states, derive_pack_properties
 from .physics.thermal import compute_next_group_temperatures, resolve_group_thermal_context
 from .profiles import current_for_time
 from .types import (
     CellGroupState,
-    GroupStepResult,
     SimulationConfig,
     SimulationPoint,
     SimulationResult,
@@ -46,14 +46,141 @@ from .types import (
 from .validation import validate_simulation_config
 
 
+@dataclass(frozen=True)
+class GroupObservation:
+    state: CellGroupState
+    terminal_voltage_v: float
+    open_circuit_voltage_v: float
+    heat_w: float
+    reversible_heat_w: float
+    effective_resistance_ohm: float
+    balance_current_a: float
+    reported_soc: float
+    fault_flags: list[str]
+    hysteresis_voltage_v: float
+    diffusion_stress_v: float
+    degradation_rate_indicator: float = 0.0
+
+
+@dataclass(frozen=True)
+class GroupAdvanceResult:
+    next_state: CellGroupState
+    degradation_rate_indicator: float
+    thermal_substep_count: int
+
+
 def _group_cutoff_voltage_v(config: SimulationConfig, series_factor: float) -> float:
     return config.cell_cutoff_voltage * series_factor
 
 
-def _step_group(
+def _group_effective_resistance_ohm(
+    *,
     group: CellGroupState,
     config: SimulationConfig,
-    time_s: int,
+    group_base_resistance_ohm: float,
+    current_a: float,
+    resistance_multiplier: float,
+    electrical_state,
+) -> float:
+    r0_ohm = (
+        effective_r0_ohm(config, group_base_resistance_ohm)
+        * effective_resistance_scale(group)
+        * resistance_multiplier
+    )
+    r0_ohm *= soc_resistance_multiplier(config, group.soc)
+    r0_ohm *= current_direction_resistance_multiplier(current_a, config)
+    r0_ohm = temperature_adjusted_resistance_ohm(r0_ohm, group.core_temp_c, config) + interconnect_resistance_ohm(config)
+    r0_ohm *= diffusion_stress_resistance_multiplier(electrical_state, config)
+    return r0_ohm
+
+
+def _observe_group(
+    *,
+    group: CellGroupState,
+    config: SimulationConfig,
+    fault_time_s: int,
+    group_voltage_scale: float,
+    group_base_resistance_ohm: float,
+    pack_current_a: float,
+    balance_current_a: float,
+    degradation_rate_indicator: float = 0.0,
+) -> GroupObservation:
+    fault_effects = effects_for_group(config.faults, group.index, fault_time_s)
+    current_a = pack_current_a + balance_current_a
+    r0_ohm = _group_effective_resistance_ohm(
+        group=group,
+        config=config,
+        group_base_resistance_ohm=group_base_resistance_ohm,
+        current_a=current_a,
+        resistance_multiplier=fault_effects.resistance_multiplier,
+        electrical_state=group.electrical_state,
+    )
+    open_circuit_voltage_v = compute_open_circuit_voltage(
+        soc=group.soc,
+        config=config,
+        group_voltage_scale=group_voltage_scale,
+    )
+    terminal_voltage_v = compute_terminal_voltage(
+        open_circuit_voltage_v=open_circuit_voltage_v,
+        current_a=current_a,
+        r0_ohm=r0_ohm,
+        state=group.electrical_state,
+    )
+    reversible_heat_w = compute_reversible_heat_w(current_a, group.core_temp_c, group.soc, config)
+    heat_w = (compute_heat_w(current_a, r0_ohm) + reversible_heat_w) * fault_effects.heat_multiplier
+
+    return GroupObservation(
+        state=group,
+        terminal_voltage_v=terminal_voltage_v,
+        open_circuit_voltage_v=open_circuit_voltage_v,
+        heat_w=heat_w,
+        reversible_heat_w=reversible_heat_w,
+        effective_resistance_ohm=r0_ohm,
+        balance_current_a=balance_current_a,
+        reported_soc=reported_soc_for_group(config.faults, group.index, group.soc, fault_time_s),
+        fault_flags=list(fault_effects.flags),
+        hysteresis_voltage_v=group.electrical_state.hysteresis_voltage_v,
+        diffusion_stress_v=group.electrical_state.diffusion_stress_v,
+        degradation_rate_indicator=degradation_rate_indicator,
+    )
+
+
+def _observe_groups(
+    *,
+    groups: list[CellGroupState],
+    config: SimulationConfig,
+    fault_time_s: int,
+    group_voltage_scale: float,
+    group_base_resistance_ohm: float,
+    pack_current_a: float,
+    balance_currents_a: list[float],
+    degradation_rate_indicators: list[float] | None = None,
+) -> list[GroupObservation]:
+    return [
+        _observe_group(
+            group=group,
+            config=config,
+            fault_time_s=fault_time_s,
+            group_voltage_scale=group_voltage_scale,
+            group_base_resistance_ohm=group_base_resistance_ohm,
+            pack_current_a=pack_current_a,
+            balance_current_a=balance_currents_a[group.index],
+            degradation_rate_indicator=(
+                degradation_rate_indicators[group.index]
+                if degradation_rate_indicators is not None
+                else 0.0
+            ),
+        )
+        for group in groups
+    ]
+
+
+def _advance_group(
+    *,
+    group: CellGroupState,
+    config: SimulationConfig,
+    fault_time_s: int,
+    dt_s: int,
     group_voltage_scale: float,
     group_base_resistance_ohm: float,
     group_capacity_as: float,
@@ -62,26 +189,13 @@ def _step_group(
     balance_current_a: float,
     left_neighbor_temp_c: float | None,
     right_neighbor_temp_c: float | None,
-) -> GroupStepResult:
-    fault_effects = effects_for_group(config.faults, group.index, time_s)
+) -> GroupAdvanceResult:
+    fault_effects = effects_for_group(config.faults, group.index, fault_time_s)
     thermal_context = resolve_group_thermal_context(config, group.index)
     current_a = pack_current_a + balance_current_a
-    r0_ohm = (
-        effective_r0_ohm(config, group_base_resistance_ohm)
-        * effective_resistance_scale(group)
-        * fault_effects.resistance_multiplier
-    )
-    r0_ohm *= soc_resistance_multiplier(config, group.soc)
-    r0_ohm *= current_direction_resistance_multiplier(current_a, config)
-    r0_ohm = temperature_adjusted_resistance_ohm(r0_ohm, group.core_temp_c, config) + interconnect_resistance_ohm(config)
-    open_circuit_voltage_v = compute_open_circuit_voltage(
-        soc=group.soc,
-        config=config,
-        group_voltage_scale=group_voltage_scale,
-    )
     next_electrical_state = step_electrical_state(
         current_a=current_a,
-        dt_s=config.time_step_s,
+        dt_s=dt_s,
         model=config.electrical_model,
         state=group.electrical_state,
         series_factor=group_voltage_scale,
@@ -90,19 +204,16 @@ def _step_group(
         temp_c=group.core_temp_c,
         config=config,
     )
-    r0_ohm *= diffusion_stress_resistance_multiplier(next_electrical_state, config)
-    terminal_voltage_v = compute_terminal_voltage(
-        open_circuit_voltage_v=open_circuit_voltage_v,
+    interval_resistance_ohm = _group_effective_resistance_ohm(
+        group=group,
+        config=config,
+        group_base_resistance_ohm=group_base_resistance_ohm,
         current_a=current_a,
-        r0_ohm=r0_ohm,
-        state=next_electrical_state,
-    )
-    joule_heat_w = compute_heat_w(
-        current_a=current_a,
-        r0_ohm=r0_ohm,
+        resistance_multiplier=fault_effects.resistance_multiplier,
+        electrical_state=next_electrical_state,
     )
     reversible_heat_w = compute_reversible_heat_w(current_a, group.core_temp_c, group.soc, config)
-    heat_w = (joule_heat_w + reversible_heat_w) * fault_effects.heat_multiplier
+    heat_w = (compute_heat_w(current_a, interval_resistance_ohm) + reversible_heat_w) * fault_effects.heat_multiplier
     thermal_step = compute_next_group_temperatures(
         core_temp_c=group.core_temp_c,
         surface_temp_c=group.surface_temp_c,
@@ -110,7 +221,7 @@ def _step_group(
         ambient_temp_c=thermal_context.ambient_temp_c,
         cooling_coeff_w_per_k=thermal_context.cooling_coeff_w_per_k * fault_effects.cooling_multiplier,
         thermal_mass_j_per_k=thermal_mass_j_per_k,
-        dt_s=config.time_step_s,
+        dt_s=dt_s,
         config=config,
         left_neighbor_surface_temp_c=left_neighbor_temp_c,
         right_neighbor_surface_temp_c=right_neighbor_temp_c,
@@ -119,14 +230,14 @@ def _step_group(
         state=group.degradation,
         config=config.degradation,
         current_a=current_a,
-        dt_s=config.time_step_s,
+        dt_s=dt_s,
         temp_c=thermal_step.core_temp_c,
         soc=group.soc,
     )
     next_soc = compute_next_soc(
         current_soc=group.soc,
         current_a=current_a,
-        dt_s=config.time_step_s,
+        dt_s=dt_s,
         capacity_as=(
             group_capacity_as
             * effective_capacity_scale(group)
@@ -136,12 +247,7 @@ def _step_group(
         config=config,
     )
 
-    return GroupStepResult(
-        terminal_voltage_v=terminal_voltage_v,
-        open_circuit_voltage_v=open_circuit_voltage_v,
-        heat_w=heat_w,
-        balance_current_a=balance_current_a,
-        fault_flags=list(fault_effects.flags),
+    return GroupAdvanceResult(
         next_state=CellGroupState(
             index=group.index,
             soc=next_soc,
@@ -153,53 +259,46 @@ def _step_group(
             electrical_state=next_electrical_state,
             degradation=degradation_result.next_state,
         ),
-        reversible_heat_w=reversible_heat_w,
-        effective_resistance_ohm=r0_ohm,
-        degradation_rate_indicator=degradation_result.capacity_loss_increment / max(config.time_step_s / 3600.0, 1e-9),
-        hysteresis_voltage_v=next_electrical_state.hysteresis_voltage_v,
-        diffusion_stress_v=next_electrical_state.diffusion_stress_v,
+        degradation_rate_indicator=degradation_result.capacity_loss_increment / max(dt_s / 3600.0, 1e-9),
+        thermal_substep_count=thermal_step.substep_count,
     )
 
 
 def _build_time_point(
+    *,
     config: SimulationConfig,
     time_s: int,
     current_a: float,
-    group_step_results: list[GroupStepResult],
+    group_observations: list[GroupObservation],
 ) -> SimulationPoint:
-    group_voltages_v = [result.terminal_voltage_v for result in group_step_results]
-    group_heats_w = [result.heat_w for result in group_step_results]
-    group_temps_c = [result.next_state.temp_c for result in group_step_results]
-    group_core_temps_c = [result.next_state.core_temp_c for result in group_step_results]
-    group_surface_temps_c = [result.next_state.surface_temp_c for result in group_step_results]
-    group_socs = [result.next_state.soc for result in group_step_results]
-    group_balance_currents_a = [result.balance_current_a for result in group_step_results]
-    group_fault_flags = [result.fault_flags for result in group_step_results]
-    group_hysteresis_v = [result.hysteresis_voltage_v for result in group_step_results]
-    group_diffusion_stress = [result.diffusion_stress_v for result in group_step_results]
-    group_effective_resistance_ohm = [result.effective_resistance_ohm for result in group_step_results]
-    group_heat_w = [result.heat_w for result in group_step_results]
-    group_zone_ids = list(config.group_zone_assignments) if config.group_zone_assignments else [0 for _ in group_step_results]
-    group_labels = list(config.group_labels) if config.group_labels else [f"Group {index}" for index in range(len(group_step_results))]
-    group_entity_ids = list(config.group_entity_ids) if config.group_entity_ids else [f"group-{index}" for index in range(len(group_step_results))]
-    degradation_rate_indicator = mean([result.degradation_rate_indicator for result in group_step_results])
-    weakest_group_index = min(
-        range(len(group_voltages_v)),
-        key=lambda index: group_voltages_v[index],
-    )
-    hottest_group_index = max(
-        range(len(group_temps_c)),
-        key=lambda index: group_temps_c[index],
-    )
+    group_voltages_v = [observation.terminal_voltage_v for observation in group_observations]
+    group_heats_w = [observation.heat_w for observation in group_observations]
+    group_temps_c = [observation.state.temp_c for observation in group_observations]
+    group_core_temps_c = [observation.state.core_temp_c for observation in group_observations]
+    group_surface_temps_c = [observation.state.surface_temp_c for observation in group_observations]
+    group_true_socs = [observation.state.soc for observation in group_observations]
+    group_reported_socs = [observation.reported_soc for observation in group_observations]
+    group_balance_currents_a = [observation.balance_current_a for observation in group_observations]
+    group_fault_flags = [observation.fault_flags for observation in group_observations]
+    group_hysteresis_v = [observation.hysteresis_voltage_v for observation in group_observations]
+    group_diffusion_stress = [observation.diffusion_stress_v for observation in group_observations]
+    group_effective_resistance_ohm = [observation.effective_resistance_ohm for observation in group_observations]
+    group_heat_w = [observation.heat_w for observation in group_observations]
+    group_zone_ids = list(config.group_zone_assignments) if config.group_zone_assignments else [0 for _ in group_observations]
+    group_labels = list(config.group_labels) if config.group_labels else [f"Group {index}" for index in range(len(group_observations))]
+    group_entity_ids = list(config.group_entity_ids) if config.group_entity_ids else [f"group-{index}" for index in range(len(group_observations))]
+    degradation_rate_indicator = mean([observation.degradation_rate_indicator for observation in group_observations])
 
+    weakest_group_index = min(range(len(group_voltages_v)), key=lambda index: group_voltages_v[index])
+    hottest_group_index = max(range(len(group_temps_c)), key=lambda index: group_temps_c[index])
     pack_voltage_v = sum(group_voltages_v)
     pack_heat_w = sum(group_heats_w)
     pack_power_w = compute_power_w(pack_voltage_v, current_a)
     pack_temp_max_c = max(group_temps_c)
     pack_temp_avg_c = mean(group_temps_c)
-    soc_min = min(group_socs)
-    soc_max = max(group_socs)
-    soc_avg = mean(group_socs)
+    soc_min = min(group_true_socs)
+    soc_max = max(group_true_socs)
+    soc_avg = mean(group_true_socs)
     zone_temp_max_c: dict[int, float] = {}
     for zone_id, temp_c in zip(group_zone_ids, group_temps_c):
         zone_temp_max_c[zone_id] = max(zone_temp_max_c.get(zone_id, temp_c), temp_c)
@@ -226,7 +325,8 @@ def _build_time_point(
         group_voltage_max_v=max(group_voltages_v),
         weakest_group_index=weakest_group_index,
         hottest_group_index=hottest_group_index,
-        group_soc=group_socs,
+        group_soc=group_reported_socs,
+        group_true_soc=group_true_socs,
         group_voltage=group_voltages_v,
         group_temp=group_temps_c,
         group_core_temp=group_core_temps_c,
@@ -246,12 +346,12 @@ def _build_time_point(
         group_entity_ids=group_entity_ids,
         zone_temp_max_c=zone_temp_max_c,
         estimated_capacity_retention=mean(
-            max(1.0 - result.next_state.degradation.capacity_loss_fraction, 0.0)
-            for result in group_step_results
+            max(1.0 - observation.state.degradation.capacity_loss_fraction, 0.0)
+            for observation in group_observations
         ),
         estimated_resistance_multiplier=mean(
-            1.0 + result.next_state.degradation.resistance_growth_fraction
-            for result in group_step_results
+            1.0 + observation.state.degradation.resistance_growth_fraction
+            for observation in group_observations
         ),
         degradation_rate_indicator=degradation_rate_indicator,
     )
@@ -269,30 +369,56 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
     )
     pack = derive_pack_properties(validated_config)
     groups = build_group_states(validated_config, pack)
-    total_steps = validated_config.duration_s // validated_config.time_step_s
     group_cutoff_voltage_v = _group_cutoff_voltage_v(validated_config, int(pack.series_factor))
     thermal_mass_j_per_k = (
         validated_config.pack_mass_kg * validated_config.pack_heat_capacity_j_per_kgk / pack.group_count
     )
 
-    time_series: list[SimulationPoint] = []
+    current_time_s = 0
+    current_a = current_for_time(validated_config.current_profile, validated_config.discharge_current_a, current_time_s)
+    balance_currents_a = balance_currents_for_groups(
+        groups=groups,
+        config=validated_config,
+        group_voltage_scale=pack.series_factor,
+        time_s=current_time_s,
+    )
+    current_observations = _observe_groups(
+        groups=groups,
+        config=validated_config,
+        fault_time_s=current_time_s,
+        group_voltage_scale=pack.series_factor,
+        group_base_resistance_ohm=pack.group_base_resistance_ohm,
+        pack_current_a=current_a,
+        balance_currents_a=balance_currents_a,
+    )
+
+    time_series: list[SimulationPoint] = [
+        _build_time_point(
+            config=validated_config,
+            time_s=current_time_s,
+            current_a=current_a,
+            group_observations=current_observations,
+        )
+    ]
+    metric_points: list[SimulationPoint] = [time_series[0]]
     termination_reason = "duration_elapsed"
     total_balance_ah = 0.0
+    delivered_capacity_ah = 0.0
+    delivered_energy_wh = 0.0
+    cumulative_charge_throughput_ah = 0.0
+    cumulative_discharge_throughput_ah = 0.0
+    cumulative_high_soc_time_s = 0.0
+    max_thermal_substeps = 1
 
-    for step in range(total_steps + 1):
-        time_s = step * validated_config.time_step_s
-        current_a = current_for_time(validated_config.current_profile, validated_config.discharge_current_a, time_s)
-        balance_currents_a = balance_currents_for_groups(
-            groups=groups,
-            config=validated_config,
-            group_voltage_scale=pack.series_factor,
-        )
-
-        step_results = [
-            _step_group(
+    while current_time_s < validated_config.duration_s:
+        interval_dt_s = min(validated_config.time_step_s, validated_config.duration_s - current_time_s)
+        interval_start_point = time_series[-1]
+        advance_results = [
+            _advance_group(
                 group=group,
                 config=validated_config,
-                time_s=time_s,
+                fault_time_s=current_time_s,
+                dt_s=interval_dt_s,
                 group_voltage_scale=pack.series_factor,
                 group_base_resistance_ohm=pack.group_base_resistance_ohm,
                 group_capacity_as=pack.group_capacity_as,
@@ -304,31 +430,101 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
             )
             for group in groups
         ]
-        groups = [result.next_state for result in step_results]
-        point = _build_time_point(config=validated_config, time_s=time_s, current_a=current_a, group_step_results=step_results)
-        time_series.append(point)
-        total_balance_ah += sum(point.group_balance_current_a) * validated_config.time_step_s / 3600.0
+        next_groups = [result.next_state for result in advance_results]
+        degradation_rate_indicators = [result.degradation_rate_indicator for result in advance_results]
+        max_thermal_substeps = max(
+            max_thermal_substeps,
+            max((result.thermal_substep_count for result in advance_results), default=1),
+        )
+        next_time_s = current_time_s + interval_dt_s
 
-        if point.group_voltage_min_v <= group_cutoff_voltage_v:
+        interval_end_observations = _observe_groups(
+            groups=next_groups,
+            config=validated_config,
+            fault_time_s=current_time_s,
+            group_voltage_scale=pack.series_factor,
+            group_base_resistance_ohm=pack.group_base_resistance_ohm,
+            pack_current_a=current_a,
+            balance_currents_a=balance_currents_a,
+            degradation_rate_indicators=degradation_rate_indicators,
+        )
+        interval_end_point = _build_time_point(
+            config=validated_config,
+            time_s=next_time_s,
+            current_a=current_a,
+            group_observations=interval_end_observations,
+        )
+        metric_points.append(interval_end_point)
+
+        delivered_capacity_ah += current_a * interval_dt_s / 3600.0
+        delivered_energy_wh += (
+            (interval_start_point.pack_power_w + interval_end_point.pack_power_w) * 0.5 * interval_dt_s / 3600.0
+        )
+        total_balance_ah += sum(balance_currents_a) * interval_dt_s / 3600.0
+        cumulative_charge_throughput_ah += abs(min(current_a, 0.0)) * interval_dt_s / 3600.0
+        cumulative_discharge_throughput_ah += max(current_a, 0.0) * interval_dt_s / 3600.0
+        if any(
+            before.soc >= validated_config.degradation.high_soc_threshold
+            or after.soc >= validated_config.degradation.high_soc_threshold
+            for before, after in zip(groups, next_groups)
+        ):
+            cumulative_high_soc_time_s += interval_dt_s
+
+        groups = next_groups
+        current_time_s = next_time_s
+        current_a = current_for_time(validated_config.current_profile, validated_config.discharge_current_a, current_time_s)
+        balance_currents_a = balance_currents_for_groups(
+            groups=groups,
+            config=validated_config,
+            group_voltage_scale=pack.series_factor,
+            time_s=current_time_s,
+        )
+        current_observations = _observe_groups(
+            groups=groups,
+            config=validated_config,
+            fault_time_s=current_time_s,
+            group_voltage_scale=pack.series_factor,
+            group_base_resistance_ohm=pack.group_base_resistance_ohm,
+            pack_current_a=current_a,
+            balance_currents_a=balance_currents_a,
+            degradation_rate_indicators=degradation_rate_indicators,
+        )
+        time_series.append(
+            _build_time_point(
+                config=validated_config,
+                time_s=current_time_s,
+                current_a=current_a,
+                group_observations=current_observations,
+            )
+        )
+
+        if interval_end_point.group_voltage_min_v <= group_cutoff_voltage_v:
             termination_reason = "group_cutoff_voltage_reached"
             break
-        if point.soc_min <= 0.0 and current_a > 0.0:
+        if interval_end_point.soc_min <= 0.0 and interval_start_point.current_a > 0.0:
             termination_reason = "soc_depleted"
             break
-        if point.soc_max >= 1.0 and current_a < 0.0:
+        if interval_end_point.soc_max >= 1.0 and interval_start_point.current_a < 0.0:
             termination_reason = "soc_ceiling_reached"
             break
 
     summary = build_summary(
         config=validated_config,
         time_series=time_series,
+        metric_points=metric_points,
         groups=groups,
         theoretical_energy_wh=pack.theoretical_energy_wh,
         group_cutoff_voltage_v=group_cutoff_voltage_v,
         termination_reason=termination_reason,
         total_balance_ah=total_balance_ah,
+        delivered_capacity_ah=delivered_capacity_ah,
+        delivered_energy_wh=delivered_energy_wh,
+        cumulative_charge_throughput_ah=cumulative_charge_throughput_ah,
+        cumulative_discharge_throughput_ah=cumulative_discharge_throughput_ah,
+        cumulative_high_soc_time_s=cumulative_high_soc_time_s,
         fault_count=len(validated_config.faults.faults),
         balancing_enabled=validated_config.balancing.enabled,
+        max_thermal_substeps=max_thermal_substeps,
     )
 
     return SimulationResult(
@@ -341,15 +537,23 @@ def run_simulation(config: SimulationConfig) -> SimulationResult:
 
 
 def build_summary(
+    *,
     config: SimulationConfig,
     time_series: list[SimulationPoint],
+    metric_points: list[SimulationPoint],
     groups: list[CellGroupState],
     theoretical_energy_wh: float,
     group_cutoff_voltage_v: float,
     termination_reason: str,
     total_balance_ah: float,
+    delivered_capacity_ah: float,
+    delivered_energy_wh: float,
+    cumulative_charge_throughput_ah: float,
+    cumulative_discharge_throughput_ah: float,
+    cumulative_high_soc_time_s: float,
     fault_count: int,
     balancing_enabled: bool,
+    max_thermal_substeps: int,
 ) -> SimulationSummary:
     if not time_series:
         return SimulationSummary(
@@ -398,22 +602,20 @@ def build_summary(
         )
 
     runtime_s = time_series[-1].time_s
-    delivered_capacity_ah = sum(point.current_a * config.time_step_s / 3600.0 for point in time_series[:-1])
-    delivered_energy_wh = sum(point.pack_power_w * config.time_step_s / 3600.0 for point in time_series[:-1])
-    min_terminal_voltage_v = min(point.pack_voltage_v for point in time_series)
-    min_group_voltage_v = min(point.group_voltage_min_v for point in time_series)
-    max_group_temp_c = max(point.pack_temp_max_c for point in time_series)
-    max_core_temp_c = max((max(point.group_core_temp) for point in time_series), default=config.ambient_temp_c)
-    max_surface_temp_c = max((max(point.group_surface_temp) for point in time_series), default=config.ambient_temp_c)
+    min_terminal_voltage_v = min(point.pack_voltage_v for point in metric_points)
+    min_group_voltage_v = min(point.group_voltage_min_v for point in metric_points)
+    max_group_temp_c = max(point.pack_temp_max_c for point in metric_points)
+    max_core_temp_c = max((max(point.group_core_temp) for point in metric_points), default=config.ambient_temp_c)
+    max_surface_temp_c = max((max(point.group_surface_temp) for point in metric_points), default=config.ambient_temp_c)
     temp_gradient_max_c = max(
-        (max(abs(core - surface) for core, surface in zip(point.group_core_temp, point.group_surface_temp)) for point in time_series),
+        (max(abs(core - surface) for core, surface in zip(point.group_core_temp, point.group_surface_temp)) for point in metric_points),
         default=0.0,
     )
     max_diffusion_stress = max((max(point.group_diffusion_stress) for point in time_series), default=0.0)
     weakest_group_index = min(
         (
             (voltage, index)
-            for point in time_series
+            for point in metric_points
             for index, voltage in enumerate(point.group_voltage)
         ),
         key=lambda item: item[0],
@@ -421,60 +623,60 @@ def build_summary(
     hottest_group_index = max(
         (
             (temp_c, index)
-            for point in time_series
+            for point in metric_points
             for index, temp_c in enumerate(point.group_temp)
         ),
         key=lambda item: item[0],
     )[1]
-    final_soc_avg = time_series[-1].soc_avg
-    soc_spread = time_series[-1].soc_max - time_series[-1].soc_min
+    final_soc_avg = mean(group.soc for group in groups)
+    soc_spread = max((group.soc for group in groups), default=config.initial_soc) - min(
+        (group.soc for group in groups),
+        default=config.initial_soc,
+    )
     estimated_capacity_retention = mean(
         max(1.0 - group.degradation.capacity_loss_fraction, 0.0) for group in groups
     )
     estimated_resistance_growth = mean(group.degradation.resistance_growth_fraction for group in groups)
-    cumulative_charge_throughput_ah = sum(group.degradation.cumulative_charge_throughput_ah for group in groups)
-    cumulative_discharge_throughput_ah = sum(group.degradation.cumulative_discharge_throughput_ah for group in groups)
-    cumulative_high_soc_time_h = sum(group.degradation.cumulative_high_soc_time_s for group in groups) / 3600.0
     estimated_cycle_stress = mean(group.degradation.cumulative_cycle_stress for group in groups)
-    group_capacity_retention = [
-        max(1.0 - group.degradation.capacity_loss_fraction, 0.0)
-        for group in groups
-    ]
-    group_resistance_growth = [
-        group.degradation.resistance_growth_fraction
-        for group in groups
-    ]
+    group_capacity_retention = [max(1.0 - group.degradation.capacity_loss_fraction, 0.0) for group in groups]
+    group_resistance_growth = [group.degradation.resistance_growth_fraction for group in groups]
     first_faulted_group_index = next(
-        (
-            point.fault_active_groups[0]
-            for point in time_series
-            if point.fault_active_groups
-        ),
+        (point.fault_active_groups[0] for point in time_series if point.fault_active_groups),
         None,
     )
     hottest_zone_id = 0
     max_zone_temp_c = config.ambient_temp_c
-    for point in time_series:
+    for point in metric_points:
         for zone_id, temp_c in point.zone_temp_max_c.items():
             if temp_c >= max_zone_temp_c:
                 max_zone_temp_c = temp_c
                 hottest_zone_id = zone_id
 
     warnings: list[SimulationWarning] = []
-    if max_group_temp_c >= 60.0:
+    peak_thermal_temp_c = max(max_core_temp_c, max_surface_temp_c)
+    if peak_thermal_temp_c >= 60.0:
         warnings.append(
             SimulationWarning(
                 code="thermal_limit_exceeded",
-                message="Peak group temperature exceeded 60 C.",
+                message="Peak core or surface temperature exceeded 60 C.",
                 severity="high",
             )
         )
-    elif max_group_temp_c >= 45.0:
+    elif peak_thermal_temp_c >= 45.0:
         warnings.append(
             SimulationWarning(
                 code="thermal_margin_low",
-                message="Peak group temperature exceeded 45 C.",
+                message="Peak core or surface temperature exceeded 45 C.",
                 severity="medium",
+            )
+        )
+
+    if max_thermal_substeps >= 4:
+        warnings.append(
+            SimulationWarning(
+                code="thermal_timestep_coarse",
+                message="Thermal timestep is coarse relative to pack thermal dynamics; internal substepping was applied and fine detail may be under-resolved.",
+                severity="medium" if max_thermal_substeps >= 16 else "low",
             )
         )
 
@@ -504,12 +706,23 @@ def build_summary(
             )
         )
 
-    usable_energy_ratio = delivered_energy_wh / theoretical_energy_wh if theoretical_energy_wh else 0.0
-    if delivered_energy_wh > 0.0 and usable_energy_ratio < 0.8:
+    initial_soc_avg = time_series[0].soc_avg
+    usable_energy_reference_wh = theoretical_energy_wh * max(initial_soc_avg, 0.0)
+    meaningful_discharge_attempt = (
+        delivered_energy_wh > 0.0
+        and initial_soc_avg >= 0.7
+        and (
+            termination_reason in {"group_cutoff_voltage_reached", "soc_depleted"}
+            or final_soc_avg <= 0.1
+            or time_series[-1].soc_min <= 0.05
+        )
+    )
+    usable_energy_ratio = delivered_energy_wh / usable_energy_reference_wh if usable_energy_reference_wh else 0.0
+    if meaningful_discharge_attempt and usable_energy_ratio < 0.8:
         warnings.append(
             SimulationWarning(
                 code="low_usable_energy",
-                message="Delivered energy was significantly below theoretical energy.",
+                message="Delivered energy was significantly below expected usable energy for the attempted discharge window.",
                 severity="low",
             )
         )
@@ -546,7 +759,7 @@ def build_summary(
         max_zone_temp_c=max_zone_temp_c,
         cumulative_charge_throughput_ah=cumulative_charge_throughput_ah,
         cumulative_discharge_throughput_ah=cumulative_discharge_throughput_ah,
-        cumulative_high_soc_time_h=cumulative_high_soc_time_h,
+        cumulative_high_soc_time_h=cumulative_high_soc_time_s / 3600.0,
         estimated_cycle_stress=estimated_cycle_stress,
         degradation_model_version="v2-pragmatic",
         group_capacity_retention=group_capacity_retention,

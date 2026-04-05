@@ -289,6 +289,11 @@ class SimulationPoint:
     Canonical serialized field names should use explicit unit suffixes such as
     ``pack_voltage_v`` and ``group_core_temp_c``. Some legacy aliases are still
     emitted at the bridge layer for older desktop payload consumers.
+
+    ``group_soc`` reflects the BMS-reported per-group SOC exposed to the
+    bridge/UI. Under reporting faults such as ``stuck_high_soc_group`` this can
+    differ from the physical ``group_true_soc`` values. Pack-level summary
+    metrics remain based on the true electrochemical state.
     """
 
     time_s: int
@@ -313,6 +318,7 @@ class SimulationPoint:
     weakest_group_index: int
     hottest_group_index: int
     group_soc: list[float]
+    group_true_soc: list[float]
     group_voltage: list[float]
     group_temp: list[float]
     group_core_temp: list[float]

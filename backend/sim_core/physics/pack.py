@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from ..physics.electrical import init_rc_state, validate_electrical_model
-from ..physics.faults import effects_for_group
 from ..types import CellGroupState, PackProperties, SimulationConfig
 
 
@@ -63,11 +62,10 @@ def build_group_states(config: SimulationConfig, pack: PackProperties) -> list[C
             max(config.initial_soc + config.group_variation.initial_soc_variation_abs * offset, 0.0),
             1.0,
         )
-        initial_faults = effects_for_group(config.faults, index, 0)
         states.append(
             CellGroupState(
                 index=index,
-                soc=min(max(initial_soc + initial_faults.soc_offset, 0.0), 1.0),
+                soc=initial_soc,
                 temp_c=config.ambient_temp_c,
                 core_temp_c=config.ambient_temp_c,
                 surface_temp_c=config.ambient_temp_c,

@@ -58,6 +58,7 @@ def _simulation_point_to_dict(point: Any) -> dict[str, Any]:
         "soc_max": point.soc_max,
         "group_voltage_v": point.group_voltage,
         "group_soc": point.group_soc,
+        "group_true_soc": point.group_true_soc,
         "group_core_temp_c": point.group_core_temp_c,
         "group_surface_temp_c": point.group_surface_temp_c,
         "group_heat_w": point.group_heat_w,
@@ -95,6 +96,51 @@ def _simulation_point_to_dict(point: Any) -> dict[str, Any]:
     }
     canonical.update(canonical["legacy_aliases"])
     return canonical
+
+
+def _parse_include_time_series(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "1", "yes"}:
+            return True
+        if normalized in {"false", "0", "no"}:
+            return False
+    raise ValueError("include_time_series must be a boolean.")
+
+
+def _parse_max_time_series_points(value: Any) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError("max_time_series_points must be an integer.")
+    numeric_value = float(value)
+    if not numeric_value.is_integer():
+        raise ValueError("max_time_series_points must be an integer.")
+    count = int(numeric_value)
+    if count < 2:
+        raise ValueError("max_time_series_points must be >= 2 when provided.")
+    return count
+
+
+def _downsample_time_series(points: list[Any], max_points: int | None) -> list[Any]:
+    if max_points is None or len(points) <= max_points:
+        return list(points)
+
+    last_index = len(points) - 1
+    selected_indices: list[int] = []
+    previous_index = -1
+    for slot in range(max_points):
+        target = round(slot * last_index / (max_points - 1))
+        minimum_index = previous_index + 1
+        maximum_index = last_index - (max_points - slot - 1)
+        index = min(max(target, minimum_index), maximum_index)
+        selected_indices.append(index)
+        previous_index = index
+    return [points[index] for index in selected_indices]
 
 
 def _simulation_summary_to_dict(summary: Any) -> dict[str, Any]:
@@ -545,7 +591,7 @@ def simulation_config_from_dict(payload: dict[str, Any]) -> SimulationConfig:
             ambient_temp_c=float(payload["ambient_temp_c"]),
             discharge_current_a=float(payload["discharge_current_a"]),
             duration_s=int(payload["duration_s"]),
-            time_step_s=int(payload["time_step_s"]),
+            time_step_s=float(payload["time_step_s"]),
             initial_soc=float(payload["initial_soc"]),
             pack_mass_kg=float(payload["pack_mass_kg"]),
             pack_heat_capacity_j_per_kgk=float(payload["pack_heat_capacity_j_per_kgk"]),
@@ -570,10 +616,19 @@ def simulation_config_from_dict(payload: dict[str, Any]) -> SimulationConfig:
 def run_simulation_from_dict(payload: dict[str, Any]) -> dict[str, Any]:
     config = simulation_config_from_dict(payload)
     result = run_simulation(config)
-    return simulation_result_to_dict(result)
+    return simulation_result_to_dict(
+        result,
+        include_time_series=_parse_include_time_series(payload.get("include_time_series", True)),
+        max_time_series_points=_parse_max_time_series_points(payload.get("max_time_series_points")),
+    )
 
 
-def simulation_result_to_dict(result: SimulationResult) -> dict[str, Any]:
+def simulation_result_to_dict(
+    result: SimulationResult,
+    *,
+    include_time_series: bool = True,
+    max_time_series_points: int | None = None,
+) -> dict[str, Any]:
     top_level_group_labels: list[str] = []
     top_level_group_entity_ids: list[str] = []
     top_level_group_zone_ids: list[int] = []
@@ -582,7 +637,8 @@ def simulation_result_to_dict(result: SimulationResult) -> dict[str, Any]:
         top_level_group_entity_ids = list(result.time_series[-1].group_entity_ids)
         top_level_group_zone_ids = list(result.time_series[-1].group_zone_ids)
 
-    return {
+    returned_time_series = _downsample_time_series(result.time_series, max_time_series_points) if include_time_series else []
+    payload = {
         "pack_nominal_voltage_v": result.pack_nominal_voltage_v,
         "pack_capacity_ah": result.pack_capacity_ah,
         "theoretical_energy_wh": result.theoretical_energy_wh,
@@ -590,8 +646,15 @@ def simulation_result_to_dict(result: SimulationResult) -> dict[str, Any]:
         "group_entity_ids": top_level_group_entity_ids,
         "group_zone_ids": top_level_group_zone_ids,
         "summary": _simulation_summary_to_dict(result.summary),
-        "time_series": [_simulation_point_to_dict(point) for point in result.time_series],
+        "time_series_metadata": {
+            "original_point_count": len(result.time_series),
+            "returned_point_count": len(returned_time_series),
+            "downsampled": include_time_series and len(returned_time_series) != len(result.time_series),
+        },
     }
+    if include_time_series:
+        payload["time_series"] = [_simulation_point_to_dict(point) for point in returned_time_series]
+    return payload
 
 
 def virtual_test_catalog_to_dict() -> dict[str, Any]:

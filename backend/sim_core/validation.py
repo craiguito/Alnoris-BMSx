@@ -1,8 +1,25 @@
 from __future__ import annotations
 
+import math
+from dataclasses import replace
+
 from .chemistry import available_chemistries
 from .physics.electrical import validate_electrical_model
 from .types import BalancingConfig, CurrentProfile, DegradationConfig, FaultConfig, PhysicsConfig, SimulationConfig, ThermalZoneConfig
+
+
+def require_integral_seconds(value: object, field_name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{field_name} must be a numeric whole number of seconds.")
+
+    numeric_value = float(value)
+    if not math.isfinite(numeric_value):
+        raise ValueError(f"{field_name} must be finite.")
+    if numeric_value <= 0.0:
+        raise ValueError(f"{field_name} must be > 0.")
+    if not numeric_value.is_integer():
+        raise ValueError(f"{field_name} must be an integer number of seconds; sub-second steps are not supported.")
+    return int(numeric_value)
 
 
 def validate_current_profile(profile: CurrentProfile | None) -> CurrentProfile | None:
@@ -212,8 +229,7 @@ def validate_physics(config: PhysicsConfig) -> PhysicsConfig:
 def validate_simulation_config(config: SimulationConfig) -> SimulationConfig:
     if config.duration_s <= 0:
         raise ValueError("duration_s must be > 0.")
-    if config.time_step_s <= 0:
-        raise ValueError("time_step_s must be > 0.")
+    config = replace(config, time_step_s=require_integral_seconds(config.time_step_s, "time_step_s"))
     if config.group_count is not None and config.group_count < 1:
         raise ValueError("group_count must be >= 1 when provided.")
     if config.cells_in_series < 1:

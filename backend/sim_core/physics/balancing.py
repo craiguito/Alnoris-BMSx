@@ -6,6 +6,7 @@ This is a deterministic bleed-current approximation, not an active balancing con
 """
 
 from ..physics.electrical import compute_open_circuit_voltage
+from ..physics.faults import effects_for_group
 from ..types import BalancingConfig, CellGroupState, SimulationConfig
 
 
@@ -13,6 +14,7 @@ def balance_currents_for_groups(
     groups: list[CellGroupState],
     config: SimulationConfig,
     group_voltage_scale: float,
+    time_s: int,
 ) -> list[float]:
     balancing = config.balancing
     if not balancing.enabled:
@@ -20,12 +22,14 @@ def balance_currents_for_groups(
 
     candidates: list[tuple[float, int]] = []
     for group in groups:
-        meets_soc = balancing.soc_threshold is not None and group.soc >= balancing.soc_threshold
+        fault_effects = effects_for_group(config.faults, group.index, time_s)
+        reported_soc = min(max(group.soc + fault_effects.reported_soc_offset, 0.0), 1.0)
+        meets_soc = balancing.soc_threshold is not None and reported_soc >= balancing.soc_threshold
         group_ocv_v = compute_open_circuit_voltage(group.soc, config, group_voltage_scale=group_voltage_scale)
         meets_voltage = balancing.voltage_threshold_v is not None and group_ocv_v >= balancing.voltage_threshold_v
         if not (meets_soc or meets_voltage):
             continue
-        score = max(group.soc, group_ocv_v)
+        score = max(reported_soc, group_ocv_v)
         candidates.append((score, group.index))
 
     candidates.sort(reverse=True)
