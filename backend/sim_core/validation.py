@@ -171,6 +171,16 @@ def validate_physics(config: PhysicsConfig) -> PhysicsConfig:
         raise ValueError("physics.pack_interconnect_resistance_ohm must be >= 0.")
     if config.neighbor_thermal_coupling_w_per_k < 0.0:
         raise ValueError("physics.neighbor_thermal_coupling_w_per_k must be >= 0.")
+    if config.ocv_curve:
+        if len(config.ocv_curve) < 2:
+            raise ValueError("physics.ocv_curve must contain at least two points when provided.")
+        previous_soc = -1.0
+        for point in config.ocv_curve:
+            if not 0.0 <= point.soc <= 1.0:
+                raise ValueError("physics.ocv_curve SOC values must be within [0, 1].")
+            if point.soc <= previous_soc:
+                raise ValueError("physics.ocv_curve SOC values must be strictly increasing.")
+            previous_soc = point.soc
     if config.resistance_vs_soc_enabled:
         if len(config.resistance_soc_curve) < 2:
             raise ValueError("physics.resistance_soc_curve must contain at least two points when enabled.")

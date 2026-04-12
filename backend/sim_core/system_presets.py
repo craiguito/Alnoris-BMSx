@@ -10,8 +10,11 @@ battery-aware CAD layout description without relying on imported mesh assets.
 from dataclasses import asdict, dataclass, field
 from math import ceil
 
+from .calibration import apply_calibration_to_simulation_config, calibrate_parameters, load_truth_dataset
 from .reference_cells import REFERENCE_CELLS
 from .test_catalog import build_test_catalog
+from .types import BalancingConfig, ElectricalModelConfig, PhysicsConfig, SimulationConfig, ThermalZoneConfig
+from .validation import validate_simulation_config
 
 
 @dataclass(frozen=True)
@@ -452,6 +455,86 @@ def _band_assignments(group_count: int, zone_count: int) -> list[int]:
         zone_index = min(group_index // groups_per_zone, zone_count - 1)
         assignments.append(zone_index)
     return assignments
+
+
+def _resolve_preset(preset_or_id: BatterySystemPreset | str) -> BatterySystemPreset:
+    if isinstance(preset_or_id, BatterySystemPreset):
+        validate_system_preset(preset_or_id)
+        return preset_or_id
+    return get_system_preset(str(preset_or_id))
+
+
+def build_simulation_config_for_preset(preset_or_id: BatterySystemPreset | str) -> SimulationConfig:
+    preset = _resolve_preset(preset_or_id)
+    cell = REFERENCE_CELLS[preset.cell.key]
+    group_count = preset.pack.series_count
+    assignments = tuple(_band_assignments(group_count, preset.thermal_zone_count))
+    thermal_zones = tuple(
+        ThermalZoneConfig(
+            zone_id=zone_index,
+            name=f"{preset.display_name} Zone {zone_index + 1}",
+            cooling_coeff_multiplier=multiplier,
+            note="Generated from battery system preset cooling bands.",
+        )
+        for zone_index, multiplier in enumerate(preset.thermal_zone_cooling_multipliers)
+    )
+    group_labels = tuple(f"Group {index + 1}" for index in range(group_count))
+    group_entity_ids = tuple(f"group-{index}" for index in range(group_count))
+
+    return validate_simulation_config(
+        SimulationConfig(
+            cell_nominal_voltage=cell.cell_nominal_voltage,
+            cell_full_voltage=cell.cell_full_voltage,
+            cell_empty_voltage=cell.cell_empty_voltage,
+            cell_cutoff_voltage=cell.cell_cutoff_voltage,
+            cell_capacity_ah=cell.cell_capacity_ah,
+            cells_in_series=preset.pack.series_count,
+            cells_in_parallel=preset.pack.parallel_count,
+            internal_resistance_ohm_per_cell=cell.internal_resistance_ohm_per_cell,
+            ambient_temp_c=preset.ambient_temp_c,
+            discharge_current_a=preset.discharge_current_a,
+            duration_s=preset.duration_s,
+            time_step_s=preset.time_step_s,
+            initial_soc=preset.initial_soc,
+            pack_mass_kg=preset.pack_mass_kg,
+            pack_heat_capacity_j_per_kgk=preset.pack_heat_capacity_j_per_kgk,
+            cooling_coeff_w_per_k=preset.cooling_coeff_w_per_k,
+            electrical_model=ElectricalModelConfig(
+                model_type="rint",
+                r0_ohm_per_cell=cell.internal_resistance_ohm_per_cell,
+            ),
+            group_count=group_count,
+            balancing=BalancingConfig(
+                enabled=preset.balancing_enabled,
+                mode="passive",
+                soc_threshold=preset.balancing_soc_threshold,
+                bleed_current_a=preset.balancing_bleed_current_a,
+            ),
+            thermal_zones=thermal_zones,
+            group_zone_assignments=assignments,
+            group_labels=group_labels,
+            group_entity_ids=group_entity_ids,
+            chemistry_name=preset.chemistry_name,
+            physics=PhysicsConfig(
+                interconnect_resistance_ohm_per_group=preset.interconnect_resistance_ohm_per_group,
+                pack_interconnect_resistance_ohm=preset.pack_interconnect_resistance_ohm,
+            ),
+        )
+    )
+
+
+def build_calibrated_simulation_config_for_preset(
+    preset_or_id: BatterySystemPreset | str,
+    dataset_path: str,
+    *,
+    rc_branch_count: int = 1,
+) -> SimulationConfig:
+    base_config = build_simulation_config_for_preset(preset_or_id)
+    dataset = load_truth_dataset(dataset_path)
+    calibrated = calibrate_parameters(dataset, rc_branch_count=rc_branch_count)
+    return validate_simulation_config(
+        apply_calibration_to_simulation_config(base_config, calibrated)
+    )
 
 
 def build_system_preset_payload(preset: BatterySystemPreset) -> dict[str, object]:

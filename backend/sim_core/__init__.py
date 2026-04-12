@@ -1,3 +1,12 @@
+from .calibration import (
+    CalibratedParameters,
+    TruthDataset,
+    TruthRecord,
+    apply_calibration_to_configs,
+    apply_calibration_to_simulation_config,
+    calibrate_parameters,
+    load_truth_dataset,
+)
 from .engine import run_simulation
 from .types import (
     CellGroupState,
@@ -18,6 +27,7 @@ __all__ = [
     "CellGroupState",
     "CurrentProfile",
     "CurrentProfilePoint",
+    "CalibratedParameters",
     "DegradationConfig",
     "ElectricalModelConfig",
     "PackProperties",
@@ -27,5 +37,11 @@ __all__ = [
     "SimulationResult",
     "SimulationSummary",
     "SimulationWarning",
+    "TruthDataset",
+    "TruthRecord",
+    "apply_calibration_to_configs",
+    "apply_calibration_to_simulation_config",
+    "calibrate_parameters",
+    "load_truth_dataset",
     "run_simulation",
 ]

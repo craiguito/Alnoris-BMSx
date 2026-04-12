@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
+from .calibration import load_truth_dataset
 from .reference_cells import REFERENCE_CELLS
 from .test_catalog import get_test_definition
 from .tests_framework import TestVettingResult
@@ -10,6 +12,8 @@ from .types import SimulationConfig
 
 
 def _parse_parameter(param_type: str, value: Any) -> Any:
+    if param_type in {"string", "path"}:
+        return str(value)
     if param_type == "int":
         return int(value)
     if param_type == "float":
@@ -79,5 +83,34 @@ def vet_virtual_test(test_id: str, parameters: dict[str, Any], base_config: Simu
         errors.append("Fault Response Test requires at least one fault spec.")
     if test_id == "rate_capability" and not normalized.get("current_list_a"):
         errors.append("Rate Capability Test requires at least one current value.")
+    if test_id == "model_validation":
+        dataset_path = Path(str(normalized.get("dataset_path", ""))).expanduser()
+        if not dataset_path.exists():
+            errors.append("Model Validation Test requires a dataset_path that exists.")
+        else:
+            try:
+                dataset = load_truth_dataset(str(dataset_path))
+            except Exception as exc:
+                errors.append(f"Could not load truth dataset: {exc}")
+            else:
+                normalized["dataset_path"] = str(dataset_path)
+                normalized["dataset_record_count"] = len(dataset.records)
+                metrics = normalized.get("metrics", [])
+                if not isinstance(metrics, list):
+                    errors.append("Metrics must be a JSON list.")
+                else:
+                    allowed_metrics = {"rmse_voltage", "energy_error", "temp_rmse"}
+                    invalid_metrics = [metric for metric in metrics if metric not in allowed_metrics]
+                    if invalid_metrics:
+                        errors.append(
+                            "Unsupported model validation metric(s): " + ", ".join(str(metric) for metric in invalid_metrics)
+                        )
+                    elif not metrics:
+                        errors.append("Model Validation Test requires at least one metric.")
+                dataset_chemistry = dataset.metadata.get("chemistry_name") or dataset.metadata.get("chemistry")
+                if dataset_chemistry and str(dataset_chemistry) != base_config.chemistry_name:
+                    warnings.append(
+                        "Truth dataset chemistry metadata does not match the base configuration chemistry_name."
+                    )
 
     return TestVettingResult(is_valid=not errors, errors=errors, warnings=warnings, normalized_parameters=normalized)

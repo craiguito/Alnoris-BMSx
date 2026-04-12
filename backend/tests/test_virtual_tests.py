@@ -3,13 +3,15 @@ from __future__ import annotations
 import unittest
 
 from backend.sim_core.bridge import run_virtual_test_from_dict, vet_virtual_test_from_dict, virtual_test_catalog_to_dict
-from backend.tests.helpers import make_config
+from backend.sim_core.engine import run_simulation
+from backend.tests.helpers import make_config, make_profile, temporary_workspace_dir, write_truth_dataset
 
 
 class VirtualTestFrameworkTests(unittest.TestCase):
     def _base_payload(self) -> dict[str, object]:
         config = make_config(cells_in_series=4, group_count=4)
         return {
+            "chemistry_name": config.chemistry_name,
             "cell_nominal_voltage": config.cell_nominal_voltage,
             "cell_full_voltage": config.cell_full_voltage,
             "cell_empty_voltage": config.cell_empty_voltage,
@@ -35,6 +37,7 @@ class VirtualTestFrameworkTests(unittest.TestCase):
         self.assertIn("constant_current_discharge", test_ids)
         self.assertIn("pulse_power", test_ids)
         self.assertIn("rate_capability", test_ids)
+        self.assertIn("model_validation", test_ids)
 
     def test_vetting_rejects_missing_required_parameter(self) -> None:
         payload = {
@@ -126,6 +129,39 @@ class VirtualTestFrameworkTests(unittest.TestCase):
         }
         result = run_virtual_test_from_dict(payload)
         self.assertIn("spread_reduced", result["pass_fail_indicators"])
+
+    def test_model_validation_replays_truth_dataset_and_reports_metrics(self) -> None:
+        config = make_config(
+            cells_in_series=4,
+            group_count=4,
+            discharge_current_a=0.0,
+            duration_s=60,
+            current_profile=make_profile((0, 0.0), (5, 2.0), (20, 0.0), (35, 1.5), (50, 0.0)),
+        )
+        truth_result = run_simulation(config)
+
+        with temporary_workspace_dir() as temp_dir:
+            dataset_path = write_truth_dataset(f"{temp_dir}/truth.json", config, truth_result)
+            payload = {
+                "test_id": "model_validation",
+                "base_config": self._base_payload(),
+                "parameters": {
+                    "dataset_path": str(dataset_path),
+                    "metrics": ["rmse_voltage", "energy_error", "temp_rmse"],
+                    "max_voltage_rmse_v": 0.01,
+                    "max_energy_error_fraction": 0.01,
+                    "max_temp_rmse_c": 0.01,
+                },
+            }
+            result = run_virtual_test_from_dict(payload)
+
+        self.assertIn("rmse_voltage_v", result["summary_metrics"])
+        self.assertIn("energy_error_fraction", result["summary_metrics"])
+        self.assertIn("rmse_temp_c", result["summary_metrics"])
+        self.assertLess(result["summary_metrics"]["rmse_voltage_v"], 1e-6)
+        self.assertLess(result["summary_metrics"]["energy_error_fraction"], 1e-6)
+        self.assertLess(result["summary_metrics"]["rmse_temp_c"], 1e-6)
+        self.assertTrue(result["pass_fail_indicators"]["validation_passed"])
 
 
 if __name__ == "__main__":

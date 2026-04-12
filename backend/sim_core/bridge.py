@@ -19,6 +19,7 @@ from .types import (
     FaultConfig,
     FaultSpec,
     GroupVariationConfig,
+    OcvLookupPoint,
     PhysicsConfig,
     RcBranchParams,
     SocLookupPoint,
@@ -417,6 +418,16 @@ def _parse_thermal_zones(payload: dict[str, Any]) -> tuple[ThermalZoneConfig, ..
 def _parse_physics(payload: dict[str, Any]) -> PhysicsConfig:
     physics_payload = payload.get("physics", {})
     defaults = PhysicsConfig()
+    ocv_curve_payload = physics_payload.get("ocv_curve", defaults.ocv_curve)
+    ocv_curve_items: list[OcvLookupPoint] = []
+    for item in ocv_curve_payload or ():
+        if isinstance(item, OcvLookupPoint):
+            ocv_curve_items.append(item)
+        else:
+            ocv_curve_items.append(
+                OcvLookupPoint(soc=float(item["soc"]), voltage_v=float(item["voltage_v"]))
+            )
+    ocv_curve = tuple(ocv_curve_items)
     curve_payload = physics_payload.get("resistance_soc_curve", defaults.resistance_soc_curve)
     curve_items: list[SocLookupPoint] = []
     for item in curve_payload or ():
@@ -457,6 +468,7 @@ def _parse_physics(payload: dict[str, Any]) -> PhysicsConfig:
         neighbor_thermal_coupling_w_per_k=float(
             physics_payload.get("neighbor_thermal_coupling_w_per_k", defaults.neighbor_thermal_coupling_w_per_k)
         ),
+        ocv_curve=ocv_curve,
         resistance_vs_soc_enabled=bool(
             physics_payload.get("resistance_vs_soc_enabled", defaults.resistance_vs_soc_enabled)
         ),

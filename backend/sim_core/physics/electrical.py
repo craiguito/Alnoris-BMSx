@@ -35,6 +35,9 @@ def compute_open_circuit_voltage(
     config: SimulationConfig,
     group_voltage_scale: float = 1.0,
 ) -> float:
+    if config.physics.ocv_curve:
+        return interpolate_ocv_curve(config.physics.ocv_curve, soc) * group_voltage_scale
+
     chemistry = get_chemistry_preset(config.chemistry_name)
     if chemistry.ocv_curve:
         return interpolate_ocv_curve(chemistry.ocv_curve, soc) * group_voltage_scale

@@ -4,6 +4,13 @@ from dataclasses import replace
 from statistics import mean
 from typing import Any
 
+from .calibration import (
+    build_validation_config,
+    compute_energy_error,
+    compute_rmse_temp,
+    compute_rmse_voltage,
+    load_truth_dataset,
+)
 from .engine import run_simulation
 from .test_catalog import get_test_definition
 from .test_vetting import vet_virtual_test
@@ -174,6 +181,32 @@ def run_virtual_test(test_id: str, parameters: dict[str, Any], base_config: Simu
             "scenario_count": len(sub_results),
             "best_capacity_ah": max((scenario.summary_metrics["capacity_ah"] for scenario in sub_results), default=0.0),
         }
+    elif test_id == "model_validation":
+        dataset = load_truth_dataset(str(p["dataset_path"]))
+        validation_config = build_validation_config(base_config, dataset)
+        primary_result = _run(validation_config)
+        requested_metrics = [str(metric) for metric in p["metrics"]]
+
+        summary_metrics = {
+            "dataset_record_count": len(dataset.records),
+            "profile_point_count": len(validation_config.current_profile.points) if validation_config.current_profile else 0,
+            "validation_duration_s": validation_config.duration_s,
+        }
+        if "rmse_voltage" in requested_metrics:
+            rmse_voltage_v = compute_rmse_voltage(primary_result, dataset)
+            summary_metrics["rmse_voltage_v"] = rmse_voltage_v
+            pass_fail["voltage_rmse_within_limit"] = rmse_voltage_v <= float(p["max_voltage_rmse_v"])
+        if "energy_error" in requested_metrics:
+            energy_error_fraction = compute_energy_error(primary_result, dataset)
+            summary_metrics["energy_error_fraction"] = energy_error_fraction
+            pass_fail["energy_error_within_limit"] = (
+                energy_error_fraction <= float(p["max_energy_error_fraction"])
+            )
+        if "temp_rmse" in requested_metrics:
+            rmse_temp_c = compute_rmse_temp(primary_result, dataset)
+            summary_metrics["rmse_temp_c"] = rmse_temp_c
+            pass_fail["temp_rmse_within_limit"] = rmse_temp_c <= float(p["max_temp_rmse_c"])
+        pass_fail["validation_passed"] = all(pass_fail.values()) if pass_fail else True
     elif test_id == "thermal_stress":
         primary_result = _run(_with_base(
             base_config,

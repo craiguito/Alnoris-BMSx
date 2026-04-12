@@ -142,6 +142,7 @@ class PhysicsConfig:
     interconnect_resistance_ohm_per_group: float = 0.0
     pack_interconnect_resistance_ohm: float = 0.0
     neighbor_thermal_coupling_w_per_k: float = 0.0
+    ocv_curve: tuple[OcvLookupPoint, ...] = ()
     resistance_vs_soc_enabled: bool = False
     resistance_soc_curve: tuple[SocLookupPoint, ...] = (
         SocLookupPoint(0.0, 1.18),

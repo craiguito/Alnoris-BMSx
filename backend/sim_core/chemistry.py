@@ -73,6 +73,7 @@ def apply_chemistry_defaults(config: SimulationConfig) -> SimulationConfig:
         interconnect_resistance_ohm_per_group=physics.interconnect_resistance_ohm_per_group if physics.interconnect_resistance_ohm_per_group != generic_defaults.interconnect_resistance_ohm_per_group else preset.default_physics.interconnect_resistance_ohm_per_group,
         pack_interconnect_resistance_ohm=physics.pack_interconnect_resistance_ohm if physics.pack_interconnect_resistance_ohm != generic_defaults.pack_interconnect_resistance_ohm else preset.default_physics.pack_interconnect_resistance_ohm,
         neighbor_thermal_coupling_w_per_k=physics.neighbor_thermal_coupling_w_per_k if physics.neighbor_thermal_coupling_w_per_k != generic_defaults.neighbor_thermal_coupling_w_per_k else preset.default_physics.neighbor_thermal_coupling_w_per_k,
+        ocv_curve=physics.ocv_curve,
         resistance_vs_soc_enabled=physics.resistance_vs_soc_enabled if physics.resistance_vs_soc_enabled != generic_defaults.resistance_vs_soc_enabled else preset.default_physics.resistance_vs_soc_enabled,
         resistance_soc_curve=physics.resistance_soc_curve if physics.resistance_soc_curve != generic_defaults.resistance_soc_curve else preset.default_physics.resistance_soc_curve,
         hysteresis_enabled=physics.hysteresis_enabled if physics.hysteresis_enabled != generic_defaults.hysteresis_enabled else preset.default_physics.hysteresis_enabled,
@@ -103,4 +104,3 @@ def apply_chemistry_defaults(config: SimulationConfig) -> SimulationConfig:
         discharge_resistance_multiplier=physics.discharge_resistance_multiplier if physics.discharge_resistance_multiplier != generic_defaults.discharge_resistance_multiplier else preset.default_physics.discharge_resistance_multiplier,
     )
     return replace(config, chemistry_name=preset.name, physics=merged_physics)
-
