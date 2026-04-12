@@ -2,3 +2,4 @@
 #include <UVLADIE3JM/moc_CadViewportWidget.cpp>
 #include <UVLADIE3JM/moc_ChartWidget.cpp>
 #include <UVLADIE3JM/moc_MainWindow.cpp>
+#include <UVLADIE3JM/moc_SimulationClient.cpp>

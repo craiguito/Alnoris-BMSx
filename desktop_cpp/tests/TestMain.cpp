@@ -1,5 +1,7 @@
 #include "TestHarness.h"
 
+#include <QCoreApplication>
+
 #include <exception>
 #include <iostream>
 #include <utility>
@@ -52,7 +54,8 @@ int runAllTests()
 
 } // namespace cad::tests
 
-int main()
+int main(int argc, char** argv)
 {
+    QCoreApplication app(argc, argv);
     return cad::tests::runAllTests();
 }

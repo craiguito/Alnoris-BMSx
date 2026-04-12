@@ -109,6 +109,26 @@ class NonlinearPhysicsTests(unittest.TestCase):
         reversible = run_simulation(make_config(duration_s=60, discharge_current_a=4.0, physics=PhysicsConfig(reversible_heat_enabled=True, reversible_heat_coeff_v_per_k=0.00012)))
         self.assertNotAlmostEqual(baseline.time_series[0].pack_heat_w, reversible.time_series[0].pack_heat_w, places=5)
 
+    def test_negative_reversible_heat_does_not_cool_below_ambient(self) -> None:
+        ambient_temp_c = 25.0
+        result = run_simulation(
+            make_config(
+                duration_s=120,
+                initial_soc=1.0,
+                discharge_current_a=4.0,
+                ambient_temp_c=ambient_temp_c,
+                physics=PhysicsConfig(
+                    two_node_thermal_enabled=True,
+                    reversible_heat_enabled=True,
+                    reversible_heat_coeff_v_per_k=0.02,
+                    core_surface_thermal_coupling_w_per_k=0.8,
+                ),
+            )
+        )
+        self.assertGreaterEqual(min(point.pack_temp_avg_c for point in result.time_series), ambient_temp_c - 1e-6)
+        self.assertGreaterEqual(min(min(point.group_core_temp_c) for point in result.time_series), ambient_temp_c - 1e-6)
+        self.assertGreaterEqual(min(min(point.group_surface_temp_c) for point in result.time_series), ambient_temp_c - 1e-6)
+
     def test_current_direction_asymmetry_changes_response(self) -> None:
         physics = PhysicsConfig(charge_resistance_multiplier=1.25, discharge_resistance_multiplier=0.95)
         discharge = run_simulation(make_config(duration_s=60, current_profile=CurrentProfile(points=(CurrentProfilePoint(0, 4.0),)), physics=physics))

@@ -1,6 +1,4 @@
-C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/build-desktop/alnoris_desktop_autogen/include_Debug/UVLADIE3JM/moc_MainWindow.cpp: C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/desktop_cpp/src/MainWindow.h \
-  C:/Program\ Files\ (x86)/Windows\ Kits/10/Include/10.0.26100.0/shared/winapifamily.h \
-  C:/Program\ Files\ (x86)/Windows\ Kits/10/Include/10.0.26100.0/shared/winpackagefamily.h \
+C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/build-desktop/alnoris_desktop_autogen/include_Debug/UVLADIE3JM/moc_SimulationClient.cpp: C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/desktop_cpp/src/SimulationClient.h \
   C:/Program\ Files\ (x86)/Windows\ Kits/10/Include/10.0.26100.0/ucrt/assert.h \
   C:/Program\ Files\ (x86)/Windows\ Kits/10/Include/10.0.26100.0/ucrt/corecrt.h \
   C:/Program\ Files\ (x86)/Windows\ Kits/10/Include/10.0.26100.0/ucrt/corecrt_malloc.h \
@@ -12,12 +10,10 @@ C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/build-desktop/alnoris_desktop_auto
   C:/Program\ Files\ (x86)/Windows\ Kits/10/Include/10.0.26100.0/ucrt/corecrt_wstdlib.h \
   C:/Program\ Files\ (x86)/Windows\ Kits/10/Include/10.0.26100.0/ucrt/corecrt_wstring.h \
   C:/Program\ Files\ (x86)/Windows\ Kits/10/Include/10.0.26100.0/ucrt/errno.h \
-  C:/Program\ Files\ (x86)/Windows\ Kits/10/Include/10.0.26100.0/ucrt/inttypes.h \
   C:/Program\ Files\ (x86)/Windows\ Kits/10/Include/10.0.26100.0/ucrt/stddef.h \
   C:/Program\ Files\ (x86)/Windows\ Kits/10/Include/10.0.26100.0/ucrt/stdio.h \
   C:/Program\ Files\ (x86)/Windows\ Kits/10/Include/10.0.26100.0/ucrt/stdlib.h \
   C:/Program\ Files\ (x86)/Windows\ Kits/10/Include/10.0.26100.0/ucrt/string.h \
-  C:/Program\ Files\ (x86)/Windows\ Kits/10/Include/10.0.26100.0/um/GL/gl.h \
   C:/Program\ Files/Microsoft\ Visual\ Studio/18/Community/VC/Tools/MSVC/14.50.35717/include/algorithm \
   C:/Program\ Files/Microsoft\ Visual\ Studio/18/Community/VC/Tools/MSVC/14.50.35717/include/array \
   C:/Program\ Files/Microsoft\ Visual\ Studio/18/Community/VC/Tools/MSVC/14.50.35717/include/atomic \
@@ -45,7 +41,6 @@ C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/build-desktop/alnoris_desktop_auto
   C:/Program\ Files/Microsoft\ Visual\ Studio/18/Community/VC/Tools/MSVC/14.50.35717/include/set \
   C:/Program\ Files/Microsoft\ Visual\ Studio/18/Community/VC/Tools/MSVC/14.50.35717/include/stdarg.h \
   C:/Program\ Files/Microsoft\ Visual\ Studio/18/Community/VC/Tools/MSVC/14.50.35717/include/stdbool.h \
-  C:/Program\ Files/Microsoft\ Visual\ Studio/18/Community/VC/Tools/MSVC/14.50.35717/include/stdint.h \
   C:/Program\ Files/Microsoft\ Visual\ Studio/18/Community/VC/Tools/MSVC/14.50.35717/include/string \
   C:/Program\ Files/Microsoft\ Visual\ Studio/18/Community/VC/Tools/MSVC/14.50.35717/include/string_view \
   C:/Program\ Files/Microsoft\ Visual\ Studio/18/Community/VC/Tools/MSVC/14.50.35717/include/tuple \
@@ -61,17 +56,10 @@ C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/build-desktop/alnoris_desktop_auto
   C:/Program\ Files/Microsoft\ Visual\ Studio/18/Community/VC/Tools/MSVC/14.50.35717/include/version \
   C:/Program\ Files/Microsoft\ Visual\ Studio/18/Community/VC/Tools/MSVC/14.50.35717/include/yvals.h \
   C:/Program\ Files/Microsoft\ Visual\ Studio/18/Community/VC/Tools/MSVC/14.50.35717/include/yvals_core.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtCore/QJsonArray \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/QJsonObject \
-  C:/Qt/6.11.0/msvc2022_64/include/QtCore/QList \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/QObject \
-  C:/Qt/6.11.0/msvc2022_64/include/QtCore/QPoint \
-  C:/Qt/6.11.0/msvc2022_64/include/QtCore/QPointF \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/QProcess \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/QString \
-  C:/Qt/6.11.0/msvc2022_64/include/QtCore/QStringList \
-  C:/Qt/6.11.0/msvc2022_64/include/QtCore/QVariant \
-  C:/Qt/6.11.0/msvc2022_64/include/QtCore/QVariantList \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/q17memory.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/q20bit.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/q20functional.h \
@@ -100,7 +88,6 @@ C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/build-desktop/alnoris_desktop_auto
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qcborcommon.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qcborvalue.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qchar.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtCore/qcheckedint_impl.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qcompare.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qcompare_impl.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qcomparehelpers.h \
@@ -131,25 +118,21 @@ C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/build-desktop/alnoris_desktop_auto
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qiodevicebase.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qiterable.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qiterator.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtCore/qjsonarray.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qjsondocument.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qjsonobject.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qjsonparseerror.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qjsonvalue.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qlatin1stringview.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtCore/qline.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qlist.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qlocale.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qlogging.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qmalloc.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qmap.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtCore/qmargins.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qmath.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qmetacontainer.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qmetatype.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qminmax.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qnamespace.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtCore/qnativeinterface.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qnumeric.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qobject.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qobject_impl.h \
@@ -157,10 +140,8 @@ C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/build-desktop/alnoris_desktop_auto
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qobjectdefs_impl.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qoverload.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qpair.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtCore/qpoint.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qprocess.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qprocessordetection.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtCore/qrect.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qrefcount.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qregularexpression.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qscopedpointer.h \
@@ -170,7 +151,6 @@ C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/build-desktop/alnoris_desktop_auto
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qshareddata_impl.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qsharedpointer.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qsharedpointer_impl.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtCore/qsize.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qspan.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qstdlibdetection.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qstring.h \
@@ -212,94 +192,7 @@ C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/build-desktop/alnoris_desktop_auto
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qutf8stringview.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/quuid.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qvariant.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtCore/qvariantlist.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qvarlengtharray.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qversiontagging.h \
   C:/Qt/6.11.0/msvc2022_64/include/QtCore/qxptype_traits.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtCore/qyieldcpu.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/QColor \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/QOpenGLFunctions \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/QSurfaceFormat \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qaction.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qbitmap.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qbrush.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qcolor.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qcursor.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qfont.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qfontinfo.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qfontmetrics.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qfontvariableaxis.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qgenericmatrix.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qicon.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qimage.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qkeysequence.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qmatrix4x4.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qopengl.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qopenglcontext.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qopenglcontext_platform.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qopenglext.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qopenglfunctions.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qpaintdevice.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qpalette.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qpixelformat.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qpixmap.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qpolygon.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qregion.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qrgb.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qrgba64.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qsurfaceformat.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qtgui-config.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qtguiexports.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qtguiglobal.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qtransform.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qvector2d.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qvector3d.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qvector4d.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qvectornd.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qwindowdefs.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtGui/qwindowdefs_win.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtOpenGL/QOpenGLBuffer \
-  C:/Qt/6.11.0/msvc2022_64/include/QtOpenGL/QOpenGLFramebufferObject \
-  C:/Qt/6.11.0/msvc2022_64/include/QtOpenGL/QOpenGLShaderProgram \
-  C:/Qt/6.11.0/msvc2022_64/include/QtOpenGL/QOpenGLVertexArrayObject \
-  C:/Qt/6.11.0/msvc2022_64/include/QtOpenGL/qopenglbuffer.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtOpenGL/qopenglframebufferobject.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtOpenGL/qopenglshaderprogram.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtOpenGL/qopenglvertexarrayobject.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtOpenGL/qtopenglexports.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtOpenGL/qtopenglglobal.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtOpenGLWidgets/QOpenGLWidget \
-  C:/Qt/6.11.0/msvc2022_64/include/QtOpenGLWidgets/qopenglwidget.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtOpenGLWidgets/qtopenglwidgetsexports.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtOpenGLWidgets/qtopenglwidgetsglobal.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtWidgets/QMainWindow \
-  C:/Qt/6.11.0/msvc2022_64/include/QtWidgets/QWidget \
-  C:/Qt/6.11.0/msvc2022_64/include/QtWidgets/qmainwindow.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtWidgets/qsizepolicy.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtWidgets/qtabwidget.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtWidgets/qtwidgets-config.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtWidgets/qtwidgetsexports.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtWidgets/qtwidgetsglobal.h \
-  C:/Qt/6.11.0/msvc2022_64/include/QtWidgets/qwidget.h \
-  C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/desktop_cpp/cad/CadEngine.h \
-  C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/desktop_cpp/cad/battery/BatteryConfig.h \
-  C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/desktop_cpp/cad/battery/BatteryEntities.h \
-  C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/desktop_cpp/cad/camera/Camera.h \
-  C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/desktop_cpp/cad/commands/CommandStack.h \
-  C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/desktop_cpp/cad/commands/ICommand.h \
-  C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/desktop_cpp/cad/core/CadDocument.h \
-  C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/desktop_cpp/cad/core/EntityId.h \
-  C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/desktop_cpp/cad/core/SelectionState.h \
-  C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/desktop_cpp/cad/geometry/BatteryGeometryGenerator.h \
-  C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/desktop_cpp/cad/geometry/ParametricPrimitives.h \
-  C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/desktop_cpp/cad/io/MeshLoader.h \
-  C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/desktop_cpp/cad/math/CadMath.h \
-  C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/desktop_cpp/cad/picking/HitTester.h \
-  C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/desktop_cpp/cad/render/RenderComposer.h \
-  C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/desktop_cpp/cad/render/RenderPacket.h \
-  C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/desktop_cpp/charts/ChartModule.h \
-  C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/desktop_cpp/charts/ChartTypes.h \
-  C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/desktop_cpp/src/CadViewportWidget.h \
-  C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/desktop_cpp/src/ChartWidget.h \
-  C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/desktop_cpp/src/SimulationClient.h \
-  C:/Users/Craig/OneDrive/Desktop/Alnoris\ BMSx/desktop_cpp/src/SimulationResultModel.h
+  C:/Qt/6.11.0/msvc2022_64/include/QtCore/qyieldcpu.h

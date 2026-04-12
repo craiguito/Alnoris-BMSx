@@ -27,6 +27,7 @@ class QPushButton;
 class QSlider;
 class QTableWidget;
 class QTabWidget;
+class QTimer;
 class QToolBar;
 class QWidget;
 
@@ -56,6 +57,7 @@ private slots:
     void handleOverlayMetricChanged(int index);
     void handleGroupSelectionChanged();
     void handleVirtualTestSelectionChanged(int index);
+    void handleBackendRequestFinished(bool ok, const QString& error, const QJsonObject& payload);
     void vetSelectedVirtualTest();
     void runSelectedVirtualTest();
     void exportActiveResultJson();
@@ -79,6 +81,16 @@ private:
         QWidget* editor = nullptr;
     };
 
+    enum class PendingBackendAction
+    {
+        None,
+        RunSimulation,
+        CaptureBaseline,
+        CompareAgainstBaseline,
+        VetVirtualTest,
+        RunVirtualTest
+    };
+
     QDoubleSpinBox* createDoubleSpin(double value, double min, double max, int decimals);
     QJsonObject buildSimulationConfig() const;
     cad::battery::BatteryCadConfig buildCadWorkspaceConfig() const;
@@ -97,7 +109,10 @@ private:
     QGroupBox* createOutputPanel();
     void applyTheme();
     void applyChartTheme(ChartWidget* graphWidget);
+    void scheduleCadWorkspaceUpdate();
+    void flushPendingCadWorkspaceUpdate();
     void updateCadWorkspace();
+    void setBackendBusy(bool busy, const QString& statusText = QString());
     void setCadEditorEnabled(bool enabled);
     charts::Series makeSeries(const std::vector<charts::Point>& points, const QString& name, const QColor& color, bool dashed = false) const;
     void refreshSimulationViews();
@@ -217,9 +232,14 @@ private:
     QJsonObject m_baselineConfig;
     QJsonObject m_baselineResult;
     QJsonObject m_lastExportPayload;
+    QJsonObject m_pendingVirtualTestPayload;
     std::optional<desktop::SimulationResultModel> m_activeResult;
     int m_activeResultPointIndex = -1;
     int m_selectedResultGroupIndex = -1;
+    PendingBackendAction m_pendingBackendAction = PendingBackendAction::None;
+    QTimer* m_cadRefreshTimer = nullptr;
+    bool m_backendBusy = false;
     bool m_isSyncingCadInspector = false;
     bool m_isSyncingGroupPanel = false;
+    bool m_runVirtualTestAfterVetting = false;
 };

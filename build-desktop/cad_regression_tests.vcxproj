@@ -108,12 +108,12 @@
       <SupportJustMyCode></SupportJustMyCode>
       <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
       <UseFullPaths>false</UseFullPaths>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;QT_CORE_LIB;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_WIN64;UNICODE;_UNICODE;CMAKE_INTDIR="Debug"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;ALNORIS_PROJECT_ROOT="C:/Users/Craig/OneDrive/Desktop/Alnoris BMSx/desktop_cpp/..";QT_CORE_LIB;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_WIN64;UNICODE;_UNICODE;CMAKE_INTDIR="Debug"</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)</ObjectFileName>
       <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
     </ClCompile>
     <ResourceCompile>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;_WINDOWS;QT_CORE_LIB;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_WIN64;UNICODE;_UNICODE;CMAKE_INTDIR=\"Debug\"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;_WINDOWS;ALNORIS_PROJECT_ROOT=\"C:/Users/Craig/OneDrive/Desktop/Alnoris BMSx/desktop_cpp/..\";QT_CORE_LIB;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_WIN64;UNICODE;_UNICODE;CMAKE_INTDIR=\"Debug\"</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\build-desktop\cad_regression_tests_autogen\include_Debug;C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\desktop_cpp;C:\Qt\6.11.0\msvc2022_64\include\QtCore;C:\Qt\6.11.0\msvc2022_64\include;C:\Qt\6.11.0\msvc2022_64\mkspecs\win32-msvc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
@@ -203,14 +203,14 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <SupportJustMyCode></SupportJustMyCode>
       <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
       <UseFullPaths>false</UseFullPaths>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;QT_CORE_LIB;QT_NO_DEBUG;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_WIN64;UNICODE;_UNICODE;CMAKE_INTDIR="Release"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;ALNORIS_PROJECT_ROOT="C:/Users/Craig/OneDrive/Desktop/Alnoris BMSx/desktop_cpp/..";QT_CORE_LIB;QT_NO_DEBUG;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_WIN64;UNICODE;_UNICODE;CMAKE_INTDIR="Release"</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)</ObjectFileName>
       <DebugInformationFormat>
       </DebugInformationFormat>
       <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
     </ClCompile>
     <ResourceCompile>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;QT_CORE_LIB;QT_NO_DEBUG;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_WIN64;UNICODE;_UNICODE;CMAKE_INTDIR=\"Release\"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;ALNORIS_PROJECT_ROOT=\"C:/Users/Craig/OneDrive/Desktop/Alnoris BMSx/desktop_cpp/..\";QT_CORE_LIB;QT_NO_DEBUG;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_WIN64;UNICODE;_UNICODE;CMAKE_INTDIR=\"Release\"</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\build-desktop\cad_regression_tests_autogen\include_Release;C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\desktop_cpp;C:\Qt\6.11.0\msvc2022_64\include\QtCore;C:\Qt\6.11.0\msvc2022_64\include;C:\Qt\6.11.0\msvc2022_64\mkspecs\win32-msvc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
@@ -300,14 +300,14 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <SupportJustMyCode></SupportJustMyCode>
       <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
       <UseFullPaths>false</UseFullPaths>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;QT_CORE_LIB;QT_NO_DEBUG;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_WIN64;UNICODE;_UNICODE;CMAKE_INTDIR="MinSizeRel"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;ALNORIS_PROJECT_ROOT="C:/Users/Craig/OneDrive/Desktop/Alnoris BMSx/desktop_cpp/..";QT_CORE_LIB;QT_NO_DEBUG;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_WIN64;UNICODE;_UNICODE;CMAKE_INTDIR="MinSizeRel"</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)</ObjectFileName>
       <DebugInformationFormat>
       </DebugInformationFormat>
       <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
     </ClCompile>
     <ResourceCompile>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;QT_CORE_LIB;QT_NO_DEBUG;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_WIN64;UNICODE;_UNICODE;CMAKE_INTDIR=\"MinSizeRel\"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;ALNORIS_PROJECT_ROOT=\"C:/Users/Craig/OneDrive/Desktop/Alnoris BMSx/desktop_cpp/..\";QT_CORE_LIB;QT_NO_DEBUG;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_WIN64;UNICODE;_UNICODE;CMAKE_INTDIR=\"MinSizeRel\"</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\build-desktop\cad_regression_tests_autogen\include_MinSizeRel;C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\desktop_cpp;C:\Qt\6.11.0\msvc2022_64\include\QtCore;C:\Qt\6.11.0\msvc2022_64\include;C:\Qt\6.11.0\msvc2022_64\mkspecs\win32-msvc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
@@ -398,12 +398,12 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <SupportJustMyCode></SupportJustMyCode>
       <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
       <UseFullPaths>false</UseFullPaths>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;QT_CORE_LIB;QT_NO_DEBUG;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_WIN64;UNICODE;_UNICODE;CMAKE_INTDIR="RelWithDebInfo"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;ALNORIS_PROJECT_ROOT="C:/Users/Craig/OneDrive/Desktop/Alnoris BMSx/desktop_cpp/..";QT_CORE_LIB;QT_NO_DEBUG;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_WIN64;UNICODE;_UNICODE;CMAKE_INTDIR="RelWithDebInfo"</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)</ObjectFileName>
       <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
     </ClCompile>
     <ResourceCompile>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;QT_CORE_LIB;QT_NO_DEBUG;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_WIN64;UNICODE;_UNICODE;CMAKE_INTDIR=\"RelWithDebInfo\"</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;ALNORIS_PROJECT_ROOT=\"C:/Users/Craig/OneDrive/Desktop/Alnoris BMSx/desktop_cpp/..\";QT_CORE_LIB;QT_NO_DEBUG;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_WIN64;UNICODE;_UNICODE;CMAKE_INTDIR=\"RelWithDebInfo\"</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\build-desktop\cad_regression_tests_autogen\include_RelWithDebInfo;C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\desktop_cpp;C:\Qt\6.11.0\msvc2022_64\include\QtCore;C:\Qt\6.11.0\msvc2022_64\include;C:\Qt\6.11.0\msvc2022_64\mkspecs\win32-msvc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
@@ -570,7 +570,10 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ClInclude Include="C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\desktop_cpp\cad\render\RenderPacket.h" />
     <ClCompile Include="C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\desktop_cpp\src\SimulationMappingBuilder.cpp" />
     <ClInclude Include="C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\desktop_cpp\src\SimulationMappingBuilder.h" />
+    <ClCompile Include="C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\desktop_cpp\src\SimulationClient.cpp" />
+    <ClInclude Include="C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\desktop_cpp\src\SimulationClient.h" />
     <ClCompile Include="C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\desktop_cpp\tests\CadRegressionTests.cpp" />
+    <ClCompile Include="C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\desktop_cpp\tests\SimulationClientTests.cpp" />
     <ClInclude Include="C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\desktop_cpp\tests\TestHarness.h" />
     <ClCompile Include="C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\desktop_cpp\tests\TestMain.cpp" />
     <ClCompile Include="C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\build-desktop\cad_regression_tests_autogen\mocs_compilation_Release.cpp">

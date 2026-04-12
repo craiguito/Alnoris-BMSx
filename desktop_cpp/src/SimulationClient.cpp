@@ -9,8 +9,9 @@
 #include <QJsonDocument>
 #include <QProcess>
 
-SimulationClient::SimulationClient(QString projectRoot)
-    : m_projectRoot(std::move(projectRoot))
+SimulationClient::SimulationClient(QString projectRoot, QObject* parent)
+    : QObject(parent)
+    , m_projectRoot(std::move(projectRoot))
 {
 }
 
@@ -64,11 +65,118 @@ SimulationClient::Result SimulationClient::invokeBackend(const QStringList& argu
         return Result{false, "Python simulation process did not finish.", {}};
     }
 
-    const QByteArray output = process.readAllStandardOutput();
-    const QByteArray stderrOutput = process.readAllStandardError();
+    return parseBackendResult(
+        process.readAllStandardOutput(),
+        process.readAllStandardError(),
+        process.exitCode(),
+        process.exitStatus());
+}
+
+bool SimulationClient::runSimulationAsync(const QJsonObject& config)
+{
+    return invokeBackendAsync({"-m", "backend.sim_core.cli", "simulate"}, &config);
+}
+
+bool SimulationClient::vetVirtualTestAsync(const QJsonObject& payload)
+{
+    return invokeBackendAsync({"-m", "backend.sim_core.cli", "vet-test"}, &payload);
+}
+
+bool SimulationClient::runVirtualTestAsync(const QJsonObject& payload)
+{
+    return invokeBackendAsync({"-m", "backend.sim_core.cli", "run-test"}, &payload);
+}
+
+bool SimulationClient::isBusy() const
+{
+    return m_activeProcess != nullptr;
+}
+
+bool SimulationClient::invokeBackendAsync(const QStringList& arguments, const QJsonObject* payload)
+{
+    if (m_activeProcess != nullptr) {
+        return false;
+    }
+
+    auto* process = new QProcess(this);
+    m_activeProcess = process;
+    process->setWorkingDirectory(m_projectRoot);
+#ifdef Q_OS_WIN
+    process->setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments* args) {
+        args->flags |= CREATE_NO_WINDOW;
+    });
+#endif
+
+    const QByteArray input = payload != nullptr
+        ? QJsonDocument(*payload).toJson(QJsonDocument::Compact)
+        : QByteArray{};
+
+    connect(process, &QProcess::started, this, [process, input]() {
+        if (!input.isEmpty()) {
+            process->write(input);
+        }
+        process->closeWriteChannel();
+    });
+
+    connect(process, &QProcess::errorOccurred, this, [this, process](QProcess::ProcessError error) {
+        if (process != m_activeProcess) {
+            return;
+        }
+        if (error == QProcess::FailedToStart) {
+            finishActiveRequest(Result{false, "Failed to start Python simulation process.", {}}, process);
+        }
+    });
+
+    connect(
+        process,
+        qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
+        this,
+        [this, process](int exitCode, QProcess::ExitStatus exitStatus) {
+            if (process != m_activeProcess) {
+                return;
+            }
+
+            finishActiveRequest(
+                parseBackendResult(
+                    process->readAllStandardOutput(),
+                    process->readAllStandardError(),
+                    exitCode,
+                    exitStatus),
+                process);
+        });
+
+    process->start(pythonExecutable(), arguments);
+    return true;
+}
+
+SimulationClient::Result SimulationClient::parseBackendResult(
+    const QByteArray& output,
+    const QByteArray& stderrOutput,
+    int exitCode,
+    QProcess::ExitStatus exitStatus) const
+{
+    if (exitStatus != QProcess::NormalExit) {
+        return Result{false, "Python simulation process crashed.", {}};
+    }
+    if (exitCode != 0 && output.isEmpty()) {
+        const QString stderrText = QString::fromUtf8(stderrOutput).trimmed();
+        return Result{
+            false,
+            stderrText.isEmpty() ? "Python simulation process failed." : stderrText,
+            {}
+        };
+    }
+
     const QJsonDocument document = QJsonDocument::fromJson(output);
     if (!document.isObject()) {
-        return Result{false, QString("Invalid simulator output: %1").arg(QString::fromUtf8(stderrOutput)), {}};
+        const QString stderrText = QString::fromUtf8(stderrOutput).trimmed();
+        return Result{
+            false,
+            stderrText.isEmpty()
+                ? "Invalid simulator output."
+                : QString("Invalid simulator output: %1").arg(stderrText),
+            {}
+        };
     }
 
     const QJsonObject object = document.object();
@@ -77,6 +185,17 @@ SimulationClient::Result SimulationClient::invokeBackend(const QStringList& argu
     }
 
     return Result{true, {}, object.value("result").toObject()};
+}
+
+void SimulationClient::finishActiveRequest(const Result& result, QProcess* process)
+{
+    if (process == nullptr || process != m_activeProcess) {
+        return;
+    }
+
+    m_activeProcess = nullptr;
+    process->deleteLater();
+    emit requestFinished(result.ok, result.error, result.payload);
 }
 
 QString SimulationClient::pythonExecutable() const

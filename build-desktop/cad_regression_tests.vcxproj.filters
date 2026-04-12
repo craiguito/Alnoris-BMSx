@@ -52,7 +52,13 @@
     <ClCompile Include="C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\desktop_cpp\src\SimulationMappingBuilder.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\desktop_cpp\src\SimulationClient.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\desktop_cpp\tests\CadRegressionTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\desktop_cpp\tests\SimulationClientTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\desktop_cpp\tests\TestMain.cpp">
@@ -130,6 +136,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\desktop_cpp\src\SimulationMappingBuilder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\desktop_cpp\src\SimulationClient.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\Craig\OneDrive\Desktop\Alnoris BMSx\desktop_cpp\tests\TestHarness.h">

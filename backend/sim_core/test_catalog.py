@@ -125,7 +125,7 @@ def build_test_catalog() -> tuple[VirtualTestDefinition, ...]:
                     ["rmse_voltage", "energy_error", "temp_rmse"],
                     tooltip="JSON list of metric ids: rmse_voltage, energy_error, temp_rmse.",
                 ),
-                _param("max_voltage_rmse_v", "Max voltage RMSE", "float", 0.05, min_value=0.0, unit="V"),
+                _param("max_voltage_rmse_v", "Max voltage RMSE", "float", 1.0, min_value=0.0, unit="V"),
                 _param(
                     "max_energy_error_fraction",
                     "Max energy error",

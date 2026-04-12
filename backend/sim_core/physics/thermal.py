@@ -139,6 +139,10 @@ def _assert_finite_temperature(temp_c: float, label: str) -> None:
         raise FloatingPointError(f"{label} reached an implausible value during thermal integration: {temp_c:.2f} C")
 
 
+def _clamp_sub_ambient_overshoot(temp_c: float, ambient_temp_c: float) -> float:
+    return max(temp_c, ambient_temp_c)
+
+
 def compute_next_group_temperatures(
     core_temp_c: float,
     surface_temp_c: float,
@@ -178,6 +182,7 @@ def compute_next_group_temperatures(
                 right_neighbor_temp_c=right_neighbor_surface_temp_c,
                 neighbor_coupling_w_per_k=config.physics.neighbor_thermal_coupling_w_per_k,
             )
+            next_temp_c = _clamp_sub_ambient_overshoot(next_temp_c, ambient_temp_c)
             _assert_finite_temperature(next_temp_c, "surface_temp_c")
         return GroupThermalStepResult(
             core_temp_c=next_temp_c,
@@ -207,6 +212,8 @@ def compute_next_group_temperatures(
         next_surface_temp_c = next_surface_temp_c + (
             (coupling_w - cooling_w + neighbor_exchange_w) * sub_dt_s / surface_mass
         )
+        next_core_temp_c = _clamp_sub_ambient_overshoot(next_core_temp_c, ambient_temp_c)
+        next_surface_temp_c = _clamp_sub_ambient_overshoot(next_surface_temp_c, ambient_temp_c)
         _assert_finite_temperature(next_core_temp_c, "core_temp_c")
         _assert_finite_temperature(next_surface_temp_c, "surface_temp_c")
 

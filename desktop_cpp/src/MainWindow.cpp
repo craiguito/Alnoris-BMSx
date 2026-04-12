@@ -9,6 +9,7 @@
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
+#include <QApplication>
 #include <QFileDialog>
 #include <QFormLayout>
 #include <QGridLayout>
@@ -30,11 +31,13 @@
 #include <QScrollArea>
 #include <QSignalBlocker>
 #include <QSlider>
+#include <QStatusBar>
 #include <QStringList>
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QTabWidget>
 #include <QTextStream>
+#include <QKeySequence>
 #include <QTimer>
 #include <QToolBar>
 #include <QHBoxLayout>
@@ -205,16 +208,26 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
 {
     setWindowTitle("Alnoris Battery Simulator");
     resize(1560, 940);
+    m_cadRefreshTimer = new QTimer(this);
+    m_cadRefreshTimer->setSingleShot(true);
+    m_cadRefreshTimer->setInterval(250);
+    connect(m_cadRefreshTimer, &QTimer::timeout, this, &MainWindow::updateCadWorkspace);
+    connect(&m_client, &SimulationClient::requestFinished, this, &MainWindow::handleBackendRequestFinished);
     createMainToolbar();
+    statusBar()->showMessage("Ready");
 
     auto* fileMenu = menuBar()->addMenu("File");
-    fileMenu->addAction("Load Project", this, &MainWindow::loadProject);
-    fileMenu->addAction("Save Project", this, &MainWindow::saveProject);
+    auto* loadAction = fileMenu->addAction("Load Project", this, &MainWindow::loadProject);
+    loadAction->setShortcut(QKeySequence::Open);
+    auto* saveAction = fileMenu->addAction("Save Project", this, &MainWindow::saveProject);
+    saveAction->setShortcut(QKeySequence::Save);
     fileMenu->addSeparator();
-    fileMenu->addAction("Exit", this, &QWidget::close);
+    auto* exitAction = fileMenu->addAction("Exit", this, &QWidget::close);
+    exitAction->setShortcut(QKeySequence::Quit);
 
     auto* editMenu = menuBar()->addMenu("Edit");
-    editMenu->addAction("Capture Baseline", this, &MainWindow::captureBaseline);
+    auto* captureAction = editMenu->addAction("Capture Baseline", this, &MainWindow::captureBaseline);
+    captureAction->setShortcut(QKeySequence(Qt::Key_F6));
 
     auto* viewMenu = menuBar()->addMenu("View");
     viewMenu->addAction("Compare to Baseline", this, &MainWindow::compareAgainstBaseline);
@@ -224,8 +237,10 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
     optionsMenu->addAction("Customization...", this, &MainWindow::openCustomizationDialog);
 
     auto* simulationMenu = menuBar()->addMenu("Simulation");
-    simulationMenu->addAction("Run", this, &MainWindow::runSimulation);
-    simulationMenu->addAction("Capture Baseline", this, &MainWindow::captureBaseline);
+    auto* simulationRunAction = simulationMenu->addAction("Run", this, &MainWindow::runSimulation);
+    simulationRunAction->setShortcut(QKeySequence(Qt::Key_F5));
+    auto* simulationCaptureAction = simulationMenu->addAction("Capture Baseline", this, &MainWindow::captureBaseline);
+    simulationCaptureAction->setShortcut(QKeySequence(Qt::Key_F6));
     simulationMenu->addAction("Compare", this, &MainWindow::compareAgainstBaseline);
 
     auto* central = new QWidget(this);
@@ -239,7 +254,7 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
     m_referencePreset->addItem("Samsung INR18650-30Q");
     m_referencePreset->addItem("A123 ANR26650M1-B");
     connect(m_referencePreset, &QComboBox::currentIndexChanged, this, &MainWindow::applyReferencePreset);
-    connect(m_referencePreset, &QComboBox::currentTextChanged, this, [this](const QString&) { updateCadWorkspace(); });
+    connect(m_referencePreset, &QComboBox::currentTextChanged, this, [this](const QString&) { scheduleCadWorkspaceUpdate(); });
 
     m_cellNominalVoltage = createDoubleSpin(3.6, 0.1, 100.0, 3);
     m_cellFullVoltage = createDoubleSpin(4.2, 0.1, 100.0, 3);
@@ -262,7 +277,7 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
             spinBox,
             qOverload<double>(&QDoubleSpinBox::valueChanged),
             this,
-            [this](double) { updateCadWorkspace(); }
+            [this](double) { scheduleCadWorkspaceUpdate(); }
         );
     };
     bindCadRefresh(m_cellNominalVoltage);
@@ -368,50 +383,70 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
 
 void MainWindow::runSimulation()
 {
-    const SimulationClient::Result result = m_client.runSimulation(buildSimulationConfig());
-    if (!result.ok) {
-        QMessageBox::critical(this, "Simulation Error", result.error);
+    if (m_client.isBusy()) {
+        statusBar()->showMessage("A simulator request is already running.", 4000);
         return;
     }
 
-    renderResult(result.payload);
+    flushPendingCadWorkspaceUpdate();
+    m_pendingBackendAction = PendingBackendAction::RunSimulation;
+    if (!m_client.runSimulationAsync(buildSimulationConfig())) {
+        m_pendingBackendAction = PendingBackendAction::None;
+        QMessageBox::critical(this, "Simulation Error", "Could not launch the simulation backend.");
+        return;
+    }
+
+    setBackendBusy(true, "Running simulation...");
 }
 
 void MainWindow::captureBaseline()
 {
-    m_baselineConfig = buildSimulationConfig();
-    const SimulationClient::Result result = m_client.runSimulation(m_baselineConfig);
-    if (!result.ok) {
-        QMessageBox::critical(this, "Simulation Error", result.error);
+    if (m_client.isBusy()) {
+        statusBar()->showMessage("A simulator request is already running.", 4000);
         return;
     }
 
-    m_baselineResult = result.payload;
-    m_summaryLabel->setText("Baseline captured. You can now tweak parameters and use Compare to Baseline.");
-    const desktop::SimulationResultModel baseline = desktop::parseSimulationResultPayload(m_baselineResult);
-    if (baseline.valid) {
-        m_outputText->setPlainText(formatSummaryLines(baseline) + "\n\n" + formatTraceLines(baseline));
+    flushPendingCadWorkspaceUpdate();
+    m_baselineConfig = buildSimulationConfig();
+    m_pendingBackendAction = PendingBackendAction::CaptureBaseline;
+    if (!m_client.runSimulationAsync(m_baselineConfig)) {
+        m_pendingBackendAction = PendingBackendAction::None;
+        QMessageBox::critical(this, "Simulation Error", "Could not launch the simulation backend.");
+        return;
     }
+
+    setBackendBusy(true, "Capturing baseline...");
 }
 
 void MainWindow::compareAgainstBaseline()
 {
+    if (m_client.isBusy()) {
+        statusBar()->showMessage("A simulator request is already running.", 4000);
+        return;
+    }
     if (m_baselineConfig.isEmpty() || m_baselineResult.isEmpty()) {
         QMessageBox::information(this, "No Baseline", "Capture a baseline simulation before comparing.");
         return;
     }
 
-    const SimulationClient::Result candidate = m_client.runSimulation(buildSimulationConfig());
-    if (!candidate.ok) {
-        QMessageBox::critical(this, "Simulation Error", candidate.error);
+    flushPendingCadWorkspaceUpdate();
+    m_pendingBackendAction = PendingBackendAction::CompareAgainstBaseline;
+    if (!m_client.runSimulationAsync(buildSimulationConfig())) {
+        m_pendingBackendAction = PendingBackendAction::None;
+        QMessageBox::critical(this, "Simulation Error", "Could not launch the simulation backend.");
         return;
     }
 
-    renderComparison(m_baselineResult, candidate.payload);
+    setBackendBusy(true, "Comparing against baseline...");
 }
 
 void MainWindow::saveProject()
 {
+    if (m_client.isBusy()) {
+        QMessageBox::information(this, "Busy", "Wait for the current simulator request to finish before saving.");
+        return;
+    }
+    flushPendingCadWorkspaceUpdate();
     const QString path = QFileDialog::getSaveFileName(
         this,
         "Save Project",
@@ -444,6 +479,10 @@ void MainWindow::saveProject()
 
 void MainWindow::loadProject()
 {
+    if (m_client.isBusy()) {
+        QMessageBox::information(this, "Busy", "Wait for the current simulator request to finish before loading a project.");
+        return;
+    }
     const QString path = QFileDialog::getOpenFileName(
         this,
         "Load Project",
@@ -467,6 +506,9 @@ void MainWindow::loadProject()
     }
 
     const QJsonObject root = document.object();
+    if (m_cadRefreshTimer != nullptr) {
+        m_cadRefreshTimer->stop();
+    }
     applySimulationConfig(root.value("simulation_config").toObject());
     m_activeSystemPreset = root.value("system_preset").toObject();
     m_baselineConfig = root.value("baseline_config").toObject();
@@ -1443,12 +1485,63 @@ cad::battery::BatteryCadConfig MainWindow::buildCadWorkspaceConfig() const
 
 void MainWindow::updateCadWorkspace()
 {
+    if (m_cadRefreshTimer != nullptr) {
+        m_cadRefreshTimer->stop();
+    }
     if (m_cadWorkspaceView == nullptr) {
         return;
     }
 
     m_cadWorkspaceView->setPackConfig(buildCadWorkspaceConfig());
     refreshCadOverlay();
+}
+
+void MainWindow::scheduleCadWorkspaceUpdate()
+{
+    if (m_cadRefreshTimer == nullptr) {
+        updateCadWorkspace();
+        return;
+    }
+    m_cadRefreshTimer->start();
+}
+
+void MainWindow::flushPendingCadWorkspaceUpdate()
+{
+    if (m_cadRefreshTimer != nullptr && m_cadRefreshTimer->isActive()) {
+        m_cadRefreshTimer->stop();
+        updateCadWorkspace();
+    }
+}
+
+void MainWindow::setBackendBusy(bool busy, const QString& statusText)
+{
+    if (m_backendBusy == busy) {
+        if (!statusText.isEmpty()) {
+            statusBar()->showMessage(statusText);
+        }
+        return;
+    }
+
+    m_backendBusy = busy;
+    if (QWidget* widget = centralWidget()) {
+        widget->setEnabled(!busy);
+    }
+    if (menuBar() != nullptr) {
+        menuBar()->setEnabled(!busy);
+    }
+    for (QToolBar* toolbar : findChildren<QToolBar*>()) {
+        toolbar->setEnabled(!busy);
+    }
+
+    if (busy) {
+        QApplication::setOverrideCursor(Qt::BusyCursor);
+        statusBar()->showMessage(statusText);
+    } else {
+        if (QApplication::overrideCursor() != nullptr) {
+            QApplication::restoreOverrideCursor();
+        }
+        statusBar()->showMessage(statusText.isEmpty() ? "Ready" : statusText, 4000);
+    }
 }
 
 void MainWindow::setCadEditorEnabled(bool enabled)
@@ -2864,54 +2957,143 @@ void MainWindow::handleVirtualTestSelectionChanged(int index)
     rebuildVirtualTestForm();
 }
 
-void MainWindow::vetSelectedVirtualTest()
+void MainWindow::handleBackendRequestFinished(bool ok, const QString& error, const QJsonObject& payload)
 {
-    const SimulationClient::Result result = m_client.vetVirtualTest(buildVirtualTestPayload());
-    if (!result.ok) {
-        setVirtualTestStatus(QString("Test vetting failed.\n%1").arg(result.error), QColor(220, 78, 78));
+    const PendingBackendAction action = m_pendingBackendAction;
+    m_pendingBackendAction = PendingBackendAction::None;
+    setBackendBusy(false);
+
+    if (!ok) {
+        m_runVirtualTestAfterVetting = false;
+        m_pendingVirtualTestPayload = {};
+        switch (action) {
+        case PendingBackendAction::VetVirtualTest:
+        case PendingBackendAction::RunVirtualTest:
+            setVirtualTestStatus(
+                QString("%1 failed.\n%2")
+                    .arg(action == PendingBackendAction::RunVirtualTest ? "Virtual test" : "Test vetting", error),
+                QColor(220, 78, 78));
+            break;
+        case PendingBackendAction::CaptureBaseline:
+        case PendingBackendAction::CompareAgainstBaseline:
+        case PendingBackendAction::RunSimulation:
+        case PendingBackendAction::None:
+        default:
+            QMessageBox::critical(this, "Simulation Error", error);
+            break;
+        }
         return;
     }
 
-    const QJsonObject vetting = result.payload.value("vetting_result").toObject();
-    QStringList lines;
-    const bool isValid = vetting.value("is_valid").toBool();
-    lines << QString("Vetting: %1").arg(isValid ? "ready to run" : "blocked");
-    const QJsonArray errors = vetting.value("errors").toArray();
-    if (!errors.isEmpty()) {
-        lines << "Errors:";
-        for (const QJsonValue& error : errors) {
-            lines << QString("- %1").arg(error.toString());
+    switch (action) {
+    case PendingBackendAction::RunSimulation:
+        renderResult(payload);
+        statusBar()->showMessage("Simulation complete.", 4000);
+        break;
+    case PendingBackendAction::CaptureBaseline: {
+        m_baselineResult = payload;
+        m_summaryLabel->setText("Baseline captured. You can now tweak parameters and use Compare to Baseline.");
+        const desktop::SimulationResultModel baseline = desktop::parseSimulationResultPayload(m_baselineResult);
+        if (baseline.valid) {
+            m_outputText->setPlainText(formatSummaryLines(baseline) + "\n\n" + formatTraceLines(baseline));
         }
+        statusBar()->showMessage("Baseline captured.", 4000);
+        break;
     }
-    const QJsonArray warnings = vetting.value("warnings").toArray();
-    if (!warnings.isEmpty()) {
-        lines << "Warnings:";
-        for (const QJsonValue& warning : warnings) {
-            lines << QString("- %1").arg(warning.toString());
+    case PendingBackendAction::CompareAgainstBaseline:
+        renderComparison(m_baselineResult, payload);
+        statusBar()->showMessage("Baseline comparison complete.", 4000);
+        break;
+    case PendingBackendAction::VetVirtualTest: {
+        const QJsonObject vetting = payload.value("vetting_result").toObject();
+        QStringList lines;
+        const bool isValid = vetting.value("is_valid").toBool();
+        lines << QString("Vetting: %1").arg(isValid ? "ready to run" : "blocked");
+        const QJsonArray errors = vetting.value("errors").toArray();
+        if (!errors.isEmpty()) {
+            lines << "Errors:";
+            for (const QJsonValue& entry : errors) {
+                lines << QString("- %1").arg(entry.toString());
+            }
         }
+        const QJsonArray warnings = vetting.value("warnings").toArray();
+        if (!warnings.isEmpty()) {
+            lines << "Warnings:";
+            for (const QJsonValue& entry : warnings) {
+                lines << QString("- %1").arg(entry.toString());
+            }
+        }
+        setVirtualTestStatus(
+            lines.join('\n'),
+            isValid ? (warnings.isEmpty() ? QColor(58, 165, 99) : QColor(214, 179, 67)) : QColor(220, 78, 78));
+
+        if (m_runVirtualTestAfterVetting && isValid && !m_pendingVirtualTestPayload.isEmpty()) {
+            m_runVirtualTestAfterVetting = false;
+            m_pendingBackendAction = PendingBackendAction::RunVirtualTest;
+            if (!m_client.runVirtualTestAsync(m_pendingVirtualTestPayload)) {
+                m_pendingBackendAction = PendingBackendAction::None;
+                m_pendingVirtualTestPayload = {};
+                setVirtualTestStatus("Virtual test could not be started because another backend request is active.", QColor(220, 78, 78));
+                return;
+            }
+            setBackendBusy(true, "Running virtual test...");
+            return;
+        }
+
+        m_runVirtualTestAfterVetting = false;
+        m_pendingVirtualTestPayload = {};
+        statusBar()->showMessage("Virtual test vetting complete.", 4000);
+        break;
     }
-    setVirtualTestStatus(lines.join('\n'), isValid ? (warnings.isEmpty() ? QColor(58, 165, 99) : QColor(214, 179, 67)) : QColor(220, 78, 78));
+    case PendingBackendAction::RunVirtualTest:
+        m_runVirtualTestAfterVetting = false;
+        m_pendingVirtualTestPayload = {};
+        renderVirtualTestResult(payload);
+        statusBar()->showMessage("Virtual test complete.", 4000);
+        break;
+    case PendingBackendAction::None:
+    default:
+        break;
+    }
+}
+
+void MainWindow::vetSelectedVirtualTest()
+{
+    if (m_client.isBusy()) {
+        setVirtualTestStatus("A simulator request is already running.", QColor(214, 179, 67));
+        return;
+    }
+    flushPendingCadWorkspaceUpdate();
+    m_runVirtualTestAfterVetting = false;
+    m_pendingVirtualTestPayload = buildVirtualTestPayload();
+    m_pendingBackendAction = PendingBackendAction::VetVirtualTest;
+    if (!m_client.vetVirtualTestAsync(m_pendingVirtualTestPayload)) {
+        m_pendingBackendAction = PendingBackendAction::None;
+        m_pendingVirtualTestPayload = {};
+        setVirtualTestStatus("Test vetting could not be started.", QColor(220, 78, 78));
+        return;
+    }
+    setBackendBusy(true, "Vetting virtual test...");
 }
 
 void MainWindow::runSelectedVirtualTest()
 {
-    const QJsonObject payload = buildVirtualTestPayload();
-    const SimulationClient::Result vet = m_client.vetVirtualTest(payload);
-    if (!vet.ok) {
-        setVirtualTestStatus(QString("Test vetting failed.\n%1").arg(vet.error), QColor(220, 78, 78));
+    if (m_client.isBusy()) {
+        setVirtualTestStatus("A simulator request is already running.", QColor(214, 179, 67));
         return;
     }
-    if (!vet.payload.value("vetting_result").toObject().value("is_valid").toBool()) {
-        vetSelectedVirtualTest();
+    flushPendingCadWorkspaceUpdate();
+    m_pendingVirtualTestPayload = buildVirtualTestPayload();
+    m_runVirtualTestAfterVetting = true;
+    m_pendingBackendAction = PendingBackendAction::VetVirtualTest;
+    if (!m_client.vetVirtualTestAsync(m_pendingVirtualTestPayload)) {
+        m_pendingBackendAction = PendingBackendAction::None;
+        m_pendingVirtualTestPayload = {};
+        m_runVirtualTestAfterVetting = false;
+        setVirtualTestStatus("Virtual test could not be started.", QColor(220, 78, 78));
         return;
     }
-
-    const SimulationClient::Result result = m_client.runVirtualTest(payload);
-    if (!result.ok) {
-        setVirtualTestStatus(QString("Virtual test failed.\n%1").arg(result.error), QColor(220, 78, 78));
-        return;
-    }
-    renderVirtualTestResult(result.payload);
+    setBackendBusy(true, "Vetting virtual test...");
 }
 
 void MainWindow::exportActiveResultJson()

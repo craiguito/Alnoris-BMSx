@@ -194,7 +194,10 @@ add_executable(cad_regression_tests
     cad/render/RenderPacket.h
     src/SimulationMappingBuilder.cpp
     src/SimulationMappingBuilder.h
+    src/SimulationClient.cpp
+    src/SimulationClient.h
     tests/CadRegressionTests.cpp
+    tests/SimulationClientTests.cpp
     tests/TestHarness.h
     tests/TestMain.cpp
 )
@@ -241,3 +244,7 @@ add_custom_command(TARGET cad_regression_tests POST_BUILD
 if (MSVC)
     target_compile_options(cad_regression_tests PRIVATE /permissive- /Zc:__cplusplus)
 endif()
+
+target_compile_definitions(cad_regression_tests PRIVATE
+    ALNORIS_PROJECT_ROOT="${CMAKE_SOURCE_DIR}/.."
+)
