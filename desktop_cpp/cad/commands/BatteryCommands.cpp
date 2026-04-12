@@ -5,6 +5,29 @@
 #include <utility>
 
 namespace cad::commands {
+namespace {
+
+std::optional<EntitySubtreeSnapshot> captureEntitySubtreeSnapshot(const CadEngine& engine, core::EntityId root_id)
+{
+    const std::vector<core::EntityId> subtree_ids = engine.document().subtreeIds(root_id);
+    if (subtree_ids.empty()) {
+        return std::nullopt;
+    }
+
+    EntitySubtreeSnapshot snapshot;
+    snapshot.previous_selection = engine.selectedEntity();
+    snapshot.entities.reserve(subtree_ids.size());
+    for (core::EntityId entity_id : subtree_ids) {
+        const auto entity = engine.snapshotEntity(entity_id);
+        if (!entity.has_value()) {
+            return std::nullopt;
+        }
+        snapshot.entities.push_back(*entity);
+    }
+    return snapshot;
+}
+
+} // namespace
 
 MoveEntityCommand::MoveEntityCommand(core::EntityId entity_id, math::Vec3 delta)
     : m_entityId(entity_id)
@@ -35,10 +58,9 @@ RemoveEntityCommand::RemoveEntityCommand(core::EntityId entity_id)
 bool RemoveEntityCommand::redo(CadEngine& engine)
 {
     if (!m_snapshot.has_value()) {
-        m_snapshot = engine.snapshotEntity(m_entityId);
-        m_previousSelection = engine.selectedEntity();
+        m_snapshot = captureEntitySubtreeSnapshot(engine, m_entityId);
     }
-    if (!m_snapshot.has_value()) {
+    if (!m_snapshot.has_value() || m_snapshot->empty()) {
         return false;
     }
     return engine.removeEntity(m_entityId);
@@ -46,12 +68,18 @@ bool RemoveEntityCommand::redo(CadEngine& engine)
 
 void RemoveEntityCommand::undo(CadEngine& engine)
 {
-    if (!m_snapshot.has_value()) {
+    if (!m_snapshot.has_value() || m_snapshot->empty()) {
         return;
     }
-    engine.restoreEntity(*m_snapshot);
-    if (m_previousSelection.isValid()) {
-        engine.selectEntity(m_previousSelection);
+
+    if (!engine.restoreEntities(m_snapshot->entities)) {
+        return;
+    }
+
+    if (m_snapshot->previous_selection.isValid() && engine.document().hasEntity(m_snapshot->previous_selection)) {
+        engine.selectEntity(m_snapshot->previous_selection);
+    } else {
+        engine.clearSelection();
     }
 }
 

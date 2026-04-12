@@ -32,6 +32,7 @@ public:
     bool setCellMeshPath(const QString& path);
     void setBackgroundColor(const QColor& color);
     void setPackConfig(const cad::battery::BatteryCadConfig& config);
+    void loadDocument(cad::core::CadDocument document, const cad::battery::BatteryCadConfig& config);
     void setSimulationOverlay(const cad::battery::BatteryVisualizationOverlay& overlay);
     void clearSimulationOverlay();
     [[nodiscard]] const cad::core::CadDocument& document() const;

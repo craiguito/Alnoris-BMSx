@@ -7,8 +7,17 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace cad::commands {
+
+struct EntitySubtreeSnapshot
+{
+    std::vector<battery::EntityRecord> entities;
+    core::EntityId previous_selection{};
+
+    [[nodiscard]] bool empty() const { return entities.empty(); }
+};
 
 class MoveEntityCommand : public ICommand
 {
@@ -34,8 +43,7 @@ public:
 
 private:
     core::EntityId m_entityId{};
-    core::EntityId m_previousSelection{};
-    std::optional<battery::EntityRecord> m_snapshot;
+    std::optional<EntitySubtreeSnapshot> m_snapshot;
 };
 
 class UpdateCellGeometryCommand : public ICommand

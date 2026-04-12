@@ -13,10 +13,9 @@ using CellKey = std::pair<int, int>;
 using BusbarKey = std::pair<int, BusbarRole>;
 
 template <typename T>
-void preserveCommonOverrides(T& generated, const T& existing)
+void preserveStableIdAndCommonOverrides(T& generated, const T& existing)
 {
     generated.id = existing.id;
-    generated.parent_id = existing.parent_id;
 
     if (existing.property_modes.label == PropertyMode::UserOverride) {
         generated.label = existing.label;
@@ -28,6 +27,17 @@ void preserveCommonOverrides(T& generated, const T& existing)
     generated.property_modes.visibility = existing.property_modes.visibility;
 }
 
+int logicalBusbarModuleIndex(const core::CadDocument& document, const BusbarEntity& busbar)
+{
+    if (busbar.module_index >= 0) {
+        return busbar.module_index;
+    }
+    if (const auto* parent = document.findModuleBoundary(busbar.parent_id); parent != nullptr) {
+        return parent->module_index;
+    }
+    return 0;
+}
+
 BatteryPackEntity mergePack(const BatteryPackEntity& generated, const BatteryPackEntity* existing)
 {
     if (existing == nullptr) {
@@ -35,7 +45,7 @@ BatteryPackEntity mergePack(const BatteryPackEntity& generated, const BatteryPac
     }
 
     BatteryPackEntity merged = generated;
-    preserveCommonOverrides(merged, *existing);
+    preserveStableIdAndCommonOverrides(merged, *existing);
     if (existing->property_modes.position == PropertyMode::UserOverride) {
         merged.center = existing->center;
     }
@@ -54,7 +64,7 @@ CellGroupEntity mergeGroup(const CellGroupEntity& generated, const CellGroupEnti
     }
 
     CellGroupEntity merged = generated;
-    preserveCommonOverrides(merged, *existing);
+    preserveStableIdAndCommonOverrides(merged, *existing);
     if (existing->property_modes.position == PropertyMode::UserOverride) {
         merged.center = existing->center;
     }
@@ -73,13 +83,15 @@ CellEntity mergeCell(const CellEntity& generated, const CellEntity* existing)
     }
 
     CellEntity merged = generated;
-    preserveCommonOverrides(merged, *existing);
+    preserveStableIdAndCommonOverrides(merged, *existing);
     if (existing->property_modes.position == PropertyMode::UserOverride) {
         merged.position = existing->position;
     }
     if (existing->property_modes.geometry == PropertyMode::UserOverride) {
         merged.radius = existing->radius;
         merged.height = existing->height;
+        merged.width = existing->width;
+        merged.depth = existing->depth;
     }
     merged.property_modes.position = existing->property_modes.position;
     merged.property_modes.geometry = existing->property_modes.geometry;
@@ -93,7 +105,7 @@ BusbarEntity mergeBusbar(const BusbarEntity& generated, const BusbarEntity* exis
     }
 
     BusbarEntity merged = generated;
-    preserveCommonOverrides(merged, *existing);
+    preserveStableIdAndCommonOverrides(merged, *existing);
     if (existing->property_modes.position == PropertyMode::UserOverride) {
         merged.center = existing->center;
     }
@@ -112,7 +124,7 @@ CoolingPlateEntity mergeCoolingPlate(const CoolingPlateEntity& generated, const 
     }
 
     CoolingPlateEntity merged = generated;
-    preserveCommonOverrides(merged, *existing);
+    preserveStableIdAndCommonOverrides(merged, *existing);
     if (existing->property_modes.position == PropertyMode::UserOverride) {
         merged.center = existing->center;
     }
@@ -131,7 +143,7 @@ ModuleBoundaryEntity mergeModuleBoundary(const ModuleBoundaryEntity& generated, 
     }
 
     ModuleBoundaryEntity merged = generated;
-    preserveCommonOverrides(merged, *existing);
+    preserveStableIdAndCommonOverrides(merged, *existing);
     if (existing->property_modes.position == PropertyMode::UserOverride) {
         merged.center = existing->center;
     }
@@ -150,7 +162,7 @@ PackEnclosureEntity mergeEnclosure(const PackEnclosureEntity& generated, const P
     }
 
     PackEnclosureEntity merged = generated;
-    preserveCommonOverrides(merged, *existing);
+    preserveStableIdAndCommonOverrides(merged, *existing);
     if (existing->property_modes.position == PropertyMode::UserOverride) {
         merged.center = existing->center;
     }
@@ -169,6 +181,7 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
 {
     const core::EntityId previous_selection = document.selection().primary;
     const BatteryPackEntity* previousPack = document.packs().empty() ? nullptr : &document.packs().front();
+    std::map<int, core::EntityId> groupIdsBySeries;
 
     std::map<CellKey, CellEntity> previousCells;
     for (const CellEntity& cell : document.cells()) {
@@ -177,11 +190,7 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
 
     std::map<BusbarKey, BusbarEntity> previousBusbars;
     for (const BusbarEntity& busbar : document.busbars()) {
-        int moduleIndex = 0;
-        if (const auto* parent = document.findModuleBoundary(busbar.parent_id); parent != nullptr) {
-            moduleIndex = parent->module_index;
-        }
-        previousBusbars[{moduleIndex, busbar.role}] = busbar;
+        previousBusbars[{logicalBusbarModuleIndex(document, busbar), busbar.role}] = busbar;
     }
 
     std::map<int, CoolingPlateEntity> previousCoolingPlates;
@@ -257,7 +266,10 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
             generatedGroup.size = {resolved.group_width, resolved.stack.bounds_height, resolved.tray_depth};
             generatedGroup.cell_count = parallel_count;
             const auto previousGroup = previousGroups.find(globalSeries);
-            document.addCellGroup(mergeGroup(generatedGroup, previousGroup == previousGroups.end() ? nullptr : &previousGroup->second));
+            CellGroupEntity& group = document.addCellGroup(
+                mergeGroup(generatedGroup, previousGroup == previousGroups.end() ? nullptr : &previousGroup->second)
+            );
+            groupIdsBySeries[globalSeries] = group.id;
         }
 
         CoolingPlateEntity generatedCoolingPlate;
@@ -278,6 +290,7 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
         BusbarEntity generatedNegativeBusbar;
         generatedNegativeBusbar.label = "Negative busbar";
         generatedNegativeBusbar.parent_id = module.id;
+        generatedNegativeBusbar.module_index = moduleIndex;
         generatedNegativeBusbar.role = BusbarRole::Negative;
         generatedNegativeBusbar.center = {
             0.0f,
@@ -291,6 +304,7 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
         BusbarEntity generatedPositiveBusbar;
         generatedPositiveBusbar.label = "Positive busbar";
         generatedPositiveBusbar.parent_id = module.id;
+        generatedPositiveBusbar.module_index = moduleIndex;
         generatedPositiveBusbar.role = BusbarRole::Positive;
         generatedPositiveBusbar.center = {
             0.0f,
@@ -306,7 +320,9 @@ void PackLayoutGenerator::rebuildDocument(core::CadDocument& document, const Pac
         for (int col = 0; col < series_count; ++col) {
             CellEntity generated;
             generated.label = "Battery cell";
-            generated.parent_id = document.cellGroups()[static_cast<std::size_t>(col)].id;
+            if (const auto groupIt = groupIdsBySeries.find(col); groupIt != groupIdsBySeries.end()) {
+                generated.parent_id = groupIt->second;
+            }
             generated.position = {
                 0.0f,
                 resolved.stack.cell_center_y - resolved.stack.bounds_center_y,

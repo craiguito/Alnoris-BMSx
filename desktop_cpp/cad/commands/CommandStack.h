@@ -20,6 +20,7 @@ public:
 
     [[nodiscard]] bool canUndo() const;
     [[nodiscard]] bool canRedo() const;
+    void clear();
 
 private:
     std::vector<std::unique_ptr<ICommand>> m_undoStack;

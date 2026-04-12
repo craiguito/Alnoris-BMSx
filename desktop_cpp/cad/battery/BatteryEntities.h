@@ -131,6 +131,7 @@ struct BatteryCell : CadEntity
 
 struct Busbar : CadEntity
 {
+    int module_index = -1;
     BusbarRole role = BusbarRole::Negative;
     math::Vec3 center{};
     math::Vec3 size{700.0f, 12.0f, 16.0f};
@@ -188,17 +189,32 @@ struct EntitySummary
 struct CellProperties
 {
     EntitySummary summary;
+    CellFormFactor form_factor = CellFormFactor::Cylindrical;
     math::Vec3 position{};
     float radius = 0.0f;
+    float width = 0.0f;
+    float depth = 0.0f;
     float height = 0.0f;
     int series_index = 0;
     int parallel_index = 0;
+    std::string cell_type;
     EntityPropertyModes property_modes;
+
+    [[nodiscard]] bool usesRadiusDimension() const
+    {
+        return form_factor == CellFormFactor::Cylindrical;
+    }
+
+    [[nodiscard]] bool usesWidthDepthDimensions() const
+    {
+        return form_factor != CellFormFactor::Cylindrical;
+    }
 };
 
 struct BusbarProperties
 {
     EntitySummary summary;
+    int module_index = -1;
     BusbarRole role = BusbarRole::Negative;
     math::Vec3 center{};
     math::Vec3 size{};
@@ -237,6 +253,8 @@ struct CellPropertiesUpdate
 {
     std::optional<math::Vec3> position;
     std::optional<float> radius;
+    std::optional<float> width;
+    std::optional<float> depth;
     std::optional<float> height;
     std::optional<std::string> label;
     std::optional<bool> visible;

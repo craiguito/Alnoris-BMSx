@@ -7,9 +7,20 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <utility>
 
 namespace cad {
+namespace {
+
+bool isNearlyZeroDelta(const math::Vec3& delta)
+{
+    return std::fabs(delta.x) <= 0.0001f
+        && std::fabs(delta.y) <= 0.0001f
+        && std::fabs(delta.z) <= 0.0001f;
+}
+
+} // namespace
 
 CadEngine::CadEngine()
 {
@@ -22,6 +33,8 @@ CadEngine::CadEngine()
 
 bool CadEngine::setCellMeshPath(const std::string& path)
 {
+    cancelInteractiveMove();
+
     io::TriangleMesh mesh;
     if (!io::MeshLoader::loadBinaryStl(path, mesh)) {
         return false;
@@ -43,7 +56,10 @@ void CadEngine::setViewportSize(int width, int height)
 
 void CadEngine::setBatteryConfig(const battery::BatteryCadConfig& config)
 {
+    cancelInteractiveMove();
+
     m_config = config;
+    m_commandStack.clear();
     m_overrideVisualizationOverlay.reset();
     rebuildDocument();
     rebuildVisualization();
@@ -52,8 +68,40 @@ void CadEngine::setBatteryConfig(const battery::BatteryCadConfig& config)
     rebuildRenderPacket();
 }
 
+void CadEngine::loadDocument(core::CadDocument document, const battery::BatteryCadConfig& config)
+{
+    cancelInteractiveMove();
+
+    m_config = config;
+    if (document.metadata().layout_config.cells_in_series > 0 || document.metadata().layout_config.cells_in_parallel > 0) {
+        m_config.layout = document.metadata().layout_config;
+    }
+
+    m_document = std::move(document);
+    if (m_document.selection().primary.isValid() && !m_document.hasEntity(m_document.selection().primary)) {
+        m_document.clearSelection();
+    }
+
+    m_commandStack.clear();
+    m_overrideVisualizationOverlay.reset();
+    m_cellMesh.vertices.clear();
+    if (!m_document.metadata().cell_mesh_path.empty()) {
+        io::TriangleMesh mesh;
+        if (io::MeshLoader::loadBinaryStl(m_document.metadata().cell_mesh_path, mesh)) {
+            m_cellMesh = std::move(mesh);
+        }
+    }
+
+    rebuildVisualization();
+    rebuildVisualGeometry();
+    fitCameraToVisualGeometry();
+    rebuildRenderPacket();
+}
+
 void CadEngine::setVisualizationOverlay(const battery::BatteryVisualizationOverlay& overlay)
 {
+    cancelInteractiveMove();
+
     m_overrideVisualizationOverlay = overlay;
     m_visualizationOverlay = overlay;
     rebuildVisualGeometry();
@@ -62,6 +110,8 @@ void CadEngine::setVisualizationOverlay(const battery::BatteryVisualizationOverl
 
 void CadEngine::clearVisualizationOverlay()
 {
+    cancelInteractiveMove();
+
     m_overrideVisualizationOverlay.reset();
     rebuildVisualization();
     rebuildVisualGeometry();
@@ -82,12 +132,16 @@ void CadEngine::zoom(float delta)
 
 void CadEngine::selectEntity(core::EntityId entity_id)
 {
+    if (m_interactiveMove.has_value() && m_interactiveMove->entity_id != entity_id) {
+        cancelInteractiveMove();
+    }
     m_document.selectEntity(entity_id);
     rebuildRenderPacket();
 }
 
 void CadEngine::clearSelection()
 {
+    cancelInteractiveMove();
     m_document.clearSelection();
     rebuildRenderPacket();
 }
@@ -122,6 +176,18 @@ bool CadEngine::removeEntity(core::EntityId entity_id)
 bool CadEngine::restoreEntity(const battery::EntityRecord& entity)
 {
     const bool changed = m_document.restoreEntity(entity);
+    if (changed) {
+        refreshDocumentView(true);
+    }
+    return changed;
+}
+
+bool CadEngine::restoreEntities(const std::vector<battery::EntityRecord>& entities)
+{
+    bool changed = false;
+    for (const auto& entity : entities) {
+        changed = m_document.restoreEntity(entity) || changed;
+    }
     if (changed) {
         refreshDocumentView(true);
     }
@@ -310,7 +376,7 @@ bool CadEngine::resetEntityGeometryToGenerated(core::EntityId entity_id)
 
 bool CadEngine::resetEntityLabelToGenerated(core::EntityId entity_id)
 {
-    const bool changed = edit::CadEditService::resetEntityLabelToGenerated(m_document, entity_id);
+    const bool changed = edit::CadEditService::resetEntityLabelToGenerated(m_document, m_config.layout, entity_id);
     if (changed) {
         refreshDocumentView(false);
     }
@@ -324,12 +390,88 @@ bool CadEngine::executeCommand(std::unique_ptr<commands::ICommand> command)
 
 bool CadEngine::undo()
 {
+    cancelInteractiveMove();
     return m_commandStack.undo(*this);
 }
 
 bool CadEngine::redo()
 {
+    cancelInteractiveMove();
     return m_commandStack.redo(*this);
+}
+
+bool CadEngine::beginInteractiveMove(core::EntityId entity_id)
+{
+    if (!entity_id.isValid()) {
+        return false;
+    }
+
+    if (m_interactiveMove.has_value()) {
+        if (m_interactiveMove->entity_id == entity_id) {
+            return true;
+        }
+        cancelInteractiveMove();
+    }
+
+    const auto snapshot = snapshotEntity(entity_id);
+    if (!snapshot.has_value()) {
+        return false;
+    }
+
+    m_interactiveMove = InteractiveMoveState{entity_id, *snapshot, {}};
+    return true;
+}
+
+bool CadEngine::updateInteractiveMovePreview(const math::Vec3& delta)
+{
+    if (!m_interactiveMove.has_value()) {
+        return false;
+    }
+
+    if (isNearlyZeroDelta(delta)) {
+        return true;
+    }
+
+    if (!previewMoveEntity(m_interactiveMove->entity_id, delta)) {
+        return false;
+    }
+
+    m_interactiveMove->accumulated_delta = math::add(m_interactiveMove->accumulated_delta, delta);
+    return true;
+}
+
+bool CadEngine::commitInteractiveMove()
+{
+    if (!m_interactiveMove.has_value()) {
+        return false;
+    }
+
+    const InteractiveMoveState transaction = *m_interactiveMove;
+    m_interactiveMove.reset();
+
+    if (isNearlyZeroDelta(transaction.accumulated_delta)) {
+        restoreInteractiveMoveState(transaction.original_state);
+        return false;
+    }
+
+    if (!restoreInteractiveMoveState(transaction.original_state)) {
+        return false;
+    }
+
+    return executeCommand(std::make_unique<commands::MoveEntityCommand>(
+        transaction.entity_id,
+        transaction.accumulated_delta));
+}
+
+bool CadEngine::cancelInteractiveMove()
+{
+    if (!m_interactiveMove.has_value()) {
+        return false;
+    }
+
+    const battery::EntityRecord original_state = m_interactiveMove->original_state;
+    m_interactiveMove.reset();
+    return restoreInteractiveMoveState(original_state);
 }
 
 bool CadEngine::applyMoveEntity(core::EntityId entity_id, const math::Vec3& delta)
@@ -457,6 +599,21 @@ std::optional<battery::PackEnclosureProperties> CadEngine::getEnclosurePropertie
     return m_document.getEnclosureProperties(entity_id);
 }
 
+bool CadEngine::canUndo() const
+{
+    return m_commandStack.canUndo();
+}
+
+bool CadEngine::canRedo() const
+{
+    return m_commandStack.canRedo();
+}
+
+bool CadEngine::hasInteractiveMove() const
+{
+    return m_interactiveMove.has_value();
+}
+
 void CadEngine::rebuildDocument()
 {
     const std::string existing_mesh_path = m_document.metadata().cell_mesh_path;
@@ -508,6 +665,24 @@ void CadEngine::refreshDocumentView(bool rebuild_visualization)
     }
     rebuildVisualGeometry();
     rebuildRenderPacket();
+}
+
+bool CadEngine::restoreInteractiveMoveState(const battery::EntityRecord& entity)
+{
+    const bool changed = m_document.restoreEntity(entity);
+    if (changed) {
+        refreshDocumentView(false);
+    }
+    return changed;
+}
+
+bool CadEngine::previewMoveEntity(core::EntityId entity_id, const math::Vec3& delta)
+{
+    const bool changed = edit::CadEditService::moveEntity(m_document, entity_id, delta);
+    if (changed) {
+        refreshDocumentView(false);
+    }
+    return changed;
 }
 
 void CadEngine::rebuildVisualGeometry()

@@ -12,6 +12,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstddef>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -557,6 +558,13 @@ void CadViewportWidget::setPackConfig(const cad::battery::BatteryCadConfig& conf
     update();
 }
 
+void CadViewportWidget::loadDocument(cad::core::CadDocument document, const cad::battery::BatteryCadConfig& config)
+{
+    m_engine.loadDocument(std::move(document), config);
+    emit selectionChanged();
+    update();
+}
+
 void CadViewportWidget::setSimulationOverlay(const cad::battery::BatteryVisualizationOverlay& overlay)
 {
     m_engine.setVisualizationOverlay(overlay);
@@ -1030,7 +1038,10 @@ void CadViewportWidget::mousePressEvent(QMouseEvent* event)
 {
     if (event->button() == Qt::LeftButton) {
         m_dragging = true;
-        m_moveDragging = event->modifiers().testFlag(Qt::ShiftModifier) && m_engine.selectedEntity().isValid();
+        m_moveDragging =
+            event->modifiers().testFlag(Qt::ShiftModifier)
+            && m_engine.selectedEntity().isValid()
+            && m_engine.beginInteractiveMove(m_engine.selectedEntity());
         m_pressMousePos = event->pos();
         m_lastMousePos = event->pos();
     }
@@ -1102,7 +1113,7 @@ void CadViewportWidget::mouseMoveEvent(QMouseEvent* event)
                     snappedTarget.z - currentPosition.z
                 };
             }
-            m_engine.moveEntity(m_engine.selectedEntity(), moveDelta);
+            m_engine.updateInteractiveMovePreview(moveDelta);
         } else {
             m_engine.orbit(static_cast<float>(delta.x()) * 0.45f, static_cast<float>(delta.y()) * 0.30f);
         }
@@ -1114,15 +1125,23 @@ void CadViewportWidget::mouseMoveEvent(QMouseEvent* event)
 
 void CadViewportWidget::mouseReleaseEvent(QMouseEvent* event)
 {
-    if (m_dragging && !m_moveDragging && (event->pos() - m_pressMousePos).manhattanLength() < 4) {
-        const cad::core::EntityId hit = m_engine.hitTestEntity(static_cast<float>(event->position().x()), static_cast<float>(event->position().y()));
-        if (hit.isValid()) {
-            m_engine.selectEntity(hit);
+    if (m_dragging) {
+        if (m_moveDragging) {
+            m_engine.commitInteractiveMove();
+            emit selectionChanged();
+            update();
         } else {
-            m_engine.clearSelection();
+            if ((event->pos() - m_pressMousePos).manhattanLength() < 4) {
+                const cad::core::EntityId hit = m_engine.hitTestEntity(static_cast<float>(event->position().x()), static_cast<float>(event->position().y()));
+                if (hit.isValid()) {
+                    m_engine.selectEntity(hit);
+                } else {
+                    m_engine.clearSelection();
+                }
+                emit selectionChanged();
+                update();
+            }
         }
-        emit selectionChanged();
-        update();
     }
     m_dragging = false;
     m_moveDragging = false;
@@ -1159,6 +1178,17 @@ void CadViewportWidget::keyPressEvent(QKeyEvent* event)
         m_moveAxis = MoveAxis::FreeXZ;
         event->accept();
         return;
+    case Qt::Key_Escape:
+        if (m_moveDragging && m_engine.hasInteractiveMove()) {
+            m_engine.cancelInteractiveMove();
+            m_dragging = false;
+            m_moveDragging = false;
+            emit selectionChanged();
+            update();
+            event->accept();
+            return;
+        }
+        break;
     default:
         break;
     }

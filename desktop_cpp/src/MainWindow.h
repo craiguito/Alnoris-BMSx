@@ -81,6 +81,7 @@ private:
 
     QDoubleSpinBox* createDoubleSpin(double value, double min, double max, int decimals);
     QJsonObject buildSimulationConfig() const;
+    cad::battery::BatteryCadConfig buildCadWorkspaceConfig() const;
     void renderResult(const QJsonObject& payload);
     void renderComparison(const QJsonObject& baselinePayload, const QJsonObject& candidatePayload);
     void applySimulationConfig(const QJsonObject& config);

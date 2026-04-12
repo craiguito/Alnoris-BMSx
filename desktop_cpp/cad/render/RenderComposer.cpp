@@ -154,27 +154,62 @@ void appendMesh(std::vector<RenderVertex>& vertices, const io::TriangleMesh& mes
     }
 }
 
-void appendMeshBoundsWireframe(std::vector<RenderVertex>& lines, const io::TriangleMesh& mesh, const Vec3& offset, const Vec3& color)
+float safeAxisScale(float source_extent, float target_extent)
+{
+    if (source_extent > 0.0001f) {
+        return target_extent / source_extent;
+    }
+    return 1.0f;
+}
+
+Vec3 meshScaleForCell(const io::TriangleMesh& mesh, const battery::CellEntity& cell)
+{
+    const Vec3 target_size = cell.localBounds().size;
+    return {
+        safeAxisScale(mesh.source_size.x, target_size.x),
+        safeAxisScale(mesh.source_size.y, target_size.y),
+        safeAxisScale(mesh.source_size.z, target_size.z)
+    };
+}
+
+Vec3 transformMeshPoint(const io::TriangleMesh& mesh, const Vec3& scale, const Vec3& point, const Vec3& offset)
+{
+    const Vec3 centered = cad::math::sub(point, mesh.source_center);
+    return {
+        offset.x + centered.x * scale.x,
+        offset.y + centered.y * scale.y,
+        offset.z + centered.z * scale.z
+    };
+}
+
+void appendMeshBoundsWireframe(
+    std::vector<RenderVertex>& lines,
+    const io::TriangleMesh& mesh,
+    const battery::CellEntity& cell,
+    const Vec3& offset,
+    const Vec3& color)
 {
     if (mesh.vertices.empty()) {
         return;
     }
 
-    Vec3 min_point = mesh.vertices.front();
-    Vec3 max_point = mesh.vertices.front();
+    const Vec3 scale = meshScaleForCell(mesh, cell);
+    Vec3 min_point = transformMeshPoint(mesh, scale, mesh.vertices.front(), offset);
+    Vec3 max_point = min_point;
     for (const Vec3& point : mesh.vertices) {
-        min_point.x = std::min(min_point.x, point.x);
-        min_point.y = std::min(min_point.y, point.y);
-        min_point.z = std::min(min_point.z, point.z);
-        max_point.x = std::max(max_point.x, point.x);
-        max_point.y = std::max(max_point.y, point.y);
-        max_point.z = std::max(max_point.z, point.z);
+        const Vec3 transformed = transformMeshPoint(mesh, scale, point, offset);
+        min_point.x = std::min(min_point.x, transformed.x);
+        min_point.y = std::min(min_point.y, transformed.y);
+        min_point.z = std::min(min_point.z, transformed.z);
+        max_point.x = std::max(max_point.x, transformed.x);
+        max_point.y = std::max(max_point.y, transformed.y);
+        max_point.z = std::max(max_point.z, transformed.z);
     }
 
     const Vec3 center{
-        (min_point.x + max_point.x) * 0.5f + offset.x,
-        (min_point.y + max_point.y) * 0.5f + offset.y,
-        (min_point.z + max_point.z) * 0.5f + offset.z
+        (min_point.x + max_point.x) * 0.5f,
+        (min_point.y + max_point.y) * 0.5f,
+        (min_point.z + max_point.z) * 0.5f
     };
     const Vec3 size{
         (max_point.x - min_point.x),
@@ -267,6 +302,17 @@ void appendBoxPickable(
         std::max(5.0f, (max_y - min_y) * 0.5f),
         depth_accumulator / static_cast<float>(valid_count)
     });
+}
+
+bool pickableSortsBefore(const ScreenPickable& a, const ScreenPickable& b)
+{
+    if (a.depth != b.depth) {
+        return a.depth < b.depth;
+    }
+    if (a.selection_priority != b.selection_priority) {
+        return a.selection_priority > b.selection_priority;
+    }
+    return a.entity_id.value < b.entity_id.value;
 }
 
 void appendWireBox(std::vector<RenderVertex>& lines, const Vec3& center, const Vec3& size, const Vec3& color)
@@ -389,6 +435,9 @@ RenderPacket RenderComposer::compose(
     const auto isSelectedOrDescendant = [&selected_subtree](core::EntityId id) {
         return std::find(selected_subtree.begin(), selected_subtree.end(), id) != selected_subtree.end();
     };
+    const auto isEffectivelyVisible = [&document](core::EntityId id) {
+        return document.isEffectivelyVisible(id);
+    };
 
     const Vec3 grid_color{0.86f, 0.88f, 0.91f};
     const Vec3 grid_axis_color{0.79f, 0.82f, 0.86f};
@@ -414,7 +463,7 @@ RenderPacket RenderComposer::compose(
     }
 
     for (const battery::BatteryPackEntity& pack : document.packs()) {
-        if (!pack.visible) {
+        if (!isEffectivelyVisible(pack.id)) {
             continue;
         }
         const battery::BoundingBox bounds = document.worldBounds(pack.id);
@@ -424,7 +473,7 @@ RenderPacket RenderComposer::compose(
         }
     }
     for (const battery::ModuleBoundaryEntity& module : document.modules()) {
-        if (!module.visible) {
+        if (!isEffectivelyVisible(module.id)) {
             continue;
         }
         const battery::BoundingBox bounds = document.worldBounds(module.id);
@@ -434,7 +483,7 @@ RenderPacket RenderComposer::compose(
         }
     }
     for (const battery::CellGroupEntity& group : document.cellGroups()) {
-        if (!group.visible) {
+        if (!isEffectivelyVisible(group.id)) {
             continue;
         }
         const battery::BoundingBox bounds = document.worldBounds(group.id);
@@ -445,7 +494,7 @@ RenderPacket RenderComposer::compose(
     }
 
     for (const battery::CoolingPlateEntity& plate : document.coolingPlates()) {
-        if (!plate.visible) {
+        if (!isEffectivelyVisible(plate.id)) {
             continue;
         }
         const battery::BoundingBox bounds = document.worldBounds(plate.id);
@@ -455,7 +504,7 @@ RenderPacket RenderComposer::compose(
         }
     }
     for (const battery::BusbarEntity& busbar : document.busbars()) {
-        if (!busbar.visible) {
+        if (!isEffectivelyVisible(busbar.id)) {
             continue;
         }
         const battery::BoundingBox bounds = document.worldBounds(busbar.id);
@@ -465,7 +514,7 @@ RenderPacket RenderComposer::compose(
         }
     }
     for (const battery::PackEnclosureEntity& enclosure : document.packEnclosures()) {
-        if (!enclosure.visible) {
+        if (!isEffectivelyVisible(enclosure.id)) {
             continue;
         }
         const battery::BoundingBox bounds = document.worldBounds(enclosure.id);
@@ -476,12 +525,12 @@ RenderPacket RenderComposer::compose(
     }
 
     for (const battery::CellEntity& cell : document.cells()) {
-        if (!cell.visible) {
+        if (!isEffectivelyVisible(cell.id)) {
             continue;
         }
         const Vec3 world_position = document.worldPosition(cell.id);
         if (cell_mesh != nullptr && !cell_mesh->vertices.empty() && isSelectedOrDescendant(cell.id)) {
-            appendMeshBoundsWireframe(packet.selection_overlay_lines, *cell_mesh, world_position, selected_overlay_color);
+            appendMeshBoundsWireframe(packet.selection_overlay_lines, *cell_mesh, cell, world_position, selected_overlay_color);
         } else if (cell.form_factor == battery::CellFormFactor::Cylindrical) {
             if (isSelectedOrDescendant(cell.id)) {
                 appendWireCylinder(packet.selection_overlay_lines, world_position, cell.radius + 1.6f, cell.height + 3.0f, 28, selected_overlay_color);
@@ -515,9 +564,7 @@ RenderPacket RenderComposer::compose(
         }
     }
 
-    std::sort(packet.pickables.begin(), packet.pickables.end(), [](const ScreenPickable& a, const ScreenPickable& b) {
-        return a.depth < b.depth;
-    });
+    std::sort(packet.pickables.begin(), packet.pickables.end(), pickableSortsBefore);
 
     packet.lines.push_back({{-180.0f, 0.0f, 0.0f}, {0.79f, 0.72f, 0.72f}, 0});
     packet.lines.push_back({{180.0f, 0.0f, 0.0f}, {0.79f, 0.72f, 0.72f}, 0});

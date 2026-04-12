@@ -8,6 +8,7 @@
 #include <cmath>
 #include <limits>
 #include <map>
+#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -15,16 +16,147 @@ namespace {
 struct GroupAggregate
 {
     int seriesIndex = 0;
+    QString label;
     cad::math::Vec3 centroid{};
     float averageHeight = 0.0f;
     QString entityId;
 };
+
+QString fallbackGroupLabel(int seriesIndex)
+{
+    return QString("Series Group %1").arg(seriesIndex + 1);
+}
+
+QString entityIdString(cad::core::EntityId entityId)
+{
+    return entityId.isValid() ? QString::number(static_cast<qulonglong>(entityId.value)) : QString();
+}
 
 bool isInsideBox(const cad::math::Vec3& point, const cad::math::Vec3& center, const cad::math::Vec3& size)
 {
     return std::abs(point.x - center.x) <= size.x * 0.5f
         && std::abs(point.y - center.y) <= size.y * 0.5f
         && std::abs(point.z - center.z) <= size.z * 0.5f;
+}
+
+GroupAggregate makeAggregateFromCells(
+    int seriesIndex,
+    QString label,
+    QString entityId,
+    const cad::core::CadDocument& document,
+    const std::vector<const cad::battery::CellEntity*>& cells)
+{
+    GroupAggregate aggregate;
+    aggregate.seriesIndex = seriesIndex;
+    aggregate.label = std::move(label);
+    aggregate.entityId = std::move(entityId);
+
+    if (cells.empty()) {
+        return aggregate;
+    }
+
+    cad::math::Vec3 centroid{};
+    float totalHeight = 0.0f;
+    for (const cad::battery::CellEntity* cell : cells) {
+        const cad::math::Vec3 worldPosition = document.worldPosition(cell->id);
+        centroid.x += worldPosition.x;
+        centroid.y += worldPosition.y;
+        centroid.z += worldPosition.z;
+        totalHeight += cell->height;
+    }
+
+    const float count = static_cast<float>(cells.size());
+    aggregate.centroid = {
+        centroid.x / count,
+        centroid.y / count,
+        centroid.z / count
+    };
+    aggregate.averageHeight = totalHeight / count;
+    return aggregate;
+}
+
+std::vector<GroupAggregate> buildGroupAggregates(const cad::core::CadDocument& document)
+{
+    std::map<int, std::vector<const cad::battery::CellEntity*>> cellsBySeries;
+    std::unordered_map<cad::core::EntityId, std::vector<const cad::battery::CellEntity*>, cad::core::EntityIdHash> cellsByParent;
+    for (const cad::battery::CellEntity& cell : document.cells()) {
+        cellsBySeries[cell.series_index].push_back(&cell);
+        if (cell.parent_id.isValid()) {
+            cellsByParent[cell.parent_id].push_back(&cell);
+        }
+    }
+
+    if (!document.cellGroups().empty()) {
+        std::vector<const cad::battery::CellGroupEntity*> orderedGroups;
+        orderedGroups.reserve(document.cellGroups().size());
+        for (const cad::battery::CellGroupEntity& group : document.cellGroups()) {
+            orderedGroups.push_back(&group);
+        }
+
+        std::sort(orderedGroups.begin(), orderedGroups.end(), [](const auto* lhs, const auto* rhs) {
+            if (lhs->series_index != rhs->series_index) {
+                return lhs->series_index < rhs->series_index;
+            }
+            return lhs->id.value < rhs->id.value;
+        });
+
+        std::vector<GroupAggregate> aggregates;
+        aggregates.reserve(orderedGroups.size());
+        for (const cad::battery::CellGroupEntity* group : orderedGroups) {
+            const auto parentIt = cellsByParent.find(group->id);
+            const bool hasParentedCells = parentIt != cellsByParent.end() && !parentIt->second.empty();
+            const auto seriesIt = cellsBySeries.find(group->series_index);
+            const bool hasSeriesCells = seriesIt != cellsBySeries.end() && !seriesIt->second.empty();
+
+            const std::vector<const cad::battery::CellEntity*>* cells = nullptr;
+            if (hasParentedCells) {
+                cells = &parentIt->second;
+            } else if (hasSeriesCells) {
+                cells = &seriesIt->second;
+            }
+
+            GroupAggregate aggregate = makeAggregateFromCells(
+                group->series_index,
+                group->label.empty() ? fallbackGroupLabel(group->series_index) : QString::fromStdString(group->label),
+                entityIdString(group->id),
+                document,
+                cells != nullptr ? *cells : std::vector<const cad::battery::CellEntity*>{});
+
+            if (cells == nullptr || cells->empty()) {
+                aggregate.centroid = document.worldPosition(group->id);
+                aggregate.averageHeight = group->size.y;
+            }
+
+            aggregates.push_back(std::move(aggregate));
+        }
+        return aggregates;
+    }
+
+    if (!cellsBySeries.empty()) {
+        std::vector<GroupAggregate> aggregates;
+        aggregates.reserve(cellsBySeries.size());
+        for (const auto& [seriesIndex, cells] : cellsBySeries) {
+            aggregates.push_back(makeAggregateFromCells(
+                seriesIndex,
+                fallbackGroupLabel(seriesIndex),
+                QString("series-%1").arg(seriesIndex),
+                document,
+                cells));
+        }
+        return aggregates;
+    }
+
+    const int configuredGroupCount = std::max(1, document.metadata().layout_config.cells_in_series);
+    std::vector<GroupAggregate> aggregates;
+    aggregates.reserve(static_cast<std::size_t>(configuredGroupCount));
+    for (int seriesIndex = 0; seriesIndex < configuredGroupCount; ++seriesIndex) {
+        GroupAggregate aggregate;
+        aggregate.seriesIndex = seriesIndex;
+        aggregate.label = fallbackGroupLabel(seriesIndex);
+        aggregate.entityId = QString("series-%1").arg(seriesIndex);
+        aggregates.push_back(std::move(aggregate));
+    }
+    return aggregates;
 }
 
 } // namespace
@@ -44,66 +176,23 @@ SimulationMappingBuilder::MappingResult SimulationMappingBuilder::build(
         {"note", "Fallback lumped thermal behavior."}
     });
 
-    const int configuredGroupCount = std::max(1, document.metadata().layout_config.cells_in_series);
-    result.groupCount = configuredGroupCount;
-
-    std::map<int, std::vector<const cad::battery::CellEntity*>> cellsBySeries;
-    for (const cad::battery::CellEntity& cell : document.cells()) {
-        if (!cell.visible) {
-            continue;
-        }
-        cellsBySeries[cell.series_index].push_back(&cell);
-    }
-
-    std::vector<GroupAggregate> groups(static_cast<std::size_t>(configuredGroupCount));
-    for (int seriesIndex = 0; seriesIndex < configuredGroupCount; ++seriesIndex) {
-        groups[static_cast<std::size_t>(seriesIndex)].seriesIndex = seriesIndex;
-        groups[static_cast<std::size_t>(seriesIndex)].entityId = QString("series-%1").arg(seriesIndex);
-
-        const auto groupIt = std::find_if(
-            document.cellGroups().begin(),
-            document.cellGroups().end(),
-            [seriesIndex](const cad::battery::CellGroupEntity& group) {
-                return group.series_index == seriesIndex;
-            }
-        );
-        if (groupIt != document.cellGroups().end()) {
-            groups[static_cast<std::size_t>(seriesIndex)].entityId = QString::number(
-                static_cast<qulonglong>(groupIt->id.value)
-            );
-        }
-
-        const auto found = cellsBySeries.find(seriesIndex);
-        if (found == cellsBySeries.end() || found->second.empty()) {
-            continue;
-        }
-
-        cad::math::Vec3 centroid{};
-        float totalHeight = 0.0f;
-        for (const cad::battery::CellEntity* cell : found->second) {
-            const cad::math::Vec3 worldPosition = document.worldPosition(cell->id);
-            centroid.x += worldPosition.x;
-            centroid.y += worldPosition.y;
-            centroid.z += worldPosition.z;
-            totalHeight += cell->height;
-        }
-        const float count = static_cast<float>(found->second.size());
-        centroid.x /= count;
-        centroid.y /= count;
-        centroid.z /= count;
-        groups[static_cast<std::size_t>(seriesIndex)].centroid = centroid;
-        groups[static_cast<std::size_t>(seriesIndex)].averageHeight = totalHeight / count;
-    }
+    const std::vector<GroupAggregate> groups = buildGroupAggregates(document);
+    result.groupCount = static_cast<int>(groups.size());
 
     std::vector<const cad::battery::CoolingPlateEntity*> coolingPlates;
     for (const cad::battery::CoolingPlateEntity& plate : document.coolingPlates()) {
-        if (!plate.visible) {
-            continue;
-        }
         coolingPlates.push_back(&plate);
+    }
+    std::sort(coolingPlates.begin(), coolingPlates.end(), [](const auto* lhs, const auto* rhs) {
+        if (lhs->plate_index != rhs->plate_index) {
+            return lhs->plate_index < rhs->plate_index;
+        }
+        return lhs->id.value < rhs->id.value;
+    });
+    for (const cad::battery::CoolingPlateEntity* plate : coolingPlates) {
         result.thermalZones.append(QJsonObject{
-            {"zone_id", 100 + plate.plate_index},
-            {"name", QString::fromStdString(plate.label.empty() ? "Cooling Plate" : plate.label)},
+            {"zone_id", 100 + plate->plate_index},
+            {"name", QString::fromStdString(plate->label.empty() ? "Cooling Plate" : plate->label)},
             {"cooling_coeff_multiplier", 1.35},
             {"note", "Derived from cooling plate proximity."}
         });
@@ -111,13 +200,18 @@ SimulationMappingBuilder::MappingResult SimulationMappingBuilder::build(
 
     std::vector<const cad::battery::ModuleBoundaryEntity*> moduleBoundaries;
     for (const cad::battery::ModuleBoundaryEntity& boundary : document.moduleBoundaries()) {
-        if (!boundary.visible) {
-            continue;
-        }
         moduleBoundaries.push_back(&boundary);
+    }
+    std::sort(moduleBoundaries.begin(), moduleBoundaries.end(), [](const auto* lhs, const auto* rhs) {
+        if (lhs->module_index != rhs->module_index) {
+            return lhs->module_index < rhs->module_index;
+        }
+        return lhs->id.value < rhs->id.value;
+    });
+    for (const cad::battery::ModuleBoundaryEntity* boundary : moduleBoundaries) {
         result.thermalZones.append(QJsonObject{
-            {"zone_id", 200 + boundary.module_index},
-            {"name", QString::fromStdString(boundary.label.empty() ? "Module Zone" : boundary.label)},
+            {"zone_id", 200 + boundary->module_index},
+            {"name", QString::fromStdString(boundary->label.empty() ? "Module Zone" : boundary->label)},
             {"cooling_coeff_multiplier", 0.9},
             {"note", "Derived from module boundary containment."}
         });
@@ -149,7 +243,7 @@ SimulationMappingBuilder::MappingResult SimulationMappingBuilder::build(
         }
 
         result.groupZoneAssignments.append(assignedZoneId);
-        result.groupLabels.append(QString("Series Group %1").arg(group.seriesIndex + 1));
+        result.groupLabels.append(group.label);
         result.groupEntityIds.append(group.entityId);
     }
 

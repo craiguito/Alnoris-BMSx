@@ -1,5 +1,6 @@
 #include "MainWindow.h"
 #include "SimulationMappingBuilder.h"
+#include "../cad/io/JsonCadDocumentIO.h"
 
 #include <QComboBox>
 #include <QCheckBox>
@@ -44,6 +45,7 @@
 #include <functional>
 #include <limits>
 #include <string>
+#include <utility>
 
 namespace {
 
@@ -99,6 +101,24 @@ cad::battery::CellFormFactor cellFormFactorFromString(const QString& value)
     return cad::battery::CellFormFactor::Cylindrical;
 }
 
+bool cellUsesRadiusDimension(cad::battery::CellFormFactor form_factor)
+{
+    return form_factor == cad::battery::CellFormFactor::Cylindrical;
+}
+
+QString cellInspectorTypeLabel(cad::battery::CellFormFactor form_factor)
+{
+    switch (form_factor) {
+    case cad::battery::CellFormFactor::Prismatic:
+        return "Prismatic Cell";
+    case cad::battery::CellFormFactor::Pouch:
+        return "Pouch Cell";
+    case cad::battery::CellFormFactor::Cylindrical:
+    default:
+        return "Cylindrical Cell";
+    }
+}
+
 struct CadCellDefaults
 {
     cad::battery::CellFormFactor form_factor = cad::battery::CellFormFactor::Cylindrical;
@@ -138,10 +158,18 @@ cad::battery::BatteryVisualizationOverlay buildSimulationOverlay(
     }
 
     for (const cad::battery::CellEntity& cell : document.cells()) {
-        int group_index = cell.simulation_group_index >= 0 ? cell.simulation_group_index : cell.series_index;
-        if (group_index < 0 && !result.group_entity_ids.isEmpty()) {
-            const QString entityId = QString::number(static_cast<qulonglong>(cell.id.value));
-            group_index = result.group_entity_ids.indexOf(entityId);
+        int group_index = -1;
+        if (!result.group_entity_ids.isEmpty()) {
+            if (cell.parent_id.isValid()) {
+                const QString parentGroupId = QString::number(static_cast<qulonglong>(cell.parent_id.value));
+                group_index = result.group_entity_ids.indexOf(parentGroupId);
+            }
+            if (group_index < 0 && cell.series_index >= 0) {
+                group_index = result.group_entity_ids.indexOf(QString("series-%1").arg(cell.series_index));
+            }
+        }
+        if (group_index < 0) {
+            group_index = cell.simulation_group_index >= 0 ? cell.simulation_group_index : cell.series_index;
         }
         if (group_index < 0) {
             continue;
@@ -400,6 +428,9 @@ void MainWindow::saveProject()
     root.insert("simulation_config", buildSimulationConfig());
     root.insert("baseline_config", m_baselineConfig);
     root.insert("baseline_result", m_baselineResult);
+    if (m_cadWorkspaceView != nullptr) {
+        root.insert("cad_document", cad::io::serializeCadDocument(m_cadWorkspaceView->document()));
+    }
 
     QFile file(path);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
@@ -450,7 +481,32 @@ void MainWindow::loadProject()
             }
         }
     }
-    updateCadWorkspace();
+
+    bool loadedCadDocument = false;
+    QString cadDocumentError;
+    if (m_cadWorkspaceView != nullptr) {
+        cad::core::CadDocument cadDocument;
+        if (cad::io::tryLoadCadDocumentFromProject(root, cadDocument, &cadDocumentError)) {
+            cad::battery::BatteryCadConfig cadConfig = buildCadWorkspaceConfig();
+            if (cadDocument.metadata().layout_config.cells_in_series > 0 || cadDocument.metadata().layout_config.cells_in_parallel > 0) {
+                cadConfig.layout = cadDocument.metadata().layout_config;
+            }
+            m_cadWorkspaceView->loadDocument(std::move(cadDocument), cadConfig);
+            refreshCadOverlay();
+            loadedCadDocument = true;
+        } else if (!cadDocumentError.isEmpty()) {
+            QMessageBox::warning(
+                this,
+                "CAD Document Warning",
+                QString("The saved CAD document could not be loaded, so the workspace was rebuilt from simulation config.\n\n%1")
+                    .arg(cadDocumentError));
+        }
+    }
+
+    if (!loadedCadDocument) {
+        updateCadWorkspace();
+    }
+    refreshCadProperties();
 
     if (!m_baselineResult.isEmpty()) {
         m_summaryLabel->setText(QString("Loaded project from %1 with a saved baseline.").arg(path));
@@ -1316,12 +1372,8 @@ void MainWindow::openCustomizationDialog()
     }
 }
 
-void MainWindow::updateCadWorkspace()
+cad::battery::BatteryCadConfig MainWindow::buildCadWorkspaceConfig() const
 {
-    if (m_cadWorkspaceView == nullptr) {
-        return;
-    }
-
     cad::battery::BatteryCadConfig cadConfig;
     const QJsonObject cadDefaults = m_activeSystemPreset.value("cad_defaults").toObject();
     const CadCellDefaults fallbackDefaults = fallbackCadCellDefaults(
@@ -1386,7 +1438,16 @@ void MainWindow::updateCadWorkspace()
     cadConfig.layout.cell_seating_offset = static_cast<float>(cadDefaults.value("cell_seating_offset_mm").toDouble(cadConfig.layout.cell_seating_offset));
     cadConfig.layout.module_tray_margin_x = static_cast<float>(cadDefaults.value("tray_margin_x_mm").toDouble(cadConfig.layout.module_tray_margin_x));
     cadConfig.layout.module_tray_margin_z = static_cast<float>(cadDefaults.value("tray_margin_z_mm").toDouble(cadConfig.layout.module_tray_margin_z));
-    m_cadWorkspaceView->setPackConfig(cadConfig);
+    return cadConfig;
+}
+
+void MainWindow::updateCadWorkspace()
+{
+    if (m_cadWorkspaceView == nullptr) {
+        return;
+    }
+
+    m_cadWorkspaceView->setPackConfig(buildCadWorkspaceConfig());
     refreshCadOverlay();
 }
 
@@ -1443,6 +1504,11 @@ void MainWindow::refreshCadProperties()
         m_cadSizeY->setValue(0.0);
         m_cadSizeZ->setValue(0.0);
         m_cadThickness->setValue(0.0);
+        m_cadRadiusLabel->setText("Radius");
+        m_cadHeightLabel->setText("Height");
+        m_cadSizeXLabel->setText("Size X");
+        m_cadSizeYLabel->setText("Size Y");
+        m_cadSizeZLabel->setText("Size Z");
         m_cadRadiusLabel->setVisible(false);
         m_cadRadius->setVisible(false);
         m_cadHeightLabel->setVisible(false);
@@ -1463,6 +1529,11 @@ void MainWindow::refreshCadProperties()
     m_cadSelectedId->setText(QString::number(static_cast<qulonglong>(entity.id.value)));
     m_cadLabelEdit->setText(QString::fromStdString(entity.label));
     m_cadVisibleCheck->setChecked(entity.visible);
+    m_cadRadiusLabel->setText("Radius");
+    m_cadHeightLabel->setText("Height");
+    m_cadSizeXLabel->setText("Size X");
+    m_cadSizeYLabel->setText("Size Y");
+    m_cadSizeZLabel->setText("Size Z");
 
     const auto setRowVisible = [](QWidget* label, QWidget* editor, bool visible) {
         if (label != nullptr) {
@@ -1499,13 +1570,23 @@ void MainWindow::refreshCadProperties()
         if (!properties.has_value()) {
             break;
         }
+        m_cadSelectedType->setText(cellInspectorTypeLabel(properties->form_factor));
         m_cadPosX->setValue(properties->position.x);
         m_cadPosY->setValue(properties->position.y);
         m_cadPosZ->setValue(properties->position.z);
-        m_cadRadius->setValue(properties->radius);
         m_cadHeight->setValue(properties->height);
-        setRowVisible(m_cadRadiusLabel, m_cadRadius, true);
         setRowVisible(m_cadHeightLabel, m_cadHeight, true);
+        if (properties->usesRadiusDimension()) {
+            m_cadRadius->setValue(properties->radius);
+            setRowVisible(m_cadRadiusLabel, m_cadRadius, true);
+        } else {
+            m_cadSizeXLabel->setText("Width");
+            m_cadSizeZLabel->setText("Depth");
+            m_cadSizeX->setValue(properties->width);
+            m_cadSizeZ->setValue(properties->depth);
+            setRowVisible(m_cadSizeXLabel, m_cadSizeX, true);
+            setRowVisible(m_cadSizeZLabel, m_cadSizeZ, true);
+        }
         break;
     }
     case cad::battery::EntityKind::Busbar: {
@@ -1624,17 +1705,26 @@ void MainWindow::applyCadPropertyChanges()
             static_cast<float>(m_cadPosZ->value())
         };
         const float radius = static_cast<float>(m_cadRadius->value());
+        const float width = static_cast<float>(m_cadSizeX->value());
+        const float depth = static_cast<float>(m_cadSizeZ->value());
         const float height = static_cast<float>(m_cadHeight->value());
         if (position.x != properties->position.x || position.y != properties->position.y || position.z != properties->position.z) {
             update.position = position;
         }
-        if (radius != properties->radius) {
+        if (properties->usesRadiusDimension() && radius != properties->radius) {
             update.radius = radius;
+        }
+        if (properties->usesWidthDepthDimensions() && width != properties->width) {
+            update.width = width;
+        }
+        if (properties->usesWidthDepthDimensions() && depth != properties->depth) {
+            update.depth = depth;
         }
         if (height != properties->height) {
             update.height = height;
         }
-        if (update.position.has_value() || update.radius.has_value() || update.height.has_value()
+        if (update.position.has_value() || update.radius.has_value() || update.width.has_value()
+            || update.depth.has_value() || update.height.has_value()
             || update.label.has_value() || update.visible.has_value()) {
             m_cadWorkspaceView->applySelectedCellUpdate(update);
         }

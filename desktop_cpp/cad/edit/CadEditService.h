@@ -24,7 +24,7 @@ public:
     static bool applyEnclosureProperties(core::CadDocument& document, core::EntityId entity_id, const battery::PackEnclosureProperties& properties);
     static bool resetEntityPositionToGenerated(core::CadDocument& document, const battery::PackLayoutConfig& layout, core::EntityId entity_id);
     static bool resetEntityGeometryToGenerated(core::CadDocument& document, const battery::PackLayoutConfig& layout, core::EntityId entity_id);
-    static bool resetEntityLabelToGenerated(core::CadDocument& document, core::EntityId entity_id);
+    static bool resetEntityLabelToGenerated(core::CadDocument& document, const battery::PackLayoutConfig& layout, core::EntityId entity_id);
 };
 
 } // namespace cad::edit

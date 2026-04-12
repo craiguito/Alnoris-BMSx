@@ -1,0 +1,6 @@
+set(__QT_DEPLOY_TARGET_alnoris_desktop_FILE C:/Users/Craig/OneDrive/Desktop/Alnoris BMSx/build-desktop/MinSizeRel/alnoris_desktop.exe)
+set(__QT_DEPLOY_TARGET_alnoris_desktop_TYPE EXECUTABLE)
+set(__QT_DEPLOY_TARGET_alnoris_desktop_RUNTIME_DLLS C:/Qt/6.11.0/msvc2022_64/bin/Qt6OpenGLWidgets.dll;C:/Qt/6.11.0/msvc2022_64/bin/Qt6Widgets.dll;C:/Qt/6.11.0/msvc2022_64/bin/Qt6OpenGL.dll;C:/Qt/6.11.0/msvc2022_64/bin/Qt6Gui.dll;C:/Qt/6.11.0/msvc2022_64/bin/Qt6Core.dll)
+set(__QT_DEPLOY_TARGET_cad_regression_tests_FILE C:/Users/Craig/OneDrive/Desktop/Alnoris BMSx/build-desktop/tests-bin/cad_regression_tests.exe)
+set(__QT_DEPLOY_TARGET_cad_regression_tests_TYPE EXECUTABLE)
+set(__QT_DEPLOY_TARGET_cad_regression_tests_RUNTIME_DLLS C:/Qt/6.11.0/msvc2022_64/bin/Qt6Core.dll)

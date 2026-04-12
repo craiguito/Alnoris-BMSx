@@ -13,6 +13,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace cad {
 
@@ -36,6 +37,7 @@ public:
     bool setCellMeshPath(const std::string& path);
     void setViewportSize(int width, int height);
     void setBatteryConfig(const battery::BatteryCadConfig& config);
+    void loadDocument(core::CadDocument document, const battery::BatteryCadConfig& config);
     void setVisualizationOverlay(const battery::BatteryVisualizationOverlay& overlay);
     void clearVisualizationOverlay();
     void orbit(float delta_yaw_deg, float delta_pitch_deg);
@@ -46,6 +48,7 @@ public:
     bool setEntityPosition(core::EntityId entity_id, const math::Vec3& position);
     bool removeEntity(core::EntityId entity_id);
     bool restoreEntity(const battery::EntityRecord& entity);
+    bool restoreEntities(const std::vector<battery::EntityRecord>& entities);
     bool setEntityLabel(core::EntityId entity_id, std::string label);
     bool setEntityVisibility(core::EntityId entity_id, bool visible);
     bool setCellPosition(core::EntityId entity_id, const math::Vec3& position);
@@ -71,6 +74,10 @@ public:
     bool executeCommand(std::unique_ptr<commands::ICommand> command);
     bool undo();
     bool redo();
+    bool beginInteractiveMove(core::EntityId entity_id);
+    bool updateInteractiveMovePreview(const math::Vec3& delta);
+    bool commitInteractiveMove();
+    bool cancelInteractiveMove();
     bool applyMoveEntity(core::EntityId entity_id, const math::Vec3& delta);
     bool applyRemoveEntity(core::EntityId entity_id);
     bool applyRenameEntity(core::EntityId entity_id, std::string label);
@@ -98,9 +105,19 @@ public:
     [[nodiscard]] std::optional<battery::CoolingPlateProperties> getCoolingPlateProperties(core::EntityId entity_id) const;
     [[nodiscard]] std::optional<battery::ModuleBoundaryProperties> getModuleBoundaryProperties(core::EntityId entity_id) const;
     [[nodiscard]] std::optional<battery::PackEnclosureProperties> getEnclosureProperties(core::EntityId entity_id) const;
+    [[nodiscard]] bool canUndo() const;
+    [[nodiscard]] bool canRedo() const;
+    [[nodiscard]] bool hasInteractiveMove() const;
     [[nodiscard]] const RenderDiagnostics& renderDiagnostics() const { return m_renderDiagnostics; }
 
 private:
+    struct InteractiveMoveState
+    {
+        core::EntityId entity_id{};
+        battery::EntityRecord original_state;
+        math::Vec3 accumulated_delta{};
+    };
+
     [[nodiscard]] battery::BoundingBox sceneBounds() const;
     [[nodiscard]] battery::BoundingBox visualGeometryBounds() const;
     void fitCameraToVisualGeometry();
@@ -109,6 +126,8 @@ private:
     void rebuildVisualGeometry();
     void rebuildRenderPacket();
     void refreshDocumentView(bool rebuild_visualization);
+    bool restoreInteractiveMoveState(const battery::EntityRecord& entity);
+    bool previewMoveEntity(core::EntityId entity_id, const math::Vec3& delta);
 
     battery::BatteryCadConfig m_config;
     core::CadDocument m_document;
@@ -125,6 +144,7 @@ private:
     render::RenderPacket m_renderPacket;
     RenderDiagnostics m_renderDiagnostics;
     commands::CommandStack m_commandStack;
+    std::optional<InteractiveMoveState> m_interactiveMove;
 };
 
 } // namespace cad

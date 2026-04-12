@@ -77,13 +77,47 @@ Vec3 overlayCellColor(const battery::BatteryVisualizationOverlay& overlay, const
     return {0.73f, 0.70f, 0.66f};
 }
 
-void appendMesh(GeometryBuffer& geometry, const io::TriangleMesh& mesh, const Vec3& offset, const Vec3& color)
+float safeAxisScale(float source_extent, float target_extent)
 {
+    if (source_extent > 0.0001f) {
+        return target_extent / source_extent;
+    }
+    return 1.0f;
+}
+
+Vec3 meshScaleForCell(const io::TriangleMesh& mesh, const battery::CellEntity& cell)
+{
+    const Vec3 target_size = cell.localBounds().size;
+    return {
+        safeAxisScale(mesh.source_size.x, target_size.x),
+        safeAxisScale(mesh.source_size.y, target_size.y),
+        safeAxisScale(mesh.source_size.z, target_size.z)
+    };
+}
+
+Vec3 transformMeshPoint(const io::TriangleMesh& mesh, const Vec3& scale, const Vec3& point, const Vec3& offset)
+{
+    const Vec3 centered = cad::math::sub(point, mesh.source_center);
+    return {
+        offset.x + centered.x * scale.x,
+        offset.y + centered.y * scale.y,
+        offset.z + centered.z * scale.z
+    };
+}
+
+void appendMesh(
+    GeometryBuffer& geometry,
+    const io::TriangleMesh& mesh,
+    const battery::CellEntity& cell,
+    const Vec3& offset,
+    const Vec3& color)
+{
+    const Vec3 scale = meshScaleForCell(mesh, cell);
     for (std::size_t i = 0; i + 2 < mesh.vertices.size(); i += 3) {
         geometry.triangles.push_back({
-            cad::math::add(mesh.vertices[i], offset),
-            cad::math::add(mesh.vertices[i + 1], offset),
-            cad::math::add(mesh.vertices[i + 2], offset),
+            transformMeshPoint(mesh, scale, mesh.vertices[i], offset),
+            transformMeshPoint(mesh, scale, mesh.vertices[i + 1], offset),
+            transformMeshPoint(mesh, scale, mesh.vertices[i + 2], offset),
             color,
             SurfaceLayer::Cell
         });
@@ -117,7 +151,8 @@ std::vector<const battery::CellEntity*> collectModuleCells(const core::CadDocume
 {
     std::vector<const battery::CellEntity*> cells;
     for (const core::EntityId entity_id : document.subtreeIds(module_id)) {
-        if (const auto* cell = document.findCell(entity_id); cell != nullptr && cell->visible) {
+        if (const auto* cell = document.findCell(entity_id);
+            cell != nullptr && document.isEffectivelyVisible(cell->id)) {
             cells.push_back(cell);
         }
     }
@@ -242,14 +277,12 @@ void appendModuleTrayGeometry(
     const battery::PackLayoutConfig& config
 )
 {
-    (void)document;
     if (module_context.cells.empty()) {
         return;
     }
 
     const battery::BoundingBox cell_bounds = module_context.cell_bounds;
-    const float tray_margin_x = config.module_tray_margin_x;
-    const float tray_margin_z = config.module_tray_margin_z;
+    const battery::BoundingBox module_bounds = document.worldBounds(module.id);
     const float tray_base_thickness = config.module_tray_base_thickness;
     const float tray_wall_thickness = config.module_tray_wall_thickness;
     const float tray_wall_height = config.module_tray_wall_height;
@@ -260,11 +293,11 @@ void appendModuleTrayGeometry(
     appendOpenTopTray(
         geometry,
         {
-            cell_bounds.center.x,
+            module_bounds.center.x,
             seating_plane_y,
-            cell_bounds.center.z
+            module_bounds.center.z
         },
-        {cell_bounds.size.x + tray_margin_x * 2.0f, cell_bounds.size.z + tray_margin_z * 2.0f, 0.0f},
+        {module_bounds.size.x, 0.0f, module_bounds.size.z},
         tray_base_thickness,
         tray_wall_thickness,
         tray_wall_height,
@@ -293,6 +326,7 @@ void appendModuleTrayGeometry(
 
 void appendEnclosureGeometry(
     GeometryBuffer& geometry,
+    const battery::PackEnclosureEntity& enclosure,
     const battery::BoundingBox& bounds,
     const battery::PackLayoutConfig& config
 )
@@ -303,7 +337,7 @@ void appendEnclosureGeometry(
         geometry,
         bounds.center,
         bounds.size,
-        config.enclosure_wall_thickness,
+        enclosure.wall_thickness,
         config.enclosure_floor_thickness,
         wall_height,
         enclosure_color,
@@ -395,7 +429,7 @@ GeometryBuffer BatteryGeometryGenerator::buildVisualGeometry(
     }
 
     for (const battery::ModuleBoundaryEntity& module : document.modules()) {
-        if (!module.visible) {
+        if (!document.isEffectivelyVisible(module.id)) {
             continue;
         }
         const auto context_it = module_contexts.find(module.id);
@@ -405,7 +439,7 @@ GeometryBuffer BatteryGeometryGenerator::buildVisualGeometry(
     }
 
     for (const battery::CoolingPlateEntity& plate : document.coolingPlates()) {
-        if (!plate.visible) {
+        if (!document.isEffectivelyVisible(plate.id)) {
             continue;
         }
         const battery::BoundingBox bounds = document.worldBounds(plate.id);
@@ -422,7 +456,7 @@ GeometryBuffer BatteryGeometryGenerator::buildVisualGeometry(
     }
 
     for (const battery::BusbarEntity& busbar : document.busbars()) {
-        if (!busbar.visible) {
+        if (!document.isEffectivelyVisible(busbar.id)) {
             continue;
         }
         const auto* module = document.findModuleBoundary(busbar.parent_id);
@@ -437,23 +471,23 @@ GeometryBuffer BatteryGeometryGenerator::buildVisualGeometry(
     }
 
     for (const battery::PackEnclosureEntity& enclosure : document.packEnclosures()) {
-        if (!enclosure.visible) {
+        if (!document.isEffectivelyVisible(enclosure.id)) {
             continue;
         }
         if (!large_pack_mode) {
-            appendEnclosureGeometry(geometry, document.worldBounds(enclosure.id), layout);
+            appendEnclosureGeometry(geometry, enclosure, document.worldBounds(enclosure.id), layout);
         }
     }
 
     for (const battery::CellEntity& cell : document.cells()) {
-        if (!cell.visible) {
+        if (!document.isEffectivelyVisible(cell.id)) {
             continue;
         }
 
         const Vec3 world_position = document.worldPosition(cell.id);
         const Vec3 body_color = overlayCellColor(overlay, cell);
         if (cell_mesh != nullptr && !cell_mesh->vertices.empty()) {
-            appendMesh(geometry, *cell_mesh, world_position, body_color);
+            appendMesh(geometry, *cell_mesh, cell, world_position, body_color);
             continue;
         }
 

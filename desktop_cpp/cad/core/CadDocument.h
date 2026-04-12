@@ -92,6 +92,7 @@ public:
     [[nodiscard]] std::optional<battery::CoolingPlateProperties> getCoolingPlateProperties(EntityId id) const;
     [[nodiscard]] std::optional<battery::ModuleBoundaryProperties> getModuleBoundaryProperties(EntityId id) const;
     [[nodiscard]] std::optional<battery::PackEnclosureProperties> getEnclosureProperties(EntityId id) const;
+    [[nodiscard]] bool isEffectivelyVisible(EntityId id) const;
     [[nodiscard]] std::vector<EntityId> childIds(EntityId parent_id) const;
     [[nodiscard]] std::vector<EntityId> subtreeIds(EntityId root_id) const;
     [[nodiscard]] battery::BoundingBox worldBounds(EntityId id) const;
@@ -113,6 +114,8 @@ public:
 
     [[nodiscard]] Metadata& metadata() { return m_metadata; }
     [[nodiscard]] const Metadata& metadata() const { return m_metadata; }
+    [[nodiscard]] std::uint64_t nextEntityIdValue() const { return m_nextEntityId; }
+    void setNextEntityIdValue(std::uint64_t next_entity_id);
 
 private:
     void rebuildIndex();

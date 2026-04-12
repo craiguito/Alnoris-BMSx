@@ -1,7 +1,14 @@
 #pragma once
 
+#include "../core/CadDocument.h"
+
+#include <QJsonObject>
+#include <QString>
+
 namespace cad::io {
 
-// TODO: add JSON save/load for persistent CAD documents once entity editing is in place.
+QJsonObject serializeCadDocument(const core::CadDocument& document);
+bool deserializeCadDocument(const QJsonObject& object, core::CadDocument& document, QString* error = nullptr);
+bool tryLoadCadDocumentFromProject(const QJsonObject& project_root, core::CadDocument& document, QString* error = nullptr);
 
 } // namespace cad::io

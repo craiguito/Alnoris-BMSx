@@ -53,4 +53,10 @@ bool CommandStack::canRedo() const
     return !m_redoStack.empty();
 }
 
+void CommandStack::clear()
+{
+    m_undoStack.clear();
+    m_redoStack.clear();
+}
+
 } // namespace cad::commands

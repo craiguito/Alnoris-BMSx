@@ -1,5 +1,6 @@
 #include "CadDocument.h"
 
+#include <algorithm>
 #include <type_traits>
 #include <utility>
 
@@ -44,6 +45,11 @@ void CadDocument::clear()
     m_coolingPlates.clear();
     m_moduleBoundaries.clear();
     m_packEnclosures.clear();
+}
+
+void CadDocument::setNextEntityIdValue(std::uint64_t next_entity_id)
+{
+    m_nextEntityId = std::max<std::uint64_t>(1, next_entity_id);
 }
 
 EntityId CadDocument::allocateEntityId()
@@ -404,6 +410,14 @@ bool CadDocument::updateCellProperties(EntityId id, const battery::CellPropertie
         cell->radius = *update.radius;
         cell->property_modes.geometry = battery::PropertyMode::UserOverride;
     }
+    if (update.width.has_value()) {
+        cell->width = *update.width;
+        cell->property_modes.geometry = battery::PropertyMode::UserOverride;
+    }
+    if (update.depth.has_value()) {
+        cell->depth = *update.depth;
+        cell->property_modes.geometry = battery::PropertyMode::UserOverride;
+    }
     if (update.height.has_value()) {
         cell->height = *update.height;
         cell->property_modes.geometry = battery::PropertyMode::UserOverride;
@@ -530,9 +544,15 @@ bool CadDocument::applyCellProperties(EntityId id, const battery::CellProperties
         return false;
     }
     assignBaseProperties(*cell, properties.summary, properties.property_modes);
+    cell->form_factor = properties.form_factor;
     cell->position = properties.position;
     cell->radius = properties.radius;
+    cell->width = properties.width;
+    cell->depth = properties.depth;
     cell->height = properties.height;
+    cell->series_index = properties.series_index;
+    cell->parallel_index = properties.parallel_index;
+    cell->cell_type = properties.cell_type;
     return true;
 }
 
@@ -543,6 +563,7 @@ bool CadDocument::applyBusbarProperties(EntityId id, const battery::BusbarProper
         return false;
     }
     assignBaseProperties(*busbar, properties.summary, properties.property_modes);
+    busbar->module_index = properties.module_index;
     busbar->center = properties.center;
     busbar->size = properties.size;
     busbar->role = properties.role;
@@ -890,15 +911,19 @@ std::optional<battery::CellProperties> CadDocument::getCellProperties(EntityId i
     if (cell == nullptr) {
         return std::nullopt;
     }
-    return battery::CellProperties{
-        summaryFromEntity(*cell),
-        cell->position,
-        cell->radius,
-        cell->height,
-        cell->series_index,
-        cell->parallel_index,
-        cell->property_modes
-    };
+    battery::CellProperties properties;
+    properties.summary = summaryFromEntity(*cell);
+    properties.form_factor = cell->form_factor;
+    properties.position = cell->position;
+    properties.radius = cell->radius;
+    properties.width = cell->width;
+    properties.depth = cell->depth;
+    properties.height = cell->height;
+    properties.series_index = cell->series_index;
+    properties.parallel_index = cell->parallel_index;
+    properties.cell_type = cell->cell_type;
+    properties.property_modes = cell->property_modes;
+    return properties;
 }
 
 std::optional<battery::BusbarProperties> CadDocument::getBusbarProperties(EntityId id) const
@@ -909,6 +934,7 @@ std::optional<battery::BusbarProperties> CadDocument::getBusbarProperties(Entity
     }
     return battery::BusbarProperties{
         summaryFromEntity(*busbar),
+        busbar->module_index,
         busbar->role,
         busbar->center,
         busbar->size,
@@ -960,6 +986,30 @@ std::optional<battery::PackEnclosureProperties> CadDocument::getEnclosurePropert
         enclosure->wall_thickness,
         enclosure->property_modes
     };
+}
+
+bool CadDocument::isEffectivelyVisible(EntityId id) const
+{
+    EntityId current_id = id;
+    std::size_t visited_count = 0;
+
+    while (current_id.isValid()) {
+        if (visited_count++ > m_entityIndex.size()) {
+            return false;
+        }
+
+        const auto summary = getEntitySummary(current_id);
+        if (!summary.has_value()) {
+            return false;
+        }
+        if (!summary->visible) {
+            return false;
+        }
+
+        current_id = summary->parent_id;
+    }
+
+    return true;
 }
 
 std::vector<EntityId> CadDocument::childIds(EntityId parent_id) const
@@ -1044,7 +1094,7 @@ battery::BoundingBox CadDocument::worldBounds(EntityId id) const
         return {worldPosition(id), group->size};
     }
     if (const auto* cell = findCell(id)) {
-        return {worldPosition(id), {cell->radius * 2.0f, cell->height, cell->radius * 2.0f}};
+        return {worldPosition(id), cell->localBounds().size};
     }
     if (const auto* busbar = findBusbar(id)) {
         return {worldPosition(id), busbar->size};
