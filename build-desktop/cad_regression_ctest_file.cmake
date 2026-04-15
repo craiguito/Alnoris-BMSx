@@ -1,1 +1,0 @@
-add_test([=[cad_regression_suite]=] "C:/Program Files/CMake/bin/cmake.exe" "-DTEST_BINARY_DIR=C:/Users/Craig/OneDrive/Desktop/Alnoris BMSx/build-desktop" "-P" "C:/Users/Craig/OneDrive/Desktop/Alnoris BMSx/desktop_cpp/tests/RunCadRegressionTests.cmake")

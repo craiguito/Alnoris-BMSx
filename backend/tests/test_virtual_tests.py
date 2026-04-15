@@ -34,10 +34,15 @@ class VirtualTestFrameworkTests(unittest.TestCase):
     def test_catalog_contains_expected_tests(self) -> None:
         catalog = virtual_test_catalog_to_dict()
         test_ids = {item["test_id"] for item in catalog["tests"]}
-        self.assertIn("constant_current_discharge", test_ids)
-        self.assertIn("pulse_power", test_ids)
+        self.assertEqual(
+            test_ids,
+            {"rate_capability", "thermal_stress", "thermal_zone_comparison", "model_validation"},
+        )
         self.assertIn("rate_capability", test_ids)
         self.assertIn("model_validation", test_ids)
+        experimental_ids = {item["test_id"] for item in catalog["experimental_tests"]}
+        self.assertIn("pulse_power", experimental_ids)
+        self.assertIn("constant_current_discharge", experimental_ids)
 
     def test_vetting_rejects_missing_required_parameter(self) -> None:
         payload = {

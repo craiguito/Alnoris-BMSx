@@ -20,6 +20,7 @@ __pycache__/
 .coverage
 .coverage.*
 htmlcov/
+backend/tests/_tmp/
 
 # Node / frontend caches
 node_modules/
@@ -29,6 +30,8 @@ node_modules/
 
 # Build outputs
 build/
+build-desktop/
+build-desktop-test-artifacts/
 dist/
 out/
 bin/
@@ -84,3 +87,7 @@ ui_*.h
 *.tar
 *.gz
 *.rar
+
+# Docs capture artifacts
+docs/*.mkv
+docs/Build started at 310 AM....txt

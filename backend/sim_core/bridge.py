@@ -7,7 +7,7 @@ from .chemistry import get_chemistry_preset
 from .engine import run_simulation
 from .physics.electrical import validate_electrical_model
 from .system_presets import battery_system_preset_catalog_to_dict
-from .test_catalog import build_test_catalog
+from .test_catalog import build_experimental_test_catalog, build_test_catalog
 from .test_runner import run_virtual_test, virtual_test_result_to_dict
 from .test_vetting import vet_virtual_test
 from .types import (
@@ -674,7 +674,11 @@ def virtual_test_catalog_to_dict() -> dict[str, Any]:
         "tests": [
             asdict(definition)
             for definition in build_test_catalog()
-        ]
+        ],
+        "experimental_tests": [
+            asdict(definition)
+            for definition in build_experimental_test_catalog()
+        ],
     }
 
 

@@ -119,12 +119,12 @@ def _pack(series_count: int, parallel_count: int, x_spacing_mm: float, z_spacing
     )
 
 
-SYSTEM_PRESETS: tuple[BatterySystemPreset, ...] = (
+PRIMARY_SYSTEM_PRESETS: tuple[BatterySystemPreset, ...] = (
     BatterySystemPreset(
-        preset_id="road_ev_generic_nmc_cylindrical",
-        display_name="Generic NMC Cylindrical EV Pack",
-        description="A road-going EV baseline using cylindrical high-energy cells with moderate cooling zoning.",
-        category="Road EV",
+        preset_id="generic_cylindrical_pack",
+        display_name="Generic Cylindrical Pack",
+        description="Baseline cylindrical trade-study archetype for fast pack layout, thermal zoning, and flagship test sweeps.",
+        category="Trade Study Archetypes",
         chemistry_name="generic_liion",
         chemistry_display_name="NMC Cylindrical",
         cell=_cell("samsung_30q", form_factor="cylindrical", radius_mm=10.5, height_mm=70.0, width_mm=21.0, depth_mm=21.0),
@@ -142,14 +142,14 @@ SYSTEM_PRESETS: tuple[BatterySystemPreset, ...] = (
         balancing_enabled=True,
         balancing_bleed_current_a=0.25,
         balancing_soc_threshold=0.92,
-        recommended_virtual_tests=("constant_current_discharge", "rate_capability", "thermal_zone_comparison", "fault_response"),
+        recommended_virtual_tests=("rate_capability", "thermal_stress", "thermal_zone_comparison", "model_validation"),
         operating_limits={"max_discharge_current_a": 280.0, "max_charge_current_a": 160.0},
     ),
     BatterySystemPreset(
-        preset_id="road_ev_generic_lfp_prismatic",
-        display_name="Generic LFP Prismatic EV Pack",
-        description="A durable LFP EV pack using prismatic cells and stronger thermal zoning.",
-        category="Road EV",
+        preset_id="generic_prismatic_pack",
+        display_name="Generic Prismatic Pack",
+        description="Baseline prismatic trade-study archetype with strong zone differentiation for cooling architecture comparisons.",
+        category="Trade Study Archetypes",
         chemistry_name="lfp",
         chemistry_display_name="LFP Prismatic",
         cell=_cell("generic_lfp_prismatic_ev", form_factor="prismatic", height_mm=180.0, width_mm=52.0, depth_mm=18.0),
@@ -167,14 +167,14 @@ SYSTEM_PRESETS: tuple[BatterySystemPreset, ...] = (
         balancing_enabled=True,
         balancing_bleed_current_a=0.3,
         balancing_soc_threshold=0.9,
-        recommended_virtual_tests=("constant_current_discharge", "thermal_stress", "thermal_zone_comparison", "storage_self_discharge"),
+        recommended_virtual_tests=("rate_capability", "thermal_stress", "thermal_zone_comparison", "model_validation"),
         operating_limits={"max_discharge_current_a": 240.0, "max_charge_current_a": 140.0},
     ),
     BatterySystemPreset(
-        preset_id="road_ev_high_performance_nca",
-        display_name="High-Performance NCA EV Pack",
-        description="A higher-power NCA EV preset with aggressive current assumptions and dense modular zoning.",
-        category="Road EV",
+        preset_id="high_power_pack",
+        display_name="High-Power Pack",
+        description="High-power trade-study archetype tuned for aggressive load sweeps, thermal stress, and baseline-to-candidate comparison.",
+        category="Trade Study Archetypes",
         chemistry_name="generic_liion",
         chemistry_display_name="NCA High Performance",
         cell=_cell("panasonic_ncr18650b", form_factor="cylindrical", radius_mm=9.0, height_mm=65.0, width_mm=18.0, depth_mm=18.0),
@@ -192,9 +192,12 @@ SYSTEM_PRESETS: tuple[BatterySystemPreset, ...] = (
         balancing_enabled=True,
         balancing_bleed_current_a=0.22,
         balancing_soc_threshold=0.93,
-        recommended_virtual_tests=("pulse_power", "rate_capability", "thermal_stress", "fault_response"),
+        recommended_virtual_tests=("rate_capability", "thermal_stress", "thermal_zone_comparison", "model_validation"),
         operating_limits={"max_discharge_current_a": 340.0, "max_charge_current_a": 180.0},
     ),
+)
+
+EXPERIMENTAL_SYSTEM_PRESETS: tuple[BatterySystemPreset, ...] = (
     BatterySystemPreset(
         preset_id="motorsport_hybrid_pulse_pack",
         display_name="High-Power Hybrid Pulse Pack",
@@ -418,10 +421,20 @@ SYSTEM_PRESETS: tuple[BatterySystemPreset, ...] = (
     ),
 )
 
+SYSTEM_PRESETS: tuple[BatterySystemPreset, ...] = PRIMARY_SYSTEM_PRESETS
+ALL_SYSTEM_PRESETS: tuple[BatterySystemPreset, ...] = PRIMARY_SYSTEM_PRESETS + EXPERIMENTAL_SYSTEM_PRESETS
+
+LEGACY_PRESET_ID_ALIASES: dict[str, str] = {
+    "road_ev_generic_nmc_cylindrical": "generic_cylindrical_pack",
+    "road_ev_generic_lfp_prismatic": "generic_prismatic_pack",
+    "road_ev_high_performance_nca": "high_power_pack",
+}
+
 
 def get_system_preset(preset_id: str) -> BatterySystemPreset:
-    for preset in SYSTEM_PRESETS:
-        if preset.preset_id == preset_id:
+    resolved_preset_id = LEGACY_PRESET_ID_ALIASES.get(preset_id, preset_id)
+    for preset in ALL_SYSTEM_PRESETS:
+        if preset.preset_id == resolved_preset_id:
             return preset
     raise ValueError(f"Unknown system preset: {preset_id}")
 
@@ -442,7 +455,7 @@ def validate_system_preset(preset: BatterySystemPreset) -> None:
         raise ValueError(f"Preset '{preset.preset_id}' thermal zone multipliers must be positive.")
     if preset.chemistry_name == "lfp" and "lfp" not in cell.chemistry.lower():
         raise ValueError(f"Preset '{preset.preset_id}' pairs LFP chemistry with a non-LFP cell preset.")
-    valid_tests = {definition.test_id for definition in build_test_catalog()}
+    valid_tests = {definition.test_id for definition in build_test_catalog(include_experimental=True)}
     invalid_tests = [test_id for test_id in preset.recommended_virtual_tests if test_id not in valid_tests]
     if invalid_tests:
         raise ValueError(f"Preset '{preset.preset_id}' references unknown virtual tests: {', '.join(invalid_tests)}")
@@ -615,9 +628,11 @@ def build_system_preset_payload(preset: BatterySystemPreset) -> dict[str, object
 
 
 def battery_system_preset_catalog_to_dict() -> dict[str, object]:
-    presets = [build_system_preset_payload(preset) for preset in SYSTEM_PRESETS]
+    presets = [build_system_preset_payload(preset) for preset in PRIMARY_SYSTEM_PRESETS]
+    experimental_presets = [build_system_preset_payload(preset) for preset in EXPERIMENTAL_SYSTEM_PRESETS]
     return {
-        "default_preset_id": SYSTEM_PRESETS[0].preset_id,
+        "default_preset_id": PRIMARY_SYSTEM_PRESETS[0].preset_id,
         "presets": presets,
-        "categories": sorted({preset.category for preset in SYSTEM_PRESETS}),
+        "experimental_presets": experimental_presets,
+        "categories": sorted({preset.category for preset in PRIMARY_SYSTEM_PRESETS}),
     }

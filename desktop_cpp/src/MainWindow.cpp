@@ -206,7 +206,7 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
     : QMainWindow(parent)
     , m_client(std::move(projectRoot))
 {
-    setWindowTitle("Alnoris Battery Simulator");
+    setWindowTitle("Alnoris Trade Study Cockpit");
     resize(1560, 940);
     m_cadRefreshTimer = new QTimer(this);
     m_cadRefreshTimer->setSingleShot(true);
@@ -225,23 +225,13 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
     auto* exitAction = fileMenu->addAction("Exit", this, &QWidget::close);
     exitAction->setShortcut(QKeySequence::Quit);
 
-    auto* editMenu = menuBar()->addMenu("Edit");
-    auto* captureAction = editMenu->addAction("Capture Baseline", this, &MainWindow::captureBaseline);
-    captureAction->setShortcut(QKeySequence(Qt::Key_F6));
-
-    auto* viewMenu = menuBar()->addMenu("View");
-    viewMenu->addAction("Compare to Baseline", this, &MainWindow::compareAgainstBaseline);
-
-    auto* optionsMenu = menuBar()->addMenu("Options");
-    optionsMenu->addAction("Run Simulation", this, &MainWindow::runSimulation);
-    optionsMenu->addAction("Customization...", this, &MainWindow::openCustomizationDialog);
-
-    auto* simulationMenu = menuBar()->addMenu("Simulation");
-    auto* simulationRunAction = simulationMenu->addAction("Run", this, &MainWindow::runSimulation);
+    auto* workflowMenu = menuBar()->addMenu("Trade Study");
+    auto* simulationRunAction = workflowMenu->addAction("Run Pack Simulation", this, &MainWindow::runSimulation);
     simulationRunAction->setShortcut(QKeySequence(Qt::Key_F5));
-    auto* simulationCaptureAction = simulationMenu->addAction("Capture Baseline", this, &MainWindow::captureBaseline);
+    auto* simulationCaptureAction = workflowMenu->addAction("Capture Baseline", this, &MainWindow::captureBaseline);
     simulationCaptureAction->setShortcut(QKeySequence(Qt::Key_F6));
-    simulationMenu->addAction("Compare", this, &MainWindow::compareAgainstBaseline);
+    workflowMenu->addAction("Compare to Baseline", this, &MainWindow::compareAgainstBaseline);
+    workflowMenu->addAction("Export Result JSON", this, &MainWindow::exportActiveResultJson);
 
     auto* central = new QWidget(this);
     auto* rootLayout = new QHBoxLayout(central);
@@ -297,9 +287,9 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
     bindCadRefresh(m_packHeatCapacity);
     bindCadRefresh(m_coolingCoeff);
 
-    m_runButton = new QPushButton("Run Simulation", central);
+    m_runButton = new QPushButton("Run Trade Study", central);
     m_captureBaselineButton = new QPushButton("Capture Baseline", central);
-    m_compareBaselineButton = new QPushButton("Compare to Baseline", central);
+    m_compareBaselineButton = new QPushButton("Compare Candidate", central);
     m_saveProjectButton = new QPushButton("Save Project", central);
     m_loadProjectButton = new QPushButton("Load Project", central);
     connect(m_runButton, &QPushButton::clicked, this, &MainWindow::runSimulation);
@@ -311,11 +301,11 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
     m_systemPresetCategoryCombo = new QComboBox(central);
     connect(m_systemPresetCategoryCombo, &QComboBox::currentIndexChanged, this, &MainWindow::handleSystemPresetCategoryChanged);
     m_systemPresetCombo = new QComboBox(central);
-    m_systemPresetDescription = new QLabel("Loading battery system presets...", central);
+    m_systemPresetDescription = new QLabel("Loading trade-study archetypes...", central);
     m_systemPresetDescription->setWordWrap(true);
     m_systemPresetDescription->setStyleSheet("font-size:12px; color:#93a6ba;");
     connect(m_systemPresetCombo, &QComboBox::currentIndexChanged, this, &MainWindow::handleSystemPresetCategoryChanged);
-    m_applySystemPresetButton = new QPushButton("Load Preset", central);
+    m_applySystemPresetButton = new QPushButton("Apply Archetype", central);
     connect(m_applySystemPresetButton, &QPushButton::clicked, this, &MainWindow::applySelectedSystemPreset);
 
     auto* mainSplitter = new QSplitter(Qt::Horizontal, central);
@@ -328,9 +318,9 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
     auto* workspaceLayout = new QVBoxLayout(workspaceGroup);
     workspaceLayout->setContentsMargins(12, 12, 12, 12);
     workspaceLayout->setSpacing(8);
-    auto* workspaceHeader = new QLabel("CAD / 3D Simulation Workspace", workspaceGroup);
+    auto* workspaceHeader = new QLabel("Pack Layout & Thermal Zones", workspaceGroup);
     workspaceHeader->setStyleSheet("font-size:16px; font-weight:700; color:#f3f7fb;");
-    auto* workspaceSubheader = new QLabel("Primary battery design view. Select entities to inspect and edit them from the sidebar.", workspaceGroup);
+    auto* workspaceSubheader = new QLabel("Parametric pack preview and CAD-derived thermal zone mapping stay at the center of the trade-study workflow.", workspaceGroup);
     workspaceSubheader->setWordWrap(true);
     workspaceSubheader->setStyleSheet("font-size:12px; color:#93a6ba;");
     workspaceLayout->addWidget(workspaceHeader);
@@ -346,9 +336,9 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
 
     auto* rightTabs = new QTabWidget(mainSplitter);
     rightTabs->setMinimumWidth(360);
-    rightTabs->addTab(createCadPropertiesPanel(), "Inspector");
+    rightTabs->addTab(createVirtualTestsPanel(), "Flagship Tests");
     rightTabs->addTab(createResultsPanel(), "Results");
-    rightTabs->addTab(createVirtualTestsPanel(), "Virtual Tests");
+    rightTabs->addTab(createCadPropertiesPanel(), "Advanced CAD");
 
     mainSplitter->addWidget(createInputsSidebar());
     mainSplitter->addWidget(centerSplitter);
@@ -554,7 +544,7 @@ void MainWindow::loadProject()
         m_summaryLabel->setText(QString("Loaded project from %1 with a saved baseline.").arg(path));
         const desktop::SimulationResultModel baseline = desktop::parseSimulationResultPayload(m_baselineResult);
         if (baseline.valid) {
-            m_outputText->setPlainText(formatSummaryLines(baseline) + "\n\n" + formatTraceLines(baseline));
+            m_outputText->setPlainText(formatSummaryLines(baseline));
         }
     } else {
         m_summaryLabel->setText(QString("Loaded project from %1.").arg(path));
@@ -623,16 +613,13 @@ void MainWindow::createMainToolbar()
     toolbar->setMovable(false);
     toolbar->setFloatable(false);
     toolbar->setToolButtonStyle(Qt::ToolButtonTextOnly);
-    toolbar->addAction("Load", this, &MainWindow::loadProject);
-    toolbar->addAction("Save", this, &MainWindow::saveProject);
+    toolbar->addAction("Load Project", this, &MainWindow::loadProject);
+    toolbar->addAction("Save Project", this, &MainWindow::saveProject);
     toolbar->addSeparator();
-    toolbar->addAction("CAD Undo", this, &MainWindow::undoCadEdit);
-    toolbar->addAction("CAD Redo", this, &MainWindow::redoCadEdit);
-    toolbar->addSeparator();
-    toolbar->addAction("Run", this, &MainWindow::runSimulation);
-    toolbar->addAction("Baseline", this, &MainWindow::captureBaseline);
+    toolbar->addAction("Run Trade Study", this, &MainWindow::runSimulation);
+    toolbar->addAction("Capture Baseline", this, &MainWindow::captureBaseline);
     toolbar->addAction("Compare", this, &MainWindow::compareAgainstBaseline);
-    toolbar->addAction("Export Result", this, &MainWindow::exportActiveResultJson);
+    toolbar->addAction("Export JSON", this, &MainWindow::exportActiveResultJson);
 }
 
 QWidget* MainWindow::createInputsSidebar()
@@ -656,32 +643,31 @@ QWidget* MainWindow::createInputsSidebar()
     auto* headerLayout = new QVBoxLayout(headerGroup);
     headerLayout->setContentsMargins(14, 14, 14, 14);
     headerLayout->setSpacing(4);
-    auto* header = new QLabel("Simulation Setup", headerGroup);
+    auto* header = new QLabel("Trade Study Setup", headerGroup);
     header->setStyleSheet("font-size:16px; font-weight:700; color:#f3f7fb;");
-    auto* subheader = new QLabel("Configure cell, pack, environment, and run settings for the active battery scenario.", headerGroup);
+    auto* subheader = new QLabel("Workflow: choose an archetype, tune pack layout, map thermal zones from the workspace, run flagship tests, compare against baseline, and export a reportable result.", headerGroup);
     subheader->setWordWrap(true);
     subheader->setStyleSheet("font-size:12px; color:#93a6ba;");
     headerLayout->addWidget(header);
     headerLayout->addWidget(subheader);
     layout->addWidget(headerGroup);
 
-    auto* presetGroup = new QGroupBox("Battery System Preset", content);
+    auto* presetGroup = new QGroupBox("Archetype", content);
     auto* presetLayout = new QFormLayout(presetGroup);
     presetLayout->setContentsMargins(14, 16, 14, 14);
     presetLayout->setHorizontalSpacing(10);
     presetLayout->setVerticalSpacing(8);
-    presetLayout->addRow("Category", m_systemPresetCategoryCombo);
-    presetLayout->addRow("Preset", m_systemPresetCombo);
+    presetLayout->addRow("Archetype", m_systemPresetCombo);
     presetLayout->addRow("", m_applySystemPresetButton);
-    presetLayout->addRow("Description", m_systemPresetDescription);
+    presetLayout->addRow("Study brief", m_systemPresetDescription);
     layout->addWidget(presetGroup);
 
-    auto* cellGroup = new QGroupBox("Cell", content);
+    auto* cellGroup = new QGroupBox("Cell Reference", content);
     auto* cellLayout = new QFormLayout(cellGroup);
     cellLayout->setContentsMargins(14, 16, 14, 14);
     cellLayout->setHorizontalSpacing(10);
     cellLayout->setVerticalSpacing(8);
-    cellLayout->addRow("Reference preset", m_referencePreset);
+    cellLayout->addRow("Cell reference", m_referencePreset);
     cellLayout->addRow("Nominal voltage (V)", m_cellNominalVoltage);
     cellLayout->addRow("Full voltage (V)", m_cellFullVoltage);
     cellLayout->addRow("Empty voltage (V)", m_cellEmptyVoltage);
@@ -690,7 +676,7 @@ QWidget* MainWindow::createInputsSidebar()
     cellLayout->addRow("Internal resistance (Ohm)", m_internalResistance);
     layout->addWidget(cellGroup);
 
-    auto* packGroup = new QGroupBox("Pack Layout", content);
+    auto* packGroup = new QGroupBox("Pack Layout Parameters", content);
     auto* packLayout = new QFormLayout(packGroup);
     packLayout->setContentsMargins(14, 16, 14, 14);
     packLayout->setHorizontalSpacing(10);
@@ -700,7 +686,7 @@ QWidget* MainWindow::createInputsSidebar()
     packLayout->addRow("Initial SOC", m_initialSoc);
     layout->addWidget(packGroup);
 
-    auto* thermalGroup = new QGroupBox("Electrical / Thermal", content);
+    auto* thermalGroup = new QGroupBox("Load & Cooling Assumptions", content);
     auto* thermalLayout = new QFormLayout(thermalGroup);
     thermalLayout->setContentsMargins(14, 16, 14, 14);
     thermalLayout->setHorizontalSpacing(10);
@@ -712,7 +698,7 @@ QWidget* MainWindow::createInputsSidebar()
     thermalLayout->addRow("Cooling coeff (W/K)", m_coolingCoeff);
     layout->addWidget(thermalGroup);
 
-    auto* simGroup = new QGroupBox("Simulation Run", content);
+    auto* simGroup = new QGroupBox("Run Horizon", content);
     auto* simLayout = new QFormLayout(simGroup);
     simLayout->setContentsMargins(14, 16, 14, 14);
     simLayout->setHorizontalSpacing(10);
@@ -721,7 +707,7 @@ QWidget* MainWindow::createInputsSidebar()
     simLayout->addRow("Time step (s)", m_timeStep);
     layout->addWidget(simGroup);
 
-    auto* actionsGroup = new QGroupBox("Actions", content);
+    auto* actionsGroup = new QGroupBox("Baseline & Report", content);
     auto* actionsLayout = new QGridLayout(actionsGroup);
     actionsLayout->setContentsMargins(14, 16, 14, 14);
     actionsLayout->setHorizontalSpacing(8);
@@ -812,23 +798,17 @@ void MainWindow::renderComparison(const QJsonObject& baselinePayload, const QJso
     }
     refreshSimulationViews();
 
-    const double runtimeDelta = candidate.summary.runtime_s - baseline.summary.runtime_s;
     const double energyDelta = candidate.summary.delivered_energy_wh - baseline.summary.delivered_energy_wh;
-    const double tempDelta = candidate.summary.max_group_temp_c - baseline.summary.max_group_temp_c;
-    const double voltageDelta = candidate.summary.min_group_voltage_v - baseline.summary.min_group_voltage_v;
+    const double tempDelta = candidate.summary.max_core_temp_c - baseline.summary.max_core_temp_c;
+    const double voltageDelta = candidate.pack_nominal_voltage_v - baseline.pack_nominal_voltage_v;
+    const double socSpreadDelta = candidate.summary.soc_spread - baseline.summary.soc_spread;
 
-    m_summaryLabel->setText("Scenario comparison view. Charts overlay candidate against baseline while the CAD viewport stays synced to the candidate run.");
+    m_summaryLabel->setText("Baseline vs candidate comparison is active. The workspace stays synced to the candidate while charts focus on trade-off deltas.");
     m_voltageChartView->showComparison(
         "Pack Voltage Comparison",
         "Voltage (V)",
         makeSeries(pointSeriesForMetric(baseline, "pack_voltage_v"), "Baseline", QColor(123, 135, 148), true),
         makeSeries(pointSeriesForMetric(candidate, "pack_voltage_v"), "Candidate", QColor(14, 165, 233))
-    );
-    m_currentChartView->showComparison(
-        "Pack Current Comparison",
-        "Current (A)",
-        makeSeries(pointSeriesForMetric(baseline, "current_a"), "Baseline", QColor(123, 135, 148), true),
-        makeSeries(pointSeriesForMetric(candidate, "current_a"), "Candidate", QColor(14, 165, 233))
     );
     m_powerChartView->showComparison(
         "Pack Power Comparison",
@@ -837,28 +817,22 @@ void MainWindow::renderComparison(const QJsonObject& baselinePayload, const QJso
         makeSeries(pointSeriesForMetric(candidate, "pack_power_w"), "Candidate", QColor(14, 165, 233))
     );
     m_temperatureChartView->showComparison(
-        "Max Temperature Comparison",
+        "Core Temperature Comparison",
         "Temperature (C)",
-        makeSeries(pointSeriesForMetric(baseline, "pack_temp_max_c"), "Baseline", QColor(123, 135, 148), true),
-        makeSeries(pointSeriesForMetric(candidate, "pack_temp_max_c"), "Candidate", QColor(14, 165, 233))
-    );
-    m_socChartView->showComparison(
-        "Average SOC Comparison",
-        "SOC",
-        makeSeries(pointSeriesForMetric(baseline, "soc_avg"), "Baseline", QColor(123, 135, 148), true),
-        makeSeries(pointSeriesForMetric(candidate, "soc_avg"), "Candidate", QColor(14, 165, 233))
+        makeSeries(pointSeriesForMetric(baseline, "group_core_temp_max_c"), "Baseline", QColor(123, 135, 148), true),
+        makeSeries(pointSeriesForMetric(candidate, "group_core_temp_max_c"), "Candidate", QColor(245, 113, 61))
     );
     m_socEnvelopeChartView->showComparison(
-        "Minimum SOC Comparison",
-        "SOC",
-        makeSeries(pointSeriesForMetric(baseline, "soc_min"), "Baseline", QColor(123, 135, 148), true),
-        makeSeries(pointSeriesForMetric(candidate, "soc_min"), "Candidate", QColor(14, 165, 233))
+        "SOC Spread Comparison",
+        "Spread",
+        makeSeries(pointSeriesForMetric(baseline, "soc_spread"), "Baseline", QColor(123, 135, 148), true),
+        makeSeries(pointSeriesForMetric(candidate, "soc_spread"), "Candidate", QColor(34, 197, 94))
     );
 
     const std::optional<double> markerTime = candidate.pointAt(m_activeResultPointIndex) != nullptr
         ? std::optional<double>(candidate.pointAt(m_activeResultPointIndex)->time_s)
         : std::nullopt;
-    for (ChartWidget* chart : {m_voltageChartView, m_currentChartView, m_powerChartView, m_temperatureChartView, m_socChartView, m_socEnvelopeChartView}) {
+    for (ChartWidget* chart : {m_voltageChartView, m_powerChartView, m_temperatureChartView, m_socEnvelopeChartView}) {
         if (chart != nullptr) {
             chart->setMarkerTime(markerTime);
         }
@@ -872,13 +846,10 @@ void MainWindow::renderComparison(const QJsonObject& baselinePayload, const QJso
     lines << formatSummaryLines(candidate);
     lines << "";
     lines << "Comparison Deltas";
-    lines << QString("Runtime delta: %1 s").arg(runtimeDelta, 0, 'f', 1);
+    lines << QString("Pack nominal voltage delta: %1 V").arg(voltageDelta, 0, 'f', 2);
     lines << QString("Delivered energy delta: %1 Wh").arg(energyDelta, 0, 'f', 2);
-    lines << QString("Max group temperature delta: %1 C").arg(tempDelta, 0, 'f', 2);
-    lines << QString("Minimum group voltage delta: %1 V").arg(voltageDelta, 0, 'f', 2);
-    lines << "";
-    lines << "Candidate Trace";
-    lines << formatTraceLines(candidate);
+    lines << QString("Max core temperature delta: %1 C").arg(tempDelta, 0, 'f', 2);
+    lines << QString("SOC spread delta: %1").arg(socSpreadDelta, 0, 'f', 4);
     m_outputText->setPlainText(lines.join('\n'));
 }
 
@@ -908,26 +879,30 @@ void MainWindow::applySimulationConfig(const QJsonObject& config)
 
 QString MainWindow::formatSummaryLines(const desktop::SimulationResultModel& result) const
 {
+    const double peakPackPowerW = [&result]() {
+        double peakValue = 0.0;
+        for (const desktop::SimulationTracePoint& point : result.points) {
+            peakValue = std::max(peakValue, point.pack_power_w);
+        }
+        return peakValue;
+    }();
+    const auto groupNameOrFallback = [&result](int index) {
+        return index >= 0 ? result.groupLabel(index) : QString("--");
+    };
+
     QStringList lines;
     lines << QString("Pack nominal voltage: %1 V").arg(result.pack_nominal_voltage_v, 0, 'f', 2);
     lines << QString("Pack capacity: %1 Ah").arg(result.pack_capacity_ah, 0, 'f', 2);
-    lines << QString("Theoretical energy: %1 Wh").arg(result.theoretical_energy_wh, 0, 'f', 2);
     lines << QString("Delivered energy: %1 Wh").arg(result.summary.delivered_energy_wh, 0, 'f', 2);
-    lines << QString("Delivered capacity: %1 Ah").arg(result.summary.delivered_capacity_ah, 0, 'f', 3);
+    lines << QString("Peak pack power: %1 W").arg(peakPackPowerW, 0, 'f', 1);
     lines << QString("Max core temperature: %1 C").arg(result.summary.max_core_temp_c, 0, 'f', 2);
-    lines << QString("Max surface temperature: %1 C").arg(result.summary.max_surface_temp_c, 0, 'f', 2);
+    lines << QString("Max pack temperature: %1 C").arg(result.summary.max_group_temp_c, 0, 'f', 2);
     lines << QString("Minimum group voltage: %1 V").arg(result.summary.min_group_voltage_v, 0, 'f', 3);
-    lines << QString("Final average SOC: %1").arg(result.summary.final_soc_avg, 0, 'f', 3);
     lines << QString("SOC spread: %1").arg(result.summary.soc_spread, 0, 'f', 4);
-    lines << QString("Max diffusion stress: %1").arg(result.summary.max_diffusion_stress, 0, 'f', 4);
-    lines << QString("Chemistry: %1").arg(result.summary.chemistry_name.isEmpty() ? "generic_liion" : result.summary.chemistry_name);
-    lines << QString("Capacity retention: %1").arg(result.summary.capacity_retention, 0, 'f', 5);
-    lines << QString("Resistance growth: %1").arg(result.summary.resistance_growth, 0, 'f', 5);
+    lines << QString("Weakest group: %1").arg(groupNameOrFallback(result.summary.weakest_group_index));
+    lines << QString("Hottest group: %1").arg(groupNameOrFallback(result.summary.hottest_group_index));
     lines << QString("Runtime: %1 s").arg(result.summary.runtime_s, 0, 'f', 0);
     lines << QString("Termination: %1").arg(result.summary.termination_reason);
-    if (!result.summary.enabled_nonlinear_features.isEmpty()) {
-        lines << QString("Enabled nonlinear features: %1").arg(result.summary.enabled_nonlinear_features.join(", "));
-    }
     const QString warningText = formatWarningLines(result.summary.warnings);
     if (!warningText.isEmpty()) {
         lines << "Warnings:";
@@ -998,11 +973,11 @@ QGroupBox* MainWindow::createCadPropertiesPanel()
     auto* layout = new QVBoxLayout(group);
     layout->setContentsMargins(12, 12, 12, 12);
     layout->setSpacing(10);
-    auto* header = new QLabel("CAD Inspector", group);
+    auto* header = new QLabel("Advanced CAD Detail", group);
     header->setStyleSheet("font-size:16px; font-weight:700; color:#f3f7fb;");
     layout->addWidget(header);
 
-    auto* subheader = new QLabel("Review the selected entity, edit its transform or geometry, then apply or undo changes.", group);
+    auto* subheader = new QLabel("The main workflow relies on generated pack layout and thermal-zone mapping. Deep per-entity edits are intentionally de-emphasized here.", group);
     subheader->setWordWrap(true);
     subheader->setStyleSheet("font-size:12px; color:#93a6ba;");
     layout->addWidget(subheader);
@@ -1010,6 +985,7 @@ QGroupBox* MainWindow::createCadPropertiesPanel()
     m_cadSelectedType = new QLabel("No selection", group);
     m_cadSelectedId = new QLabel("-", group);
     m_cadLabelEdit = new QLineEdit(group);
+    m_cadLabelEdit->setReadOnly(true);
     m_cadVisibleCheck = new QCheckBox("Visible", group);
 
     m_cadPosXLabel = new QLabel("Pos X", group);
@@ -1038,34 +1014,10 @@ QGroupBox* MainWindow::createCadPropertiesPanel()
     selectionLayout->setContentsMargins(14, 16, 14, 14);
     selectionLayout->setHorizontalSpacing(10);
     selectionLayout->setVerticalSpacing(8);
-    selectionLayout->addRow("Type", m_cadSelectedType);
+    selectionLayout->addRow("Selection", m_cadSelectedType);
     selectionLayout->addRow("Entity ID", m_cadSelectedId);
-    selectionLayout->addRow("Label", m_cadLabelEdit);
-    selectionLayout->addRow(QString(), m_cadVisibleCheck);
+    selectionLayout->addRow("Generated label", m_cadLabelEdit);
     layout->addWidget(selectionGroup);
-
-    auto* transformGroup = new QGroupBox("Transform", group);
-    auto* transformLayout = new QFormLayout(transformGroup);
-    transformLayout->setContentsMargins(14, 16, 14, 14);
-    transformLayout->setHorizontalSpacing(10);
-    transformLayout->setVerticalSpacing(8);
-    transformLayout->addRow(m_cadPosXLabel, m_cadPosX);
-    transformLayout->addRow(m_cadPosYLabel, m_cadPosY);
-    transformLayout->addRow(m_cadPosZLabel, m_cadPosZ);
-    layout->addWidget(transformGroup);
-
-    auto* geometryGroup = new QGroupBox("Geometry", group);
-    auto* geometryLayout = new QFormLayout(geometryGroup);
-    geometryLayout->setContentsMargins(14, 16, 14, 14);
-    geometryLayout->setHorizontalSpacing(10);
-    geometryLayout->setVerticalSpacing(8);
-    geometryLayout->addRow(m_cadRadiusLabel, m_cadRadius);
-    geometryLayout->addRow(m_cadHeightLabel, m_cadHeight);
-    geometryLayout->addRow(m_cadSizeXLabel, m_cadSizeX);
-    geometryLayout->addRow(m_cadSizeYLabel, m_cadSizeY);
-    geometryLayout->addRow(m_cadSizeZLabel, m_cadSizeZ);
-    geometryLayout->addRow(m_cadThicknessLabel, m_cadThickness);
-    layout->addWidget(geometryGroup);
 
     auto* buttonLayout = new QGridLayout();
     m_cadApplyButton = new QPushButton("Apply", group);
@@ -1090,7 +1042,14 @@ QGroupBox* MainWindow::createCadPropertiesPanel()
     auto* actionsGroupLayout = new QVBoxLayout(actionsGroup);
     actionsGroupLayout->setContentsMargins(14, 16, 14, 14);
     actionsGroupLayout->addLayout(buttonLayout);
-    layout->addWidget(actionsGroup);
+    actionsGroup->hide();
+
+    auto* note = new QLabel(
+        "Use this tab only when you need to inspect how the generated document maps cells, modules, cooling plates, and enclosure entities. The trade-study cockpit no longer treats manual CAD cleanup as a primary workflow.",
+        group);
+    note->setWordWrap(true);
+    note->setStyleSheet("color:#93a6ba;");
+    layout->addWidget(note);
     layout->addStretch(1);
 
     return group;
@@ -1103,24 +1062,24 @@ QGroupBox* MainWindow::createResultsPanel()
     layout->setContentsMargins(12, 12, 12, 12);
     layout->setSpacing(10);
 
-    auto* header = new QLabel("Results & Charts", group);
+    auto* header = new QLabel("Trade Study Results", group);
     header->setStyleSheet("font-size:16px; font-weight:700; color:#f3f7fb;");
-    auto* subheader = new QLabel("Keep simulation performance visible without stealing focus from the CAD workspace.", group);
+    auto* subheader = new QLabel("Stay focused on decision support: pack voltage, power delivery, thermal peaks, SOC spread, and weakest or hottest groups.", group);
     subheader->setWordWrap(true);
     subheader->setStyleSheet("font-size:12px; color:#93a6ba;");
     layout->addWidget(header);
     layout->addWidget(subheader);
 
-    auto* summaryGroup = new QGroupBox("Run Summary", group);
+    auto* summaryGroup = new QGroupBox("Decision Summary", group);
     auto* summaryLayout = new QVBoxLayout(summaryGroup);
     summaryLayout->setContentsMargins(14, 16, 14, 14);
-    m_summaryLabel = new QLabel("Run a simulation to view the desktop-first results. Capture a baseline when you want to compare design changes.", summaryGroup);
+    m_summaryLabel = new QLabel("Run a study to see the candidate pack summary. Capture a baseline when you want a fast side-by-side trade comparison.", summaryGroup);
     m_summaryLabel->setWordWrap(true);
     m_summaryLabel->setStyleSheet("font-size: 13px; color: #d8e5f2;");
     summaryLayout->addWidget(m_summaryLabel);
     layout->addWidget(summaryGroup);
 
-    auto* playbackGroup = new QGroupBox("Playback & Overlay", group);
+    auto* playbackGroup = new QGroupBox("Workspace Playback", group);
     auto* playbackLayout = new QGridLayout(playbackGroup);
     playbackLayout->setContentsMargins(14, 16, 14, 14);
     playbackLayout->setHorizontalSpacing(10);
@@ -1130,9 +1089,7 @@ QGroupBox* MainWindow::createResultsPanel()
         "Core Temperature Overlay",
         "SOC Overlay",
         "Voltage Overlay",
-        "Surface Temperature Overlay",
-        "Diffusion Stress Overlay",
-        "Effective Resistance Overlay"
+        "Surface Temperature Overlay"
     });
     connect(m_overlayMetricCombo, &QComboBox::currentIndexChanged, this, &MainWindow::handleOverlayMetricChanged);
     m_resultTimeSlider = new QSlider(Qt::Horizontal, playbackGroup);
@@ -1152,42 +1109,22 @@ QGroupBox* MainWindow::createResultsPanel()
     playbackLayout->addWidget(m_resultOverlayLegendLabel, 3, 0, 1, 2);
     layout->addWidget(playbackGroup);
 
-    auto* chartTabs = new QTabWidget(group);
-    auto* electricalTab = new QWidget(chartTabs);
-    auto* electricalLayout = new QVBoxLayout(electricalTab);
-    electricalLayout->setContentsMargins(8, 8, 8, 8);
-    electricalLayout->setSpacing(10);
-    m_topChartTabs = new QTabWidget(electricalTab);
     m_voltageChartView = createGraphWidget();
-    m_currentChartView = createGraphWidget();
     m_powerChartView = createGraphWidget();
-    m_topChartTabs->addTab(m_voltageChartView, "Voltage");
-    m_topChartTabs->addTab(m_currentChartView, "Current");
-    m_topChartTabs->addTab(m_powerChartView, "Power");
-    electricalLayout->addWidget(m_topChartTabs, 1);
-
-    auto* thermalTab = new QWidget(chartTabs);
-    auto* thermalLayout = new QVBoxLayout(thermalTab);
-    thermalLayout->setContentsMargins(8, 8, 8, 8);
-    thermalLayout->setSpacing(10);
-    m_bottomChartTabs = new QTabWidget(thermalTab);
     m_temperatureChartView = createGraphWidget();
+    m_socEnvelopeChartView = createGraphWidget();
+    m_currentChartView = createGraphWidget();
     m_coreTemperatureChartView = createGraphWidget();
     m_surfaceTemperatureChartView = createGraphWidget();
     m_socChartView = createGraphWidget();
-    m_socEnvelopeChartView = createGraphWidget();
-    m_bottomChartTabs->addTab(m_temperatureChartView, "Temp Summary");
-    m_bottomChartTabs->addTab(m_coreTemperatureChartView, "Core Temp");
-    m_bottomChartTabs->addTab(m_surfaceTemperatureChartView, "Surface Temp");
-    m_bottomChartTabs->addTab(m_socChartView, "Avg SOC");
-    m_bottomChartTabs->addTab(m_socEnvelopeChartView, "SOC Envelope");
-    thermalLayout->addWidget(m_bottomChartTabs, 1);
-
-    chartTabs->addTab(electricalTab, "Electrical");
-    chartTabs->addTab(thermalTab, "Thermal / State");
+    auto* chartTabs = new QTabWidget(group);
+    chartTabs->addTab(m_voltageChartView, "Pack Voltage");
+    chartTabs->addTab(m_powerChartView, "Power");
+    chartTabs->addTab(m_temperatureChartView, "Thermal Peak");
+    chartTabs->addTab(m_socEnvelopeChartView, "SOC Spread");
     layout->addWidget(chartTabs, 1);
 
-    auto* groupInfoGroup = new QGroupBox("Group Inspection", group);
+    auto* groupInfoGroup = new QGroupBox("Weakest / Hottest Groups", group);
     auto* groupInfoLayout = new QVBoxLayout(groupInfoGroup);
     groupInfoLayout->setContentsMargins(14, 16, 14, 14);
     groupInfoLayout->setSpacing(10);
@@ -1201,25 +1138,17 @@ QGroupBox* MainWindow::createResultsPanel()
     m_groupTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
     connect(m_groupTable, &QTableWidget::itemSelectionChanged, this, &MainWindow::handleGroupSelectionChanged);
     groupInfoLayout->addWidget(m_groupTable);
-    m_groupDetailLabel = new QLabel("Select a group from the table or CAD view to inspect nonlinear state values.", groupInfoGroup);
+    m_groupDetailLabel = new QLabel("Select a group from the table or workspace to review the hottest or weakest area in the current candidate.", groupInfoGroup);
     m_groupDetailLabel->setWordWrap(true);
     m_groupDetailLabel->setStyleSheet("color:#93a6ba;");
     groupInfoLayout->addWidget(m_groupDetailLabel);
 
-    auto* groupChartTabs = new QTabWidget(groupInfoGroup);
     m_groupVoltageChartView = createGraphWidget();
     m_groupCoreTemperatureChartView = createGraphWidget();
     m_groupSurfaceTemperatureChartView = createGraphWidget();
     m_groupDiffusionStressChartView = createGraphWidget();
     m_groupHysteresisChartView = createGraphWidget();
     m_groupSocChartView = createGraphWidget();
-    groupChartTabs->addTab(m_groupVoltageChartView, "Selected Voltage");
-    groupChartTabs->addTab(m_groupCoreTemperatureChartView, "Core Temp");
-    groupChartTabs->addTab(m_groupSurfaceTemperatureChartView, "Surface Temp");
-    groupChartTabs->addTab(m_groupDiffusionStressChartView, "Stress");
-    groupChartTabs->addTab(m_groupHysteresisChartView, "Hysteresis");
-    groupChartTabs->addTab(m_groupSocChartView, "Selected SOC");
-    groupInfoLayout->addWidget(groupChartTabs, 1);
     layout->addWidget(groupInfoGroup, 1);
 
     return group;
@@ -1231,9 +1160,9 @@ QGroupBox* MainWindow::createOutputPanel()
     auto* outputLayout = new QVBoxLayout(outputGroup);
     outputLayout->setContentsMargins(12, 12, 12, 12);
     outputLayout->setSpacing(8);
-    auto* outputHeader = new QLabel("Logs / Output", outputGroup);
+    auto* outputHeader = new QLabel("Report Notes", outputGroup);
     outputHeader->setStyleSheet("font-size:14px; font-weight:700; color:#f3f7fb;");
-    auto* outputHint = new QLabel("Diagnostics stay available here, but the workspace remains the primary focus.", outputGroup);
+    auto* outputHint = new QLabel("This pane keeps a concise trade-study narrative ready for project saves, baseline reviews, and result export.", outputGroup);
     outputHint->setWordWrap(true);
     outputHint->setStyleSheet("font-size:12px; color:#93a6ba;");
     m_outputText = new QPlainTextEdit(outputGroup);
@@ -1252,15 +1181,15 @@ QGroupBox* MainWindow::createVirtualTestsPanel()
     layout->setContentsMargins(12, 12, 12, 12);
     layout->setSpacing(10);
 
-    auto* header = new QLabel("Virtual Testbench", group);
+    auto* header = new QLabel("Flagship Virtual Tests", group);
     header->setStyleSheet("font-size:16px; font-weight:700; color:#f3f7fb;");
-    auto* subheader = new QLabel("Select an engineering test workflow, vet it against the current pack configuration, then run it into the existing desktop result views.", group);
+    auto* subheader = new QLabel("Only the four product-facing trade-study workflows are shown here. Archived validation and lab workflows stay behind the experimental registry.", group);
     subheader->setWordWrap(true);
     subheader->setStyleSheet("font-size:12px; color:#93a6ba;");
     layout->addWidget(header);
     layout->addWidget(subheader);
 
-    auto* selectionGroup = new QGroupBox("Test Selection", group);
+    auto* selectionGroup = new QGroupBox("Workflow", group);
     auto* selectionLayout = new QVBoxLayout(selectionGroup);
     selectionLayout->setContentsMargins(14, 16, 14, 14);
     selectionLayout->setSpacing(8);
@@ -1273,14 +1202,14 @@ QGroupBox* MainWindow::createVirtualTestsPanel()
     selectionLayout->addWidget(m_virtualTestDescription);
     layout->addWidget(selectionGroup);
 
-    auto* parametersGroup = new QGroupBox("Parameters", group);
+    auto* parametersGroup = new QGroupBox("Test Inputs", group);
     m_virtualTestFormLayout = new QFormLayout(parametersGroup);
     m_virtualTestFormLayout->setContentsMargins(14, 16, 14, 14);
     m_virtualTestFormLayout->setHorizontalSpacing(10);
     m_virtualTestFormLayout->setVerticalSpacing(8);
     layout->addWidget(parametersGroup);
 
-    auto* actionsGroup = new QGroupBox("Actions", group);
+    auto* actionsGroup = new QGroupBox("Run & Review", group);
     auto* actionsLayout = new QVBoxLayout(actionsGroup);
     actionsLayout->setContentsMargins(14, 16, 14, 14);
     actionsLayout->setSpacing(8);
@@ -2049,6 +1978,8 @@ std::vector<charts::Point> MainWindow::pointSeriesForMetric(const desktop::Simul
             value = point.soc_min;
         } else if (metricKey == "soc_max") {
             value = point.soc_max;
+        } else if (metricKey == "soc_spread") {
+            value = point.soc_max - point.soc_min;
         } else if (metricKey == "pack_temp_avg_c") {
             value = point.pack_temp_avg_c;
         } else if (metricKey == "pack_temp_max_c") {
@@ -2099,14 +2030,14 @@ void MainWindow::refreshSimulationViews()
         return;
     }
 
-    m_summaryLabel->setText("Simulation results are live in charts, group inspection, and the CAD workspace. Scrub time or change overlay metric to inspect behavior.");
+    m_summaryLabel->setText("Candidate results are live. Scrub time to inspect the workspace mapping, then compare against baseline when you want a trade-off decision view.");
     refreshResultScrubber();
     refreshCharts();
     refreshGroupTable();
     refreshGroupDetailPanel();
     refreshSelectedGroupCharts();
     refreshCadOverlay();
-    m_outputText->setPlainText(formatSummaryLines(*m_activeResult) + "\n\n" + formatTraceLines(*m_activeResult));
+    m_outputText->setPlainText(formatSummaryLines(*m_activeResult));
 }
 
 void MainWindow::refreshCharts()
@@ -2124,32 +2055,21 @@ void MainWindow::refreshCharts()
         "Voltage (V)",
         makeSeries(pointSeriesForMetric(*m_activeResult, "pack_voltage_v"), "Current Scenario", QColor(14, 165, 233))
     );
-    m_currentChartView->showSingleSeries(
-        "Current vs Time",
-        "Current (A)",
-        makeSeries(pointSeriesForMetric(*m_activeResult, "current_a"), "Current Scenario", QColor(59, 130, 246))
-    );
     m_powerChartView->showSingleSeries(
         "Pack Power vs Time",
         "Power (W)",
         makeSeries(pointSeriesForMetric(*m_activeResult, "pack_power_w"), "Current Scenario", QColor(245, 158, 11))
     );
-    m_socChartView->showSingleSeries(
-        "Average SOC vs Time",
-        "SOC",
-        makeSeries(pointSeriesForMetric(*m_activeResult, "soc_avg"), "Current Scenario", QColor(34, 197, 94))
-    );
-    m_socEnvelopeChartView->showComparison(
-        "SOC Envelope",
-        "SOC",
-        makeSeries(pointSeriesForMetric(*m_activeResult, "soc_min"), "Minimum", QColor(239, 68, 68), true),
-        makeSeries(pointSeriesForMetric(*m_activeResult, "soc_max"), "Maximum", QColor(34, 197, 94))
-    );
     m_temperatureChartView->showComparison(
-        "Temperature vs Time",
+        "Thermal Peak vs Time",
         "Temperature (C)",
-        makeSeries(pointSeriesForMetric(*m_activeResult, "pack_temp_avg_c"), "Average", QColor(56, 189, 248), true),
-        makeSeries(pointSeriesForMetric(*m_activeResult, "pack_temp_max_c"), "Maximum", QColor(245, 113, 61))
+        makeSeries(pointSeriesForMetric(*m_activeResult, "pack_temp_max_c"), "Pack Max", QColor(56, 189, 248), true),
+        makeSeries(pointSeriesForMetric(*m_activeResult, "group_core_temp_max_c"), "Core Max", QColor(245, 113, 61))
+    );
+    m_socEnvelopeChartView->showSingleSeries(
+        "SOC Spread vs Time",
+        "Spread",
+        makeSeries(pointSeriesForMetric(*m_activeResult, "soc_spread"), "SOC Spread", QColor(34, 197, 94))
     );
     m_coreTemperatureChartView->showSingleSeries(
         "Max Core Temperature vs Time",
@@ -2161,8 +2081,18 @@ void MainWindow::refreshCharts()
         "Temperature (C)",
         makeSeries(pointSeriesForMetric(*m_activeResult, "group_surface_temp_max_c"), "Surface Max", QColor(56, 189, 248))
     );
+    m_currentChartView->showSingleSeries(
+        "Current vs Time",
+        "Current (A)",
+        makeSeries(pointSeriesForMetric(*m_activeResult, "current_a"), "Current Scenario", QColor(59, 130, 246))
+    );
+    m_socChartView->showSingleSeries(
+        "Average SOC vs Time",
+        "SOC",
+        makeSeries(pointSeriesForMetric(*m_activeResult, "soc_avg"), "Current Scenario", QColor(34, 197, 94))
+    );
 
-    for (ChartWidget* chart : {m_voltageChartView, m_currentChartView, m_powerChartView, m_socChartView, m_socEnvelopeChartView, m_temperatureChartView, m_coreTemperatureChartView, m_surfaceTemperatureChartView}) {
+    for (ChartWidget* chart : {m_voltageChartView, m_powerChartView, m_temperatureChartView, m_socEnvelopeChartView, m_currentChartView, m_socChartView, m_coreTemperatureChartView, m_surfaceTemperatureChartView}) {
         if (chart != nullptr) {
             chart->setMarkerTime(markerTime);
         }
@@ -2248,13 +2178,13 @@ void MainWindow::refreshGroupDetailPanel()
         return;
     }
     if (!m_activeResult.has_value() || !m_activeResult->valid || m_selectedResultGroupIndex < 0) {
-        m_groupDetailLabel->setText("Select a group from the table or CAD view to inspect nonlinear state values.");
+        m_groupDetailLabel->setText("Select a group from the table or workspace to review the hottest or weakest area in the current candidate.");
         return;
     }
 
     const desktop::SimulationTracePoint* point = m_activeResult->pointAt(m_activeResultPointIndex);
     if (point == nullptr) {
-        m_groupDetailLabel->setText("Select a group from the table or CAD view to inspect nonlinear state values.");
+        m_groupDetailLabel->setText("Select a group from the table or workspace to review the hottest or weakest area in the current candidate.");
         return;
     }
 
@@ -2272,19 +2202,12 @@ void MainWindow::refreshGroupDetailPanel()
     if (index == m_activeResult->summary.hottest_group_index) {
         flags << "hottest";
     }
-    if (point->group_diffusion_stress.size() > static_cast<std::size_t>(index)) {
-        const auto maxIt = std::max_element(point->group_diffusion_stress.begin(), point->group_diffusion_stress.end());
-        if (maxIt != point->group_diffusion_stress.end() && std::distance(point->group_diffusion_stress.begin(), maxIt) == index) {
-            flags << "highest stress";
-        }
-    }
 
     m_groupDetailLabel->setText(QString(
         "%1\n"
         "Entity: %2 | Zone: %3 | Flags: %4\n"
         "SOC: %5 | Voltage: %6 V\n"
-        "Core: %7 C | Surface: %8 C\n"
-        "Stress: %9 | Hysteresis: %10 V | Resistance: %11 ohm")
+        "Core: %7 C | Surface: %8 C")
         .arg(m_activeResult->groupLabel(index))
         .arg(m_activeResult->groupEntityId(index).isEmpty() ? "--" : m_activeResult->groupEntityId(index))
         .arg(index < static_cast<int>(point->group_zone_ids.size()) ? QString::number(point->group_zone_ids[static_cast<std::size_t>(index)]) : "--")
@@ -2292,10 +2215,7 @@ void MainWindow::refreshGroupDetailPanel()
         .arg(valueAt(point->group_soc))
         .arg(valueAt(point->group_voltage_v))
         .arg(valueAt(point->group_core_temp_c))
-        .arg(valueAt(point->group_surface_temp_c))
-        .arg(valueAt(point->group_diffusion_stress))
-        .arg(valueAt(point->group_hysteresis_v))
-        .arg(valueAt(point->group_effective_resistance_ohm)));
+        .arg(valueAt(point->group_surface_temp_c)));
 }
 
 void MainWindow::refreshCadOverlay()
@@ -2324,12 +2244,6 @@ void MainWindow::refreshCadOverlay()
         case 3:
             metric = cad::battery::BatteryVisualizationOverlay::Metric::SurfaceTemperature;
             break;
-        case 4:
-            metric = cad::battery::BatteryVisualizationOverlay::Metric::DiffusionStress;
-            break;
-        case 5:
-            metric = cad::battery::BatteryVisualizationOverlay::Metric::EffectiveResistance;
-            break;
         case 0:
         default:
             metric = cad::battery::BatteryVisualizationOverlay::Metric::CoreTemperature;
@@ -2348,12 +2262,6 @@ void MainWindow::refreshCadOverlay()
             break;
         case cad::battery::BatteryVisualizationOverlay::Metric::SurfaceTemperature:
             values = point->group_surface_temp_c;
-            break;
-        case cad::battery::BatteryVisualizationOverlay::Metric::DiffusionStress:
-            values = point->group_diffusion_stress;
-            break;
-        case cad::battery::BatteryVisualizationOverlay::Metric::EffectiveResistance:
-            values = point->group_effective_resistance_ohm;
             break;
         case cad::battery::BatteryVisualizationOverlay::Metric::CoreTemperature:
         default:
@@ -2473,13 +2381,13 @@ void MainWindow::clearSimulationVisualization()
     m_lastExportPayload = {};
     m_activeResultPointIndex = -1;
     m_selectedResultGroupIndex = -1;
-    m_summaryLabel->setText("Run a simulation to view the desktop-first results. Capture a baseline when you want to compare design changes.");
+    m_summaryLabel->setText("Run a study to see the candidate pack summary. Capture a baseline when you want a fast side-by-side trade comparison.");
     clearChart(m_voltageChartView, "Pack Voltage vs Time", "Voltage (V)");
     clearChart(m_currentChartView, "Current vs Time", "Current (A)");
     clearChart(m_powerChartView, "Pack Power vs Time", "Power (W)");
     clearChart(m_socChartView, "Average SOC vs Time", "SOC");
-    clearChart(m_socEnvelopeChartView, "SOC Envelope", "SOC");
-    clearChart(m_temperatureChartView, "Temperature vs Time", "Temperature (C)");
+    clearChart(m_socEnvelopeChartView, "SOC Spread vs Time", "Spread");
+    clearChart(m_temperatureChartView, "Thermal Peak vs Time", "Temperature (C)");
     clearChart(m_coreTemperatureChartView, "Max Core Temperature vs Time", "Temperature (C)");
     clearChart(m_surfaceTemperatureChartView, "Max Surface Temperature vs Time", "Temperature (C)");
     clearChart(m_groupVoltageChartView, "Selected Group Voltage", "Voltage (V)");
@@ -2506,7 +2414,7 @@ void MainWindow::clearSimulationVisualization()
         m_resultOverlayLegendLabel->setText("Overlay range: --");
     }
     if (m_groupDetailLabel != nullptr) {
-        m_groupDetailLabel->setText("Select a group from the table or CAD view to inspect nonlinear state values.");
+        m_groupDetailLabel->setText("Select a group from the table or workspace to review the hottest or weakest area in the current candidate.");
     }
     if (m_virtualTestComparisonTable != nullptr) {
         m_virtualTestComparisonTable->setRowCount(0);
@@ -2567,7 +2475,7 @@ void MainWindow::loadSystemPresetCatalog()
     const SimulationClient::Result result = m_client.listSystemPresets();
     if (!result.ok) {
         if (m_systemPresetDescription != nullptr) {
-            m_systemPresetDescription->setText(QString("Failed to load battery system presets.\n%1").arg(result.error));
+            m_systemPresetDescription->setText(QString("Failed to load trade-study archetypes.\n%1").arg(result.error));
         }
         return;
     }
@@ -2645,11 +2553,16 @@ void MainWindow::refreshSelectedSystemPresetDescription()
         const QStringList recommended = [&]() {
             QStringList output;
             for (const QJsonValue& item : preset.value("recommended_virtual_tests").toArray()) {
-                output << item.toString();
+                QString label = item.toString();
+                label.replace('_', ' ');
+                if (!label.isEmpty()) {
+                    label[0] = label[0].toUpper();
+                }
+                output << label;
             }
             return output;
         }();
-        m_systemPresetDescription->setText(QString("%1\nChemistry: %2 | Cell: %3\nRecommended tests: %4")
+        m_systemPresetDescription->setText(QString("%1\nChemistry: %2 | Cell: %3\nFlagship tests: %4")
             .arg(preset.value("description").toString())
             .arg(preset.value("chemistry_display_name").toString())
             .arg(preset.value("cell_preset_name").toString())
@@ -2685,7 +2598,7 @@ void MainWindow::applySystemPreset(const QJsonObject& preset)
     }
 
     if (m_summaryLabel != nullptr) {
-        m_summaryLabel->setText(QString("Loaded battery system preset: %1").arg(preset.value("display_name").toString()));
+        m_summaryLabel->setText(QString("Loaded trade-study archetype: %1").arg(preset.value("display_name").toString()));
     }
     appendDesktopStartupLog("apply system preset complete");
 }
@@ -2714,7 +2627,7 @@ void MainWindow::loadVirtualTestCatalog()
 
     const SimulationClient::Result result = m_client.listVirtualTests();
     if (!result.ok) {
-        setVirtualTestStatus(QString("Failed to load virtual test catalog.\n%1").arg(result.error), QColor(220, 78, 78));
+        setVirtualTestStatus(QString("Failed to load flagship test catalog.\n%1").arg(result.error), QColor(220, 78, 78));
         return;
     }
 
@@ -2741,7 +2654,7 @@ void MainWindow::rebuildVirtualTestForm()
     const int index = m_virtualTestCombo->currentIndex();
     if (index < 0 || index >= m_virtualTestCatalog.size()) {
         if (m_virtualTestDescription != nullptr) {
-            m_virtualTestDescription->setText("No virtual tests available.");
+            m_virtualTestDescription->setText("No flagship trade-study tests available.");
         }
         return;
     }
@@ -2806,7 +2719,7 @@ void MainWindow::rebuildVirtualTestForm()
         }
     }
 
-    setVirtualTestStatus("Choose parameters, then vet the selected workflow against the current pack and simulation setup.", QColor(90, 144, 203));
+    setVirtualTestStatus("Choose parameters, vet the selected flagship workflow against the active pack, then run it into the shared result views.", QColor(90, 144, 203));
 }
 
 QJsonObject MainWindow::buildVirtualTestPayload() const
@@ -2995,7 +2908,7 @@ void MainWindow::handleBackendRequestFinished(bool ok, const QString& error, con
         m_summaryLabel->setText("Baseline captured. You can now tweak parameters and use Compare to Baseline.");
         const desktop::SimulationResultModel baseline = desktop::parseSimulationResultPayload(m_baselineResult);
         if (baseline.valid) {
-            m_outputText->setPlainText(formatSummaryLines(baseline) + "\n\n" + formatTraceLines(baseline));
+            m_outputText->setPlainText(formatSummaryLines(baseline));
         }
         statusBar()->showMessage("Baseline captured.", 4000);
         break;
