@@ -97,12 +97,26 @@ qt_add_executable(alnoris_desktop WIN32
     src/ChartWidget.h
     src/MainWindow.cpp
     src/MainWindow.h
+    src/ProjectPersistence.cpp
+    src/ProjectPersistence.h
     src/SimulationClient.cpp
     src/SimulationClient.h
     src/SimulationResultModel.cpp
     src/SimulationResultModel.h
     src/SimulationMappingBuilder.cpp
     src/SimulationMappingBuilder.h
+    src/TradeStudyReportExporter.cpp
+    src/TradeStudyReportExporter.h
+    src/TradeStudyResultsPanel.cpp
+    src/TradeStudyResultsPanel.h
+    src/TradeStudySetupPanel.cpp
+    src/TradeStudySetupPanel.h
+    src/TradeStudySummary.cpp
+    src/TradeStudySummary.h
+    src/TradeStudyTestsPanel.cpp
+    src/TradeStudyTestsPanel.h
+    src/TradeStudyWorkspacePanel.cpp
+    src/TradeStudyWorkspacePanel.h
 )
 
 target_link_libraries(alnoris_desktop

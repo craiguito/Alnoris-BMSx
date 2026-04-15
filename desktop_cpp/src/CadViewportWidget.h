@@ -31,6 +31,7 @@ public:
 
     bool setCellMeshPath(const QString& path);
     void setBackgroundColor(const QColor& color);
+    void setEditorInteractionsEnabled(bool enabled);
     void setPackConfig(const cad::battery::BatteryCadConfig& config);
     void loadDocument(cad::core::CadDocument document, const cad::battery::BatteryCadConfig& config);
     void setSimulationOverlay(const cad::battery::BatteryVisualizationOverlay& overlay);
@@ -129,6 +130,7 @@ private:
     QPoint m_lastMousePos;
     bool m_dragging = false;
     bool m_moveDragging = false;
+    bool m_editorInteractionsEnabled = true;
     bool m_gridSnapEnabled = true;
     float m_gridSnapStep = 14.0f;
     MoveAxis m_moveAxis = MoveAxis::FreeXZ;

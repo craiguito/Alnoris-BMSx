@@ -551,6 +551,18 @@ void CadViewportWidget::setBackgroundColor(const QColor& color)
     update();
 }
 
+void CadViewportWidget::setEditorInteractionsEnabled(bool enabled)
+{
+    m_editorInteractionsEnabled = enabled;
+    if (!m_editorInteractionsEnabled && m_moveDragging && m_engine.hasInteractiveMove()) {
+        m_engine.cancelInteractiveMove();
+        m_dragging = false;
+        m_moveDragging = false;
+        emit selectionChanged();
+        update();
+    }
+}
+
 void CadViewportWidget::setPackConfig(const cad::battery::BatteryCadConfig& config)
 {
     m_engine.setBatteryConfig(config);
@@ -1039,7 +1051,8 @@ void CadViewportWidget::mousePressEvent(QMouseEvent* event)
     if (event->button() == Qt::LeftButton) {
         m_dragging = true;
         m_moveDragging =
-            event->modifiers().testFlag(Qt::ShiftModifier)
+            m_editorInteractionsEnabled
+            && event->modifiers().testFlag(Qt::ShiftModifier)
             && m_engine.selectedEntity().isValid()
             && m_engine.beginInteractiveMove(m_engine.selectedEntity());
         m_pressMousePos = event->pos();
@@ -1157,6 +1170,11 @@ void CadViewportWidget::wheelEvent(QWheelEvent* event)
 
 void CadViewportWidget::keyPressEvent(QKeyEvent* event)
 {
+    if (!m_editorInteractionsEnabled) {
+        QOpenGLWidget::keyPressEvent(event);
+        return;
+    }
+
     switch (event->key()) {
     case Qt::Key_G:
         m_gridSnapEnabled = !m_gridSnapEnabled;
