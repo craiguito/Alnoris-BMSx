@@ -10,6 +10,7 @@ from .system_presets import battery_system_preset_catalog_to_dict
 from .test_catalog import build_experimental_test_catalog, build_test_catalog
 from .test_runner import run_virtual_test, virtual_test_result_to_dict
 from .test_vetting import vet_virtual_test
+from .truth_data_manager import TruthDatasetRegistry
 from .types import (
     BalancingConfig,
     CurrentProfile,
@@ -684,6 +685,15 @@ def virtual_test_catalog_to_dict() -> dict[str, Any]:
 
 def battery_system_preset_catalog_to_bridge_dict() -> dict[str, Any]:
     return battery_system_preset_catalog_to_dict()
+
+
+def truth_dataset_catalog_to_dict() -> dict[str, Any]:
+    registry = TruthDatasetRegistry()
+    return {
+        "truth_data_directory": str(registry.truth_data_dir),
+        "datasets": [asdict(item) for item in registry.list_truth_datasets()],
+        "scan_errors": list(registry.scan_errors),
+    }
 
 
 def vet_virtual_test_from_dict(payload: dict[str, Any]) -> dict[str, Any]:

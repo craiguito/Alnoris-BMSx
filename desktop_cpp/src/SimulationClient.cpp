@@ -30,6 +30,11 @@ SimulationClient::Result SimulationClient::listVirtualTests() const
     return invokeBackend({"-m", "backend.sim_core.cli", "list-tests"}, nullptr);
 }
 
+SimulationClient::Result SimulationClient::listTruthDatasets() const
+{
+    return invokeBackend({"-m", "backend.sim_core.cli", "list-truth-datasets"}, nullptr);
+}
+
 SimulationClient::Result SimulationClient::vetVirtualTest(const QJsonObject& payload) const
 {
     return invokeBackend({"-m", "backend.sim_core.cli", "vet-test"}, &payload);

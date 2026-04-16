@@ -47,6 +47,42 @@ TradeStudyTestsPanel::TradeStudyTestsPanel(QWidget* parent)
     virtualTestFormLayout->setVerticalSpacing(8);
     layout->addWidget(parametersGroup);
 
+    auto* truthDataGroup = new QGroupBox("Truth Datasets", this);
+    auto* truthDataLayout = new QVBoxLayout(truthDataGroup);
+    truthDataLayout->setContentsMargins(14, 16, 14, 14);
+    truthDataLayout->setSpacing(8);
+    auto* truthDataHint = new QLabel(
+        "Browse canonical, trusted, and experimental truth sets, inspect their metadata, then push selected ids into Model Validation.",
+        truthDataGroup);
+    truthDataHint->setWordWrap(true);
+    truthDataHint->setStyleSheet("color:#93a6ba;");
+    truthDatasetTable = new QTableWidget(0, 5, truthDataGroup);
+    truthDatasetTable->setHorizontalHeaderLabels({"Name", "Status", "Chemistry", "Form Factor", "Tags"});
+    truthDatasetTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    truthDatasetTable->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    truthDatasetTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    truthDatasetTable->verticalHeader()->setVisible(false);
+    truthDatasetTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    truthDatasetTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    truthDatasetTable->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    truthDatasetTable->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
+    truthDatasetTable->horizontalHeader()->setStretchLastSection(true);
+    truthDatasetDetailLabel = new QLabel(
+        "Select a dataset to review its trust tier, source, and current-profile coverage.",
+        truthDataGroup);
+    truthDatasetDetailLabel->setWordWrap(true);
+    truthDatasetDetailLabel->setStyleSheet("color:#d8e5f2;");
+    truthDatasetStatusLabel = new QLabel("Loading bundled truth datasets...", truthDataGroup);
+    truthDatasetStatusLabel->setWordWrap(true);
+    truthDatasetStatusLabel->setStyleSheet("color:#93a6ba;");
+    useTruthDatasetsButton = new QPushButton("Use For Validation", truthDataGroup);
+    truthDataLayout->addWidget(truthDataHint);
+    truthDataLayout->addWidget(truthDatasetTable);
+    truthDataLayout->addWidget(truthDatasetDetailLabel);
+    truthDataLayout->addWidget(truthDatasetStatusLabel);
+    truthDataLayout->addWidget(useTruthDatasetsButton);
+    layout->addWidget(truthDataGroup);
+
     auto* actionsGroup = new QGroupBox("Vet & Run", this);
     auto* actionsLayout = new QVBoxLayout(actionsGroup);
     actionsLayout->setContentsMargins(14, 16, 14, 14);
@@ -78,4 +114,3 @@ TradeStudyTestsPanel::TradeStudyTestsPanel(QWidget* parent)
     compareLayout->addWidget(virtualTestComparisonTable);
     layout->addWidget(compareGroup, 1);
 }
-

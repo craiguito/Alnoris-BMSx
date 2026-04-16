@@ -29,6 +29,7 @@
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QSet>
 #include <QSignalBlocker>
 #include <QSlider>
 #include <QSplitter>
@@ -274,8 +275,10 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
     connect(m_resultsPanel->resultTimeSlider, &QSlider::valueChanged, this, &MainWindow::handleResultScrubChanged);
     connect(m_resultsPanel->groupTable, &QTableWidget::itemSelectionChanged, this, &MainWindow::handleGroupSelectionChanged);
     connect(m_testsPanel->virtualTestCombo, &QComboBox::currentIndexChanged, this, &MainWindow::handleVirtualTestSelectionChanged);
+    connect(m_testsPanel->truthDatasetTable, &QTableWidget::itemSelectionChanged, this, &MainWindow::handleTruthDatasetSelectionChanged);
     connect(m_testsPanel->vetTestButton, &QPushButton::clicked, this, &MainWindow::vetSelectedVirtualTest);
     connect(m_testsPanel->runTestButton, &QPushButton::clicked, this, &MainWindow::runSelectedVirtualTest);
+    connect(m_testsPanel->useTruthDatasetsButton, &QPushButton::clicked, this, &MainWindow::applySelectedTruthDatasetsToValidation);
 
     createMainToolbar();
     statusBar()->showMessage("Ready");
@@ -335,6 +338,8 @@ MainWindow::MainWindow(QString projectRoot, QWidget* parent)
         appendDesktopStartupLog("system preset catalog loaded");
         loadVirtualTestCatalog();
         appendDesktopStartupLog("virtual test catalog loaded");
+        loadTruthDatasetCatalog();
+        appendDesktopStartupLog("truth dataset catalog loaded");
         if (m_setupPanel->systemPresetCombo != nullptr && m_setupPanel->systemPresetCombo->count() > 0) {
             applySelectedSystemPreset();
             appendDesktopStartupLog("default system preset applied");
@@ -433,6 +438,8 @@ void MainWindow::saveProject()
     state.baselineResult = m_baselineResult;
     state.activeResult = m_activeResultPayload;
     state.reportContext = trade_study::reportContextToJson(m_reportContext);
+    state.validationSettings = m_validationSettings;
+    state.validationResult = m_lastValidationResult;
     if (m_workspacePanel->workspaceView != nullptr) {
         state.cadDocument = cad::io::serializeCadDocument(m_workspacePanel->workspaceView->document());
     }
@@ -479,6 +486,8 @@ void MainWindow::loadProject()
     m_baselineResult = state->baselineResult;
     m_activeResultPayload = state->activeResult;
     m_reportContext = trade_study::reportContextFromJson(state->reportContext);
+    m_validationSettings = state->validationSettings;
+    m_lastValidationResult = state->validationResult;
     m_setupPanel->referencePreset->setCurrentIndex(state->referencePresetIndex);
 
     if (m_setupPanel->systemPresetCombo != nullptr && !m_activeSystemPreset.isEmpty()) {
@@ -491,6 +500,9 @@ void MainWindow::loadProject()
         }
     }
     refreshSelectedSystemPresetDescription();
+    syncTruthDatasetSelectionFromSettings();
+    refreshTruthDatasetDetailPanel();
+    applyValidationSettingsToForm();
 
     bool loadedCadDocument = false;
     QString cadDocumentError;
@@ -975,6 +987,13 @@ void MainWindow::renderResult(const QJsonObject& payload)
 {
     m_activeResultPayload = payload;
     m_activeComparisonSummary.reset();
+    if (payload.contains("validation_summary")) {
+        m_lastValidationResult = QJsonObject{
+            {"validation_summary", payload.value("validation_summary").toObject()},
+            {"validation_scorecards", payload.value("validation_scorecards").toArray()},
+            {"validation_parameters", payload.value("validation_parameters").toObject()},
+        };
+    }
     m_activeResult = desktop::parseSimulationResultPayload(payload);
     if (!m_activeResult->valid) {
         QMessageBox::warning(this, "Simulation Result Error", m_activeResult->error);
@@ -1023,19 +1042,35 @@ void MainWindow::refreshSimulationViews()
     refreshCharts();
     refreshGroupTable();
     refreshGroupDetailPanel();
+    refreshValidationScorecardPanel();
     refreshCadOverlay();
     refreshWorkspaceSummary();
 
     if (m_activeComparisonSummary.has_value()) {
+        const QJsonObject validationSummary = m_activeResultPayload.value("validation_summary").toObject();
+        const QString validationSuffix = validationSummary.isEmpty()
+            ? QString()
+            : QString(" Validation status: %1 across %2 dataset(s).")
+                  .arg(validationSummary.value("overall_status").toString().toUpper())
+                  .arg(validationSummary.value("dataset_count").toInt());
         m_resultsPanel->summaryLabel->setText(
-            "Candidate-vs-baseline deltas are active. The workspace stays synced to the candidate while charts and report preview stay focused on the trade-off.");
+            "Candidate-vs-baseline deltas are active. The workspace stays synced to the candidate while charts and report preview stay focused on the trade-off."
+            + validationSuffix);
         m_workspacePanel->reportNotes->setPlainText(trade_study::formatComparisonSummaryText(*m_activeComparisonSummary));
         return;
     }
 
     const trade_study::ComparisonSummary summary = trade_study::buildComparisonSummary(*m_activeResult, parseOptionalResult(m_baselineResult), m_reportContext);
-    m_resultsPanel->summaryLabel->setText(
-        "Candidate results are live. Scrub the workspace to inspect thermal zoning, then compare against baseline when you need a recommendation-ready delta view.");
+    const QJsonObject validationSummary = m_activeResultPayload.value("validation_summary").toObject();
+    if (!validationSummary.isEmpty()) {
+        m_resultsPanel->summaryLabel->setText(
+            QString("Validation replay is live. Status: %1 across %2 dataset(s). Scrub the workspace to inspect the primary replay, then use the scorecard below for decision support.")
+                .arg(validationSummary.value("overall_status").toString().toUpper())
+                .arg(validationSummary.value("dataset_count").toInt()));
+    } else {
+        m_resultsPanel->summaryLabel->setText(
+            "Candidate results are live. Scrub the workspace to inspect thermal zoning, then compare against baseline when you need a recommendation-ready delta view.");
+    }
     m_workspacePanel->reportNotes->setPlainText(trade_study::formatComparisonSummaryText(summary));
 }
 
@@ -1227,6 +1262,105 @@ void MainWindow::refreshGroupDetailPanel()
             .arg(valueAt(point->group_surface_temp_c)));
 }
 
+void MainWindow::refreshValidationScorecardPanel()
+{
+    if (m_resultsPanel == nullptr
+        || m_resultsPanel->validationSummaryLabel == nullptr
+        || m_resultsPanel->validationInterpretationLabel == nullptr
+        || m_resultsPanel->validationWarningsLabel == nullptr
+        || m_resultsPanel->validationTable == nullptr) {
+        return;
+    }
+
+    const QJsonObject summary = m_activeResultPayload.value("validation_summary").toObject();
+    const QJsonArray scorecards = m_activeResultPayload.value("validation_scorecards").toArray();
+    if (summary.isEmpty() || scorecards.isEmpty()) {
+        m_resultsPanel->validationSummaryLabel->setText(
+            "Run Model Validation to score the active pack against one or more trusted truth datasets.");
+        m_resultsPanel->validationInterpretationLabel->setText(
+            "The scorecard turns raw replay metrics into a decision-support readout for comparative trade-study use.");
+        m_resultsPanel->validationWarningsLabel->setText("Warnings: --");
+        m_resultsPanel->validationTable->setRowCount(0);
+        return;
+    }
+
+    const QString overallStatus = summary.value("overall_status").toString().toUpper();
+    const int datasetCount = summary.value("dataset_count").toInt();
+    const int passedCount = summary.value("passed_count").toInt();
+    const int failedCount = summary.value("failed_count").toInt();
+    m_resultsPanel->validationSummaryLabel->setText(
+        QString("Validation %1: %2 of %3 dataset(s) passed. Strongest: %4 | Weakest: %5")
+            .arg(overallStatus)
+            .arg(passedCount)
+            .arg(datasetCount)
+            .arg(summary.value("strongest_dataset_display_name").toString("--"))
+            .arg(summary.value("weakest_dataset_display_name").toString("--")));
+
+    QString interpretation = summary.value("recommendation_text").toString();
+    if (failedCount > 0 && passedCount > 0) {
+        interpretation += " Mixed results mean the pack is directionally useful but still needs careful interpretation.";
+    }
+    m_resultsPanel->validationInterpretationLabel->setText(interpretation);
+
+    QStringList warningLines;
+    for (const QJsonValue& value : summary.value("key_warnings").toArray()) {
+        warningLines << value.toString();
+    }
+    m_resultsPanel->validationWarningsLabel->setText(
+        warningLines.isEmpty() ? "Warnings: none." : QString("Warnings: %1").arg(warningLines.join(" | ")));
+
+    const auto formatMetricValue = [](double value, const QString& unit) {
+        const int decimals = unit == "fraction" ? 4 : 3;
+        return unit.isEmpty()
+            ? QString::number(value, 'f', decimals)
+            : QString("%1 %2").arg(QString::number(value, 'f', decimals), unit);
+    };
+
+    m_resultsPanel->validationTable->setRowCount(0);
+    int row = 0;
+    for (const QJsonValue& scorecardValue : scorecards) {
+        const QJsonObject scorecard = scorecardValue.toObject();
+        const QString datasetLabel = QString("%1 (%2)")
+            .arg(scorecard.value("dataset_display_name").toString())
+            .arg(scorecard.value("dataset_status").toString());
+        for (const QJsonValue& metricValue : scorecard.value("metric_results").toArray()) {
+            const QJsonObject metric = metricValue.toObject();
+            const QString unit = metric.value("unit").toString();
+            const bool hasThreshold = !metric.value("threshold_value").isNull();
+            const QString thresholdText = hasThreshold
+                ? formatMetricValue(metric.value("threshold_value").toDouble(), unit)
+                : QString("--");
+            const QString statusText = metric.value("passed").isBool()
+                ? (metric.value("passed").toBool() ? "PASS" : "FLAG")
+                : "INFO";
+
+            m_resultsPanel->validationTable->insertRow(row);
+            auto* datasetItem = new QTableWidgetItem(datasetLabel);
+            auto* metricItem = new QTableWidgetItem(metric.value("display_name").toString());
+            auto* valueItem = new QTableWidgetItem(formatMetricValue(metric.value("value").toDouble(), unit));
+            auto* thresholdItem = new QTableWidgetItem(thresholdText);
+            auto* statusItem = new QTableWidgetItem(statusText);
+
+            QColor tint(214, 179, 67, 45);
+            if (statusText == "PASS") {
+                tint = QColor(58, 165, 99, 50);
+            } else if (statusText == "FLAG") {
+                tint = QColor(220, 78, 78, 55);
+            }
+            for (QTableWidgetItem* item : {datasetItem, metricItem, valueItem, thresholdItem, statusItem}) {
+                item->setBackground(tint);
+            }
+
+            m_resultsPanel->validationTable->setItem(row, 0, datasetItem);
+            m_resultsPanel->validationTable->setItem(row, 1, metricItem);
+            m_resultsPanel->validationTable->setItem(row, 2, valueItem);
+            m_resultsPanel->validationTable->setItem(row, 3, thresholdItem);
+            m_resultsPanel->validationTable->setItem(row, 4, statusItem);
+            ++row;
+        }
+    }
+}
+
 void MainWindow::refreshCadOverlay()
 {
     if (m_workspacePanel == nullptr || m_workspacePanel->workspaceView == nullptr) {
@@ -1356,6 +1490,12 @@ void MainWindow::clearSimulationVisualization()
     if (m_resultsPanel != nullptr) {
         m_resultsPanel->summaryLabel->setText(
             "Run a candidate study to populate the primary trade-study readout, then compare it against a saved baseline.");
+        m_resultsPanel->validationSummaryLabel->setText(
+            "Run Model Validation to score the active pack against one or more trusted truth datasets.");
+        m_resultsPanel->validationInterpretationLabel->setText(
+            "The scorecard turns raw replay metrics into a decision-support readout for comparative trade-study use.");
+        m_resultsPanel->validationWarningsLabel->setText("Warnings: --");
+        m_resultsPanel->validationTable->setRowCount(0);
         clearChart(m_resultsPanel->voltageChartView, "Pack Voltage vs Time", "Voltage (V)");
         clearChart(m_resultsPanel->powerChartView, "Pack Power vs Time", "Power (W)");
         clearChart(m_resultsPanel->temperatureChartView, "Thermal Peak vs Time", "Temperature (C)");
@@ -1555,6 +1695,229 @@ void MainWindow::loadVirtualTestCatalog()
     rebuildVirtualTestForm();
 }
 
+void MainWindow::loadTruthDatasetCatalog()
+{
+    if (m_testsPanel == nullptr || m_testsPanel->truthDatasetTable == nullptr || m_testsPanel->truthDatasetStatusLabel == nullptr) {
+        return;
+    }
+
+    const SimulationClient::Result result = m_client.listTruthDatasets();
+    if (!result.ok) {
+        m_truthDatasetCatalog = {};
+        refreshTruthDatasetTable();
+        m_testsPanel->truthDatasetStatusLabel->setText(QString("Failed to load bundled truth datasets.\n%1").arg(result.error));
+        return;
+    }
+
+    m_truthDatasetCatalog = result.payload.value("datasets").toArray();
+    refreshTruthDatasetTable();
+
+    const QString directory = result.payload.value("truth_data_directory").toString();
+    const QJsonArray scanErrors = result.payload.value("scan_errors").toArray();
+    QString statusText = QString("Loaded %1 truth dataset%2 from %3.")
+        .arg(m_truthDatasetCatalog.size())
+        .arg(m_truthDatasetCatalog.size() == 1 ? "" : "s")
+        .arg(directory.isEmpty() ? "the configured truth-data directory" : directory);
+    if (!scanErrors.isEmpty()) {
+        statusText += QString("\nSkipped %1 malformed file%2 while scanning the registry.")
+            .arg(scanErrors.size())
+            .arg(scanErrors.size() == 1 ? "" : "s");
+    }
+    m_testsPanel->truthDatasetStatusLabel->setText(statusText);
+}
+
+void MainWindow::refreshTruthDatasetTable()
+{
+    if (m_testsPanel == nullptr || m_testsPanel->truthDatasetTable == nullptr) {
+        return;
+    }
+
+    m_isSyncingTruthDatasetTable = true;
+    QSignalBlocker blocker(m_testsPanel->truthDatasetTable);
+    m_testsPanel->truthDatasetTable->clearContents();
+    m_testsPanel->truthDatasetTable->setRowCount(m_truthDatasetCatalog.size());
+
+    for (int row = 0; row < m_truthDatasetCatalog.size(); ++row) {
+        const QJsonObject dataset = m_truthDatasetCatalog.at(row).toObject();
+        const QString datasetId = dataset.value("dataset_id").toString();
+        const QString status = dataset.value("status").toString();
+        const QJsonArray tags = dataset.value("tags").toArray();
+        QStringList tagStrings;
+        for (const QJsonValue& value : tags) {
+            tagStrings << value.toString();
+        }
+
+        auto* nameItem = new QTableWidgetItem(dataset.value("display_name").toString(datasetId));
+        nameItem->setData(Qt::UserRole, datasetId);
+        auto* statusItem = new QTableWidgetItem(status);
+        auto* chemistryItem = new QTableWidgetItem(dataset.value("chemistry").toString());
+        auto* formFactorItem = new QTableWidgetItem(dataset.value("form_factor").toString());
+        auto* tagsItem = new QTableWidgetItem(tagStrings.join(", "));
+
+        QColor statusTint(58, 165, 99, 60);
+        if (status == "trusted") {
+            statusTint = QColor(59, 130, 246, 55);
+        } else if (status == "experimental") {
+            statusTint = QColor(214, 179, 67, 70);
+        } else if (status == "deprecated") {
+            statusTint = QColor(220, 78, 78, 70);
+        }
+
+        for (QTableWidgetItem* item : {nameItem, statusItem, chemistryItem, formFactorItem, tagsItem}) {
+            item->setBackground(statusTint);
+        }
+
+        m_testsPanel->truthDatasetTable->setItem(row, 0, nameItem);
+        m_testsPanel->truthDatasetTable->setItem(row, 1, statusItem);
+        m_testsPanel->truthDatasetTable->setItem(row, 2, chemistryItem);
+        m_testsPanel->truthDatasetTable->setItem(row, 3, formFactorItem);
+        m_testsPanel->truthDatasetTable->setItem(row, 4, tagsItem);
+    }
+
+    syncTruthDatasetSelectionFromSettings();
+    m_isSyncingTruthDatasetTable = false;
+    refreshTruthDatasetDetailPanel();
+}
+
+void MainWindow::refreshTruthDatasetDetailPanel()
+{
+    if (m_testsPanel == nullptr || m_testsPanel->truthDatasetTable == nullptr || m_testsPanel->truthDatasetDetailLabel == nullptr) {
+        return;
+    }
+
+    const QModelIndexList selectedRows = m_testsPanel->truthDatasetTable->selectionModel() != nullptr
+        ? m_testsPanel->truthDatasetTable->selectionModel()->selectedRows()
+        : QModelIndexList{};
+    if (selectedRows.isEmpty()) {
+        m_testsPanel->truthDatasetDetailLabel->setText(
+            "Select a dataset to review its trust tier, source, and current-profile coverage.");
+        return;
+    }
+
+    if (selectedRows.size() > 1) {
+        QStringList names;
+        for (const QModelIndex& index : selectedRows) {
+            names << m_truthDatasetCatalog.at(index.row()).toObject().value("display_name").toString();
+        }
+        m_testsPanel->truthDatasetDetailLabel->setText(
+            QString("Selected %1 truth datasets.\nUse For Validation will copy their ids into the Model Validation workflow.\n%2")
+                .arg(selectedRows.size())
+                .arg(names.join(", ")));
+        return;
+    }
+
+    const QJsonObject dataset = m_truthDatasetCatalog.at(selectedRows.first().row()).toObject();
+    const QJsonArray temperatureRange = dataset.value("temperature_range_c").toArray();
+    const QJsonArray tags = dataset.value("tags").toArray();
+    QStringList tagStrings;
+    for (const QJsonValue& value : tags) {
+        tagStrings << value.toString();
+    }
+
+    const QString temperatureText = temperatureRange.size() == 2
+        ? QString("%1 to %2 C").arg(temperatureRange.at(0).toDouble(), 0, 'f', 1).arg(temperatureRange.at(1).toDouble(), 0, 'f', 1)
+        : QString("--");
+    m_testsPanel->truthDatasetDetailLabel->setText(
+        QString("%1\n"
+                "Status: %2 | Chemistry: %3 | Form factor: %4\n"
+                "Nominal pack: %5 V | %6 Ah | Temp range: %7\n"
+                "Profile: %8 | Source: %9\n"
+                "Tags: %10\n"
+                "Notes: %11")
+            .arg(dataset.value("display_name").toString())
+            .arg(dataset.value("status").toString())
+            .arg(dataset.value("chemistry").toString())
+            .arg(dataset.value("form_factor").toString())
+            .arg(dataset.value("nominal_voltage_v").toDouble(), 0, 'f', 2)
+            .arg(dataset.value("nominal_capacity_ah").toDouble(), 0, 'f', 2)
+            .arg(temperatureText)
+            .arg(dataset.value("current_profile_type").toString())
+            .arg(dataset.value("source").toString())
+            .arg(tagStrings.join(", "))
+            .arg(dataset.value("notes").toString()));
+}
+
+void MainWindow::syncTruthDatasetSelectionFromSettings()
+{
+    if (m_testsPanel == nullptr || m_testsPanel->truthDatasetTable == nullptr || m_testsPanel->truthDatasetTable->selectionModel() == nullptr) {
+        return;
+    }
+
+    QJsonArray selectedIds = m_validationSettings.value("selected_dataset_ids").toArray();
+    if (selectedIds.isEmpty()) {
+        selectedIds = m_validationSettings.value("dataset_ids").toArray();
+    }
+
+    QSet<QString> wantedIds;
+    for (const QJsonValue& value : selectedIds) {
+        wantedIds.insert(value.toString());
+    }
+
+    QSignalBlocker blocker(m_testsPanel->truthDatasetTable);
+    m_testsPanel->truthDatasetTable->clearSelection();
+    for (int row = 0; row < m_truthDatasetCatalog.size(); ++row) {
+        const QString datasetId = m_truthDatasetCatalog.at(row).toObject().value("dataset_id").toString();
+        if (wantedIds.contains(datasetId)) {
+            m_testsPanel->truthDatasetTable->selectRow(row);
+        }
+    }
+}
+
+void MainWindow::applyValidationSettingsToForm()
+{
+    if (m_testsPanel == nullptr || m_testsPanel->virtualTestCombo == nullptr) {
+        return;
+    }
+    if (m_testsPanel->virtualTestCombo->currentData().toString() != "model_validation") {
+        return;
+    }
+
+    for (const VirtualTestField& field : m_virtualTestFields) {
+        if (!m_validationSettings.contains(field.key) || field.editor == nullptr) {
+            continue;
+        }
+
+        const QJsonValue value = m_validationSettings.value(field.key);
+        if (field.type == "bool") {
+            if (auto* check = qobject_cast<QCheckBox*>(field.editor); check != nullptr) {
+                check->setChecked(value.toBool());
+            }
+            continue;
+        }
+        if (field.type == "enum") {
+            if (auto* combo = qobject_cast<QComboBox*>(field.editor); combo != nullptr) {
+                combo->setCurrentText(value.toString());
+            }
+            continue;
+        }
+
+        auto* line = qobject_cast<QLineEdit*>(field.editor);
+        if (line == nullptr) {
+            continue;
+        }
+
+        if (field.type == "list_float" && value.isArray()) {
+            QStringList items;
+            for (const QJsonValue& item : value.toArray()) {
+                items << QString::number(item.toDouble());
+            }
+            line->setText(items.join(", "));
+        } else if (field.type == "json" && value.isArray()) {
+            line->setText(QString::fromUtf8(QJsonDocument(value.toArray()).toJson(QJsonDocument::Compact)));
+        } else if (field.type == "json" && value.isObject()) {
+            line->setText(QString::fromUtf8(QJsonDocument(value.toObject()).toJson(QJsonDocument::Compact)));
+        } else if (value.isDouble()) {
+            line->setText(QString::number(value.toDouble()));
+        } else if (value.isBool()) {
+            line->setText(value.toBool() ? "true" : "false");
+        } else {
+            line->setText(value.toString());
+        }
+    }
+
+    syncTruthDatasetSelectionFromSettings();
+}
+
 void MainWindow::rebuildVirtualTestForm()
 {
     if (m_testsPanel == nullptr || m_testsPanel->virtualTestFormLayout == nullptr || m_testsPanel->virtualTestCombo == nullptr) {
@@ -1602,11 +1965,15 @@ void MainWindow::rebuildVirtualTestForm()
             auto* line = new QLineEdit(m_testsPanel);
             const QJsonValue defaultValue = parameter.value("default_value");
             if (defaultValue.isArray()) {
-                QStringList items;
-                for (const QJsonValue& item : defaultValue.toArray()) {
-                    items << QString::number(item.toDouble());
+                if (type == "list_float") {
+                    QStringList items;
+                    for (const QJsonValue& item : defaultValue.toArray()) {
+                        items << QString::number(item.toDouble());
+                    }
+                    line->setText(items.join(", "));
+                } else {
+                    line->setText(QString::fromUtf8(QJsonDocument(defaultValue.toArray()).toJson(QJsonDocument::Compact)));
                 }
-                line->setText(items.join(", "));
             } else if (defaultValue.isObject()) {
                 line->setText(QString::fromUtf8(QJsonDocument(defaultValue.toObject()).toJson(QJsonDocument::Compact)));
             } else if (defaultValue.isBool()) {
@@ -1632,6 +1999,7 @@ void MainWindow::rebuildVirtualTestForm()
         }
     }
 
+    applyValidationSettingsToForm();
     setVirtualTestStatus(
         "Choose parameters, vet the selected flagship workflow against the active pack, then run it into the shared results and report preview.",
         QColor(90, 144, 203));
@@ -1703,6 +2071,14 @@ void MainWindow::setVirtualTestStatus(const QString& text, const QColor& accent)
 void MainWindow::renderVirtualTestResult(const QJsonObject& payload)
 {
     m_reportContext = trade_study::buildVirtualTestReportContext(currentArchetypeId(), currentArchetypeName(), payload);
+    if (payload.contains("validation_summary")) {
+        m_lastValidationResult = QJsonObject{
+            {"validation_summary", payload.value("validation_summary").toObject()},
+            {"validation_scorecards", payload.value("validation_scorecards").toArray()},
+            {"validation_parameters", payload.value("parameters_used").toObject()},
+        };
+        m_validationSettings = payload.value("parameters_used").toObject();
+    }
 
     const QString testName = payload.value("test_name").toString();
     const QJsonObject summary = payload.value("summary_metrics").toObject();
@@ -1765,7 +2141,13 @@ void MainWindow::renderVirtualTestResult(const QJsonObject& payload)
 
     const QJsonObject primaryResult = payload.value("primary_result").toObject();
     if (!primaryResult.isEmpty()) {
-        renderResult(primaryResult);
+        QJsonObject decoratedResult = primaryResult;
+        if (payload.contains("validation_summary")) {
+            decoratedResult.insert("validation_summary", payload.value("validation_summary").toObject());
+            decoratedResult.insert("validation_scorecards", payload.value("validation_scorecards").toArray());
+            decoratedResult.insert("validation_parameters", payload.value("parameters_used").toObject());
+        }
+        renderResult(decoratedResult);
         return;
     }
 
@@ -1784,6 +2166,23 @@ void MainWindow::handleVirtualTestSelectionChanged(int index)
 {
     Q_UNUSED(index);
     rebuildVirtualTestForm();
+}
+
+void MainWindow::handleTruthDatasetSelectionChanged()
+{
+    if (m_isSyncingTruthDatasetTable || m_testsPanel == nullptr || m_testsPanel->truthDatasetTable == nullptr) {
+        return;
+    }
+
+    QJsonArray selectedIds;
+    if (m_testsPanel->truthDatasetTable->selectionModel() != nullptr) {
+        const QModelIndexList rows = m_testsPanel->truthDatasetTable->selectionModel()->selectedRows();
+        for (const QModelIndex& index : rows) {
+            selectedIds.append(m_truthDatasetCatalog.at(index.row()).toObject().value("dataset_id").toString());
+        }
+    }
+    m_validationSettings.insert("selected_dataset_ids", selectedIds);
+    refreshTruthDatasetDetailPanel();
 }
 
 void MainWindow::handleBackendRequestFinished(bool ok, const QString& error, const QJsonObject& payload)
@@ -1897,6 +2296,9 @@ void MainWindow::vetSelectedVirtualTest()
     flushPendingCadWorkspaceUpdate();
     m_runVirtualTestAfterVetting = false;
     m_pendingVirtualTestPayload = buildVirtualTestPayload();
+    if (m_pendingVirtualTestPayload.value("test_id").toString() == "model_validation") {
+        m_validationSettings = m_pendingVirtualTestPayload.value("parameters").toObject();
+    }
     m_pendingBackendAction = PendingBackendAction::VetVirtualTest;
     if (!m_client.vetVirtualTestAsync(m_pendingVirtualTestPayload)) {
         m_pendingBackendAction = PendingBackendAction::None;
@@ -1915,6 +2317,9 @@ void MainWindow::runSelectedVirtualTest()
     }
     flushPendingCadWorkspaceUpdate();
     m_pendingVirtualTestPayload = buildVirtualTestPayload();
+    if (m_pendingVirtualTestPayload.value("test_id").toString() == "model_validation") {
+        m_validationSettings = m_pendingVirtualTestPayload.value("parameters").toObject();
+    }
     m_runVirtualTestAfterVetting = true;
     m_pendingBackendAction = PendingBackendAction::VetVirtualTest;
     if (!m_client.vetVirtualTestAsync(m_pendingVirtualTestPayload)) {
@@ -1925,6 +2330,47 @@ void MainWindow::runSelectedVirtualTest()
         return;
     }
     setBackendBusy(true, "Vetting virtual test...");
+}
+
+void MainWindow::applySelectedTruthDatasetsToValidation()
+{
+    if (m_testsPanel == nullptr || m_testsPanel->truthDatasetTable == nullptr || m_testsPanel->virtualTestCombo == nullptr) {
+        return;
+    }
+
+    QJsonArray selectedIds;
+    if (m_testsPanel->truthDatasetTable->selectionModel() != nullptr) {
+        const QModelIndexList rows = m_testsPanel->truthDatasetTable->selectionModel()->selectedRows();
+        for (const QModelIndex& index : rows) {
+            selectedIds.append(m_truthDatasetCatalog.at(index.row()).toObject().value("dataset_id").toString());
+        }
+    }
+
+    if (selectedIds.isEmpty()) {
+        setVirtualTestStatus("Select one or more truth datasets before using them for validation.", QColor(214, 179, 67));
+        return;
+    }
+
+    m_validationSettings.insert("selected_dataset_ids", selectedIds);
+    m_validationSettings.insert("dataset_ids", selectedIds);
+    m_validationSettings.insert("dataset_path", QString());
+
+    if (m_testsPanel->virtualTestCombo->currentData().toString() != "model_validation") {
+        for (int index = 0; index < m_testsPanel->virtualTestCombo->count(); ++index) {
+            if (m_testsPanel->virtualTestCombo->itemData(index).toString() == "model_validation") {
+                m_testsPanel->virtualTestCombo->setCurrentIndex(index);
+                break;
+            }
+        }
+    } else {
+        applyValidationSettingsToForm();
+    }
+
+    setVirtualTestStatus(
+        QString("Queued %1 truth dataset%2 for Model Validation. Review metrics/thresholds, then vet or run the workflow.")
+            .arg(selectedIds.size())
+            .arg(selectedIds.size() == 1 ? "" : "s"),
+        QColor(58, 165, 99));
 }
 
 void MainWindow::exportActiveResultJson()

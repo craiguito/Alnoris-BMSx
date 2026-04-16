@@ -8,6 +8,12 @@ from .calibration import (
     load_truth_dataset,
 )
 from .engine import run_simulation
+from .truth_data_manager import (
+    get_truth_dataset,
+    list_truth_datasets,
+    resolve_truth_dataset_input,
+    validate_truth_dataset_file,
+)
 from .types import (
     CellGroupState,
     CurrentProfile,
@@ -42,6 +48,10 @@ __all__ = [
     "apply_calibration_to_configs",
     "apply_calibration_to_simulation_config",
     "calibrate_parameters",
+    "get_truth_dataset",
+    "list_truth_datasets",
     "load_truth_dataset",
+    "resolve_truth_dataset_input",
     "run_simulation",
+    "validate_truth_dataset_file",
 ]

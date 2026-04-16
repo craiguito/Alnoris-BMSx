@@ -2,6 +2,7 @@
 
 #include "SimulationResultModel.h"
 
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QString>
 #include <QStringList>
@@ -18,6 +19,8 @@ struct ReportContext
     QString workflowName;
     QString recommendationSummary;
     QStringList recommendationDetails;
+    QJsonObject validationSummary;
+    QJsonArray validationScorecards;
 };
 
 struct RunSummary
@@ -41,6 +44,8 @@ struct RunSummary
     QString recommendationSummary;
     QStringList recommendationDetails;
     QStringList warnings;
+    QJsonObject validationSummary;
+    QJsonArray validationScorecards;
 };
 
 struct ComparisonSummary
@@ -86,4 +91,3 @@ QJsonObject runSummaryToJson(const RunSummary& summary);
 QJsonObject comparisonSummaryToJson(const ComparisonSummary& summary);
 
 } // namespace trade_study
-

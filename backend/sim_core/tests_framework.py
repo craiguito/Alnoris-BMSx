@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .types import SimulationResult
+from .validation_scorecard import AggregateValidationSummary, ValidationScorecard
 
 
 @dataclass(frozen=True)
@@ -69,3 +70,5 @@ class VirtualTestResult:
     primary_result: SimulationResult | None = None
     sub_results: list[VirtualTestScenarioResult] = field(default_factory=list)
     comparison_series: list[dict[str, Any]] = field(default_factory=list)
+    validation_scorecards: list[ValidationScorecard] = field(default_factory=list)
+    validation_summary: AggregateValidationSummary | None = None

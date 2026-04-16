@@ -47,6 +47,39 @@ TradeStudyResultsPanel::TradeStudyResultsPanel(QWidget* parent)
     summaryLayout->addWidget(summaryLabel);
     layout->addWidget(summaryGroup);
 
+    auto* validationGroup = new QGroupBox("Validation Scorecard", this);
+    auto* validationLayout = new QVBoxLayout(validationGroup);
+    validationLayout->setContentsMargins(14, 16, 14, 14);
+    validationLayout->setSpacing(8);
+    validationSummaryLabel = new QLabel(
+        "Run Model Validation to score the active pack against one or more trusted truth datasets.",
+        validationGroup);
+    validationSummaryLabel->setWordWrap(true);
+    validationSummaryLabel->setStyleSheet("font-size:13px; color:#d8e5f2;");
+    validationInterpretationLabel = new QLabel(
+        "The scorecard turns raw replay metrics into a decision-support readout for comparative trade-study use.",
+        validationGroup);
+    validationInterpretationLabel->setWordWrap(true);
+    validationInterpretationLabel->setStyleSheet("color:#93a6ba;");
+    validationTable = new QTableWidget(0, 5, validationGroup);
+    validationTable->setHorizontalHeaderLabels({"Dataset", "Metric", "Value", "Threshold", "Status"});
+    validationTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    validationTable->setSelectionMode(QAbstractItemView::NoSelection);
+    validationTable->verticalHeader()->setVisible(false);
+    validationTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    validationTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+    validationTable->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    validationTable->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
+    validationTable->horizontalHeader()->setStretchLastSection(true);
+    validationWarningsLabel = new QLabel("Warnings: --", validationGroup);
+    validationWarningsLabel->setWordWrap(true);
+    validationWarningsLabel->setStyleSheet("color:#93a6ba;");
+    validationLayout->addWidget(validationSummaryLabel);
+    validationLayout->addWidget(validationInterpretationLabel);
+    validationLayout->addWidget(validationTable);
+    validationLayout->addWidget(validationWarningsLabel);
+    layout->addWidget(validationGroup);
+
     auto* playbackGroup = new QGroupBox("Workspace Playback", this);
     auto* playbackLayout = new QGridLayout(playbackGroup);
     playbackLayout->setContentsMargins(14, 16, 14, 14);
@@ -107,4 +140,3 @@ TradeStudyResultsPanel::TradeStudyResultsPanel(QWidget* parent)
     groupInfoLayout->addWidget(groupDetailLabel);
     layout->addWidget(groupInfoGroup, 1);
 }
-

@@ -19,7 +19,10 @@ public:
     QFormLayout* virtualTestFormLayout = nullptr;
     QPlainTextEdit* virtualTestStatus = nullptr;
     QTableWidget* virtualTestComparisonTable = nullptr;
+    QTableWidget* truthDatasetTable = nullptr;
+    QLabel* truthDatasetDetailLabel = nullptr;
+    QLabel* truthDatasetStatusLabel = nullptr;
+    QPushButton* useTruthDatasetsButton = nullptr;
     QPushButton* vetTestButton = nullptr;
     QPushButton* runTestButton = nullptr;
 };
-

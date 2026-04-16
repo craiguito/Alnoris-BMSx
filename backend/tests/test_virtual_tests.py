@@ -1,10 +1,33 @@
 from __future__ import annotations
 
+import json
+import os
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
 from backend.sim_core.bridge import run_virtual_test_from_dict, vet_virtual_test_from_dict, virtual_test_catalog_to_dict
 from backend.sim_core.engine import run_simulation
 from backend.tests.helpers import make_config, make_profile, temporary_workspace_dir, write_truth_dataset
+
+
+def _registry_metadata(dataset_id: str, display_name: str, *, status: str = "canonical") -> dict[str, object]:
+    return {
+        "dataset_id": dataset_id,
+        "display_name": display_name,
+        "description": f"Synthetic validation dataset for {display_name}.",
+        "chemistry": "generic_liion",
+        "form_factor": "cylindrical",
+        "nominal_voltage_v": 14.8,
+        "nominal_capacity_ah": 3.2,
+        "temperature_range_c": [20.0, 35.0],
+        "current_profile_type": "synthetic_pulse",
+        "tags": ["synthetic", "validation"],
+        "source": "backend-tests",
+        "status": status,
+        "created_at": "2026-04-16T00:00:00Z",
+        "notes": "Synthetic dataset used for model validation tests.",
+    }
 
 
 class VirtualTestFrameworkTests(unittest.TestCase):
@@ -167,6 +190,65 @@ class VirtualTestFrameworkTests(unittest.TestCase):
         self.assertLess(result["summary_metrics"]["energy_error_fraction"], 1e-6)
         self.assertLess(result["summary_metrics"]["rmse_temp_c"], 1e-6)
         self.assertTrue(result["pass_fail_indicators"]["validation_passed"])
+        self.assertEqual(len(result["validation_scorecards"]), 1)
+        self.assertEqual(result["validation_summary"]["overall_status"], "pass")
+
+    def test_model_validation_supports_multiple_registered_truth_datasets(self) -> None:
+        config = make_config(
+            cells_in_series=4,
+            group_count=4,
+            discharge_current_a=0.0,
+            duration_s=60,
+            current_profile=make_profile((0, 0.0), (5, 2.0), (20, 0.0), (35, 1.5), (50, 0.0)),
+        )
+        truth_result = run_simulation(config)
+
+        with temporary_workspace_dir() as temp_dir:
+            truth_dir = Path(temp_dir) / "truth_data"
+            truth_dir.mkdir(parents=True, exist_ok=True)
+            write_truth_dataset(
+                truth_dir / "canonical.json",
+                config,
+                truth_result,
+                extra_metadata=_registry_metadata("canonical_validation", "Canonical Validation", status="canonical"),
+            )
+            shifted_dataset_path = write_truth_dataset(
+                truth_dir / "experimental.json",
+                config,
+                truth_result,
+                extra_metadata=_registry_metadata("experimental_validation", "Experimental Validation", status="experimental"),
+            )
+
+            payload = json.loads(shifted_dataset_path.read_text(encoding="utf-8"))
+            for row in payload["data"]:
+                row["voltage_v"] = float(row["voltage_v"]) + 0.35
+            shifted_dataset_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+            with patch.dict(os.environ, {"ALNORIS_TRUTH_DATA_DIR": str(truth_dir)}, clear=False):
+                result = run_virtual_test_from_dict(
+                    {
+                        "test_id": "model_validation",
+                        "base_config": self._base_payload(),
+                        "parameters": {
+                            "dataset_ids": ["canonical_validation", "experimental_validation"],
+                            "metrics": ["rmse_voltage", "energy_error", "temp_rmse"],
+                            "max_voltage_rmse_v": 0.02,
+                            "max_abs_voltage_error_v": 0.05,
+                            "max_energy_error_fraction": 0.02,
+                            "max_temp_rmse_c": 0.02,
+                            "max_final_soc_error": 0.02,
+                            "max_final_voltage_error_v": 0.05,
+                        },
+                    }
+                )
+
+        self.assertEqual(len(result["validation_scorecards"]), 2)
+        self.assertEqual(result["validation_summary"]["dataset_count"], 2)
+        self.assertEqual(result["validation_summary"]["passed_count"], 1)
+        self.assertEqual(result["validation_summary"]["failed_count"], 1)
+        self.assertEqual(result["validation_summary"]["overall_status"], "warning")
+        self.assertFalse(result["pass_fail_indicators"]["validation_passed"])
+        self.assertIn("primary_result", result)
 
 
 if __name__ == "__main__":

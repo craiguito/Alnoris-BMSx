@@ -78,6 +78,17 @@ QJsonArray toJsonArray(const QStringList& items)
     return array;
 }
 
+QString formatValidationHeadline(const QJsonObject& validationSummary)
+{
+    if (validationSummary.isEmpty()) {
+        return {};
+    }
+    return QString("Validation %1: %2 of %3 datasets passed.")
+        .arg(validationSummary.value("overall_status").toString().toUpper())
+        .arg(validationSummary.value("passed_count").toInt())
+        .arg(validationSummary.value("dataset_count").toInt());
+}
+
 } // namespace
 
 ReportContext buildPackSimulationReportContext(
@@ -125,6 +136,14 @@ ReportContext buildVirtualTestReportContext(
     for (const QJsonValue& value : runtimeWarnings) {
         context.recommendationDetails << QString("Runtime warning: %1").arg(value.toString());
     }
+    context.validationSummary = payload.value("validation_summary").toObject();
+    context.validationScorecards = payload.value("validation_scorecards").toArray();
+    if (!context.validationSummary.isEmpty()) {
+        context.recommendationDetails << formatValidationHeadline(context.validationSummary);
+        for (const QJsonValue& value : context.validationSummary.value("key_warnings").toArray()) {
+            context.recommendationDetails << QString("Validation note: %1").arg(value.toString());
+        }
+    }
 
     if (totalChecks == 0) {
         context.recommendationSummary = context.recommendationDetails.isEmpty()
@@ -136,6 +155,12 @@ ReportContext buildVirtualTestReportContext(
         context.recommendationSummary = QString("%1 of %2 flagship checks were flagged.")
             .arg(flaggedChecks)
             .arg(totalChecks);
+    }
+    if (!context.validationSummary.isEmpty()) {
+        const QString recommendation = context.validationSummary.value("recommendation_text").toString();
+        if (!recommendation.isEmpty()) {
+            context.recommendationSummary = recommendation;
+        }
     }
 
     return context;
@@ -167,6 +192,8 @@ RunSummary buildRunSummary(
         ? defaultCandidateRecommendation(summary)
         : context.recommendationSummary;
     summary.recommendationDetails = context.recommendationDetails;
+    summary.validationSummary = context.validationSummary;
+    summary.validationScorecards = context.validationScorecards;
     return summary;
 }
 
@@ -228,6 +255,9 @@ QString formatRunSummaryText(const RunSummary& summary)
     lines << QString("Runtime: %1 s").arg(formatNumber(summary.runtimeS, 0));
     lines << QString("Termination: %1").arg(summary.terminationReason.isEmpty() ? "n/a" : summary.terminationReason);
     lines << QString("Recommendation: %1").arg(summary.recommendationSummary);
+    if (!summary.validationSummary.isEmpty()) {
+        lines << QString("Validation: %1").arg(formatValidationHeadline(summary.validationSummary));
+    }
     if (!summary.recommendationDetails.isEmpty()) {
         lines << "Review notes:";
         for (const QString& detail : summary.recommendationDetails) {
@@ -274,6 +304,9 @@ QString formatComparisonSummaryText(const ComparisonSummary& summary)
     lines << QString("Max core temp delta: %1 C").arg(formatNumber(summary.maxCoreTempDeltaC, 2));
     lines << QString("SOC spread delta: %1").arg(formatNumber(summary.socSpreadDelta, 4));
     lines << QString("Recommendation: %1").arg(summary.recommendationSummary);
+    if (!summary.candidate.validationSummary.isEmpty()) {
+        lines << QString("Validation: %1").arg(formatValidationHeadline(summary.candidate.validationSummary));
+    }
     if (!summary.recommendationDetails.isEmpty()) {
         lines << "Review notes:";
         for (const QString& detail : summary.recommendationDetails) {
@@ -309,6 +342,8 @@ QJsonObject reportContextToJson(const ReportContext& context)
         {"workflow_name", context.workflowName},
         {"recommendation_summary", context.recommendationSummary},
         {"recommendation_details", details},
+        {"validation_summary", context.validationSummary},
+        {"validation_scorecards", context.validationScorecards},
     };
 }
 
@@ -323,6 +358,8 @@ ReportContext reportContextFromJson(const QJsonObject& object)
     for (const QJsonValue& value : object.value("recommendation_details").toArray()) {
         context.recommendationDetails << value.toString();
     }
+    context.validationSummary = object.value("validation_summary").toObject();
+    context.validationScorecards = object.value("validation_scorecards").toArray();
     return context;
 }
 
@@ -357,6 +394,8 @@ QJsonObject runSummaryToJson(const RunSummary& summary)
         {"recommendation_summary", summary.recommendationSummary},
         {"recommendation_details", details},
         {"warnings", warnings},
+        {"validation_summary", summary.validationSummary},
+        {"validation_scorecards", summary.validationScorecards},
     };
 }
 

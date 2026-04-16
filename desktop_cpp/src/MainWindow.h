@@ -47,9 +47,11 @@ private slots:
     void handleOverlayMetricChanged(int index);
     void handleGroupSelectionChanged();
     void handleVirtualTestSelectionChanged(int index);
+    void handleTruthDatasetSelectionChanged();
     void handleBackendRequestFinished(bool ok, const QString& error, const QJsonObject& payload);
     void vetSelectedVirtualTest();
     void runSelectedVirtualTest();
+    void applySelectedTruthDatasetsToValidation();
     void exportActiveResultJson();
     void applySelectedSystemPreset();
 
@@ -107,10 +109,16 @@ private:
     void refreshSelectedSystemPresetDescription();
     void applySystemPreset(const QJsonObject& preset);
     void loadVirtualTestCatalog();
+    void loadTruthDatasetCatalog();
     void rebuildVirtualTestForm();
     QJsonObject buildVirtualTestPayload() const;
     void setVirtualTestStatus(const QString& text, const QColor& accent);
     void renderVirtualTestResult(const QJsonObject& payload);
+    void refreshTruthDatasetTable();
+    void refreshTruthDatasetDetailPanel();
+    void syncTruthDatasetSelectionFromSettings();
+    void applyValidationSettingsToForm();
+    void refreshValidationScorecardPanel();
     QString currentArchetypeId() const;
     QString currentArchetypeName() const;
     trade_study::ReportContext packStudyContext(const QString& workflowName) const;
@@ -123,12 +131,15 @@ private:
     ThemeSettings m_theme;
     QJsonArray m_virtualTestCatalog;
     QJsonArray m_systemPresetCatalog;
+    QJsonArray m_truthDatasetCatalog;
     std::vector<VirtualTestField> m_virtualTestFields;
     QJsonObject m_activeSystemPreset;
     QJsonObject m_baselineConfig;
     QJsonObject m_baselineResult;
     QJsonObject m_activeResultPayload;
     QJsonObject m_pendingVirtualTestPayload;
+    QJsonObject m_validationSettings;
+    QJsonObject m_lastValidationResult;
     trade_study::ReportContext m_reportContext;
     std::optional<trade_study::ComparisonSummary> m_activeComparisonSummary;
     std::optional<desktop::SimulationResultModel> m_activeResult;
@@ -138,5 +149,6 @@ private:
     QTimer* m_cadRefreshTimer = nullptr;
     bool m_backendBusy = false;
     bool m_isSyncingGroupPanel = false;
+    bool m_isSyncingTruthDatasetTable = false;
     bool m_runVirtualTestAfterVetting = false;
 };

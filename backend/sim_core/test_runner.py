@@ -6,15 +6,16 @@ from typing import Any
 
 from .calibration import (
     build_validation_config,
-    compute_energy_error,
-    compute_rmse_temp,
-    compute_rmse_voltage,
     load_truth_dataset,
 )
 from .engine import run_simulation
 from .test_catalog import get_test_definition
 from .test_vetting import vet_virtual_test
 from .tests_framework import TestVettingResult, VirtualTestResult, VirtualTestScenarioResult
+from .validation_scorecard import (
+    build_validation_scorecard,
+    summarize_validation_scorecards,
+)
 from .types import (
     BalancingConfig,
     CurrentProfile,
@@ -27,6 +28,24 @@ from .types import (
     ThermalZoneConfig,
 )
 from .validation import require_integral_seconds, validate_simulation_config
+
+
+_MODEL_VALIDATION_SUMMARY_KEY_BY_METRIC = {
+    "rmse_voltage": "rmse_voltage_v",
+    "max_abs_voltage_error": "max_abs_voltage_error_v",
+    "energy_error": "energy_error_fraction",
+    "temp_rmse": "rmse_temp_c",
+    "final_soc_error": "final_soc_error",
+    "final_voltage_error": "final_voltage_error_v",
+}
+_MODEL_VALIDATION_PASS_FAIL_KEY_BY_METRIC = {
+    "rmse_voltage": "voltage_rmse_within_limit",
+    "max_abs_voltage_error": "max_abs_voltage_error_within_limit",
+    "energy_error": "energy_error_within_limit",
+    "temp_rmse": "temp_rmse_within_limit",
+    "final_soc_error": "final_soc_error_within_limit",
+    "final_voltage_error": "final_voltage_error_within_limit",
+}
 
 
 def _result_metric(result: SimulationResult, key: str) -> float:
@@ -49,6 +68,21 @@ def _with_base(config: SimulationConfig, **updates: Any) -> SimulationConfig:
 
 def _profile(*pairs: tuple[int, float]) -> CurrentProfile:
     return CurrentProfile(points=tuple(CurrentProfilePoint(time_s=int(t), current_a=float(i)) for t, i in pairs))
+
+
+def _validation_thresholds(parameters: dict[str, Any]) -> dict[str, float]:
+    thresholds: dict[str, float] = {}
+    for key in (
+        "max_voltage_rmse_v",
+        "max_abs_voltage_error_v",
+        "max_energy_error_fraction",
+        "max_temp_rmse_c",
+        "max_final_soc_error",
+        "max_final_voltage_error_v",
+    ):
+        if parameters.get(key) is not None:
+            thresholds[key] = float(parameters[key])
+    return thresholds
 
 
 def run_virtual_test(test_id: str, parameters: dict[str, Any], base_config: SimulationConfig) -> VirtualTestResult:
@@ -182,31 +216,100 @@ def run_virtual_test(test_id: str, parameters: dict[str, Any], base_config: Simu
             "best_capacity_ah": max((scenario.summary_metrics["capacity_ah"] for scenario in sub_results), default=0.0),
         }
     elif test_id == "model_validation":
-        dataset = load_truth_dataset(str(p["dataset_path"]))
-        validation_config = build_validation_config(base_config, dataset)
-        primary_result = _run(validation_config)
         requested_metrics = [str(metric) for metric in p["metrics"]]
+        thresholds = _validation_thresholds(p)
+        resolved_datasets = [dict(item) for item in p.get("resolved_datasets", [])]
+        if not resolved_datasets and p.get("dataset_path"):
+            dataset_path = str(p["dataset_path"])
+            dataset = load_truth_dataset(dataset_path)
+            resolved_datasets = [{
+                "dataset_id": str(dataset.metadata.get("dataset_id", "legacy_truth_dataset")),
+                "display_name": str(dataset.metadata.get("display_name", "Legacy Truth Dataset")),
+                "dataset_path": dataset_path,
+                "source_type": "path",
+                "record_count": len(dataset.records),
+                "metadata": dict(dataset.metadata),
+            }]
 
-        summary_metrics = {
-            "dataset_record_count": len(dataset.records),
-            "profile_point_count": len(validation_config.current_profile.points) if validation_config.current_profile else 0,
-            "validation_duration_s": validation_config.duration_s,
-        }
-        if "rmse_voltage" in requested_metrics:
-            rmse_voltage_v = compute_rmse_voltage(primary_result, dataset)
-            summary_metrics["rmse_voltage_v"] = rmse_voltage_v
-            pass_fail["voltage_rmse_within_limit"] = rmse_voltage_v <= float(p["max_voltage_rmse_v"])
-        if "energy_error" in requested_metrics:
-            energy_error_fraction = compute_energy_error(primary_result, dataset)
-            summary_metrics["energy_error_fraction"] = energy_error_fraction
-            pass_fail["energy_error_within_limit"] = (
-                energy_error_fraction <= float(p["max_energy_error_fraction"])
+        scorecards = []
+        primary_label = ""
+        primary_dataset_id = ""
+        primary_profile_point_count = 0
+        primary_duration_s = 0
+
+        for dataset_payload in resolved_datasets:
+            dataset_path = str(dataset_payload["dataset_path"])
+            dataset = load_truth_dataset(dataset_path)
+            validation_config = build_validation_config(base_config, dataset)
+            scenario_result = _run(validation_config)
+
+            if primary_result is None:
+                primary_result = scenario_result
+                primary_label = str(dataset_payload.get("display_name", dataset.metadata.get("display_name", dataset_path)))
+                primary_dataset_id = str(dataset_payload.get("dataset_id", dataset.metadata.get("dataset_id", dataset_path)))
+                primary_profile_point_count = len(validation_config.current_profile.points) if validation_config.current_profile else 0
+                primary_duration_s = validation_config.duration_s
+
+            scorecards.append(
+                build_validation_scorecard(
+                    scenario_result,
+                    dataset,
+                    dataset_path=dataset_path,
+                    base_config=base_config,
+                    requested_metrics=requested_metrics,
+                    thresholds=thresholds,
+                )
             )
-        if "temp_rmse" in requested_metrics:
-            rmse_temp_c = compute_rmse_temp(primary_result, dataset)
-            summary_metrics["rmse_temp_c"] = rmse_temp_c
-            pass_fail["temp_rmse_within_limit"] = rmse_temp_c <= float(p["max_temp_rmse_c"])
-        pass_fail["validation_passed"] = all(pass_fail.values()) if pass_fail else True
+
+        validation_summary = summarize_validation_scorecards(scorecards)
+        summary_metrics = {
+            "dataset_record_count": int(p.get("dataset_record_count", 0)),
+            "validation_dataset_count": validation_summary.dataset_count,
+            "validation_passed_count": validation_summary.passed_count,
+            "validation_failed_count": validation_summary.failed_count,
+            "validation_overall_status": validation_summary.overall_status,
+            "profile_point_count": primary_profile_point_count,
+            "validation_duration_s": primary_duration_s,
+            "primary_validation_dataset_id": primary_dataset_id,
+            "primary_validation_dataset": primary_label,
+        }
+
+        if len(scorecards) == 1:
+            scorecard = scorecards[0]
+            summary_metrics["dataset_record_count"] = len(load_truth_dataset(scorecard.dataset_path).records)
+            for metric in scorecard.metric_results:
+                summary_key = _MODEL_VALIDATION_SUMMARY_KEY_BY_METRIC.get(metric.metric_id)
+                pass_fail_key = _MODEL_VALIDATION_PASS_FAIL_KEY_BY_METRIC.get(metric.metric_id)
+                if summary_key is not None:
+                    summary_metrics[summary_key] = metric.value
+                if pass_fail_key is not None and metric.passed is not None:
+                    pass_fail[pass_fail_key] = metric.passed
+        else:
+            for headline_metric in validation_summary.headline_metrics:
+                summary_key = _MODEL_VALIDATION_SUMMARY_KEY_BY_METRIC.get(headline_metric.metric_id)
+                if summary_key is None:
+                    continue
+                summary_metrics[f"average_{summary_key}"] = headline_metric.average_value
+                summary_metrics[f"best_{summary_key}"] = headline_metric.best_value
+                summary_metrics[f"worst_{summary_key}"] = headline_metric.worst_value
+
+            for metric_name in requested_metrics:
+                metric_passes = [
+                    metric.passed
+                    for scorecard in scorecards
+                    for metric in scorecard.metric_results
+                    if metric.metric_id == metric_name and metric.passed is not None
+                ]
+                pass_fail_key = _MODEL_VALIDATION_PASS_FAIL_KEY_BY_METRIC.get(metric_name)
+                if pass_fail_key is not None and metric_passes:
+                    pass_fail[pass_fail_key] = all(metric_passes)
+
+        pass_fail["validation_passed"] = validation_summary.overall_status == "pass"
+        warnings.extend(validation_summary.key_warnings)
+        if len(scorecards) > 1 and primary_label:
+            warnings.append(
+                f"Charts and replay traces show {primary_label}; additional datasets are summarized in the validation scorecard."
+            )
     elif test_id == "thermal_stress":
         primary_result = _run(_with_base(
             base_config,
@@ -345,6 +448,8 @@ def run_virtual_test(test_id: str, parameters: dict[str, Any], base_config: Simu
         primary_result=primary_result,
         sub_results=sub_results,
         comparison_series=comparison_series,
+        validation_scorecards=scorecards if test_id == "model_validation" else [],
+        validation_summary=validation_summary if test_id == "model_validation" else None,
     )
 
 
@@ -374,6 +479,17 @@ def virtual_test_result_to_dict(result: VirtualTestResult) -> dict[str, Any]:
             for item in result.sub_results
         ],
     }
+    if result.validation_scorecards:
+        from .validation_scorecard import validation_scorecard_to_dict
+
+        payload["validation_scorecards"] = [
+            validation_scorecard_to_dict(scorecard)
+            for scorecard in result.validation_scorecards
+        ]
+    if result.validation_summary is not None:
+        from .validation_scorecard import validation_summary_to_dict
+
+        payload["validation_summary"] = validation_summary_to_dict(result.validation_summary)
     if result.primary_result is not None:
         payload["primary_result"] = simulation_result_to_dict(result.primary_result)
     return payload

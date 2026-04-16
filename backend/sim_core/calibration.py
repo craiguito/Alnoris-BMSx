@@ -73,8 +73,192 @@ class _ResistanceEstimate:
     resistance_ohm: float
 
 
+TRUTH_DATASET_STATUSES = ("canonical", "trusted", "experimental", "deprecated")
+_TRUTH_DATASET_CANONICAL_KEYS = {
+    "chemistry_name": "chemistry",
+    "cell_form_factor": "form_factor",
+    "capacity_ah": "nominal_capacity_ah",
+    "cell_capacity_ah": "nominal_capacity_ah",
+}
+_TRUTH_DATASET_REQUIRED_METADATA_FIELDS = (
+    "dataset_id",
+    "display_name",
+    "chemistry",
+    "form_factor",
+    "nominal_voltage_v",
+    "nominal_capacity_ah",
+    "current_profile_type",
+    "source",
+    "status",
+)
+
+
 def _clamp(value: float, low: float, high: float) -> float:
     return max(low, min(value, high))
+
+
+def _truth_dataset_error(message: str, *, source_path: str | None = None) -> ValueError:
+    if source_path:
+        return ValueError(f"{message} [dataset={source_path}]")
+    return ValueError(message)
+
+
+def _row_label(row_index: int) -> str:
+    return f"row {row_index + 1}"
+
+
+def _coerce_finite_float(
+    value: Any,
+    field_name: str,
+    *,
+    source_path: str | None = None,
+    row_index: int | None = None,
+) -> float:
+    try:
+        parsed = float(value)
+    except Exception as exc:
+        location = f" in {_row_label(row_index)}" if row_index is not None else ""
+        raise _truth_dataset_error(f"Truth dataset field '{field_name}'{location} must be numeric: {exc}", source_path=source_path)
+    if not math.isfinite(parsed):
+        location = f" in {_row_label(row_index)}" if row_index is not None else ""
+        raise _truth_dataset_error(f"Truth dataset field '{field_name}'{location} must be finite.", source_path=source_path)
+    return parsed
+
+
+def _coerce_optional_finite_float(
+    value: Any,
+    field_name: str,
+    *,
+    source_path: str | None = None,
+) -> float | None:
+    if value is None:
+        return None
+    return _coerce_finite_float(value, field_name, source_path=source_path)
+
+
+def _derive_display_name(value: str) -> str:
+    cleaned = value.replace("_", " ").replace("-", " ").strip()
+    return " ".join(part.capitalize() for part in cleaned.split()) if cleaned else "Truth Dataset"
+
+
+def _normalize_truth_dataset_metadata(
+    metadata: dict[str, Any],
+    *,
+    strict_metadata: bool,
+    source_path: str | None = None,
+) -> dict[str, Any]:
+    normalized = dict(metadata)
+    for source_key, target_key in _TRUTH_DATASET_CANONICAL_KEYS.items():
+        if target_key not in normalized and normalized.get(source_key) not in (None, ""):
+            normalized[target_key] = normalized[source_key]
+
+    dataset_id = str(normalized.get("dataset_id", "")).strip()
+    if strict_metadata and not dataset_id:
+        raise _truth_dataset_error("Truth dataset metadata must define 'dataset_id'.", source_path=source_path)
+    if not dataset_id:
+        dataset_id = Path(source_path).stem if source_path else "legacy_truth_dataset"
+    normalized["dataset_id"] = dataset_id
+
+    display_name = str(normalized.get("display_name", "")).strip()
+    if strict_metadata and not display_name:
+        raise _truth_dataset_error("Truth dataset metadata must define 'display_name'.", source_path=source_path)
+    if not display_name:
+        display_name = _derive_display_name(dataset_id)
+    normalized["display_name"] = display_name
+
+    description = str(normalized.get("description", "")).strip()
+    normalized["description"] = description
+
+    chemistry = str(normalized.get("chemistry", "")).strip()
+    if strict_metadata and not chemistry:
+        raise _truth_dataset_error("Truth dataset metadata must define 'chemistry'.", source_path=source_path)
+    normalized["chemistry"] = chemistry
+
+    form_factor = str(normalized.get("form_factor", "")).strip()
+    if strict_metadata and not form_factor:
+        raise _truth_dataset_error("Truth dataset metadata must define 'form_factor'.", source_path=source_path)
+    normalized["form_factor"] = form_factor
+
+    nominal_voltage_v = _coerce_optional_finite_float(
+        normalized.get("nominal_voltage_v"),
+        "nominal_voltage_v",
+        source_path=source_path,
+    )
+    if strict_metadata and nominal_voltage_v is None:
+        raise _truth_dataset_error("Truth dataset metadata must define 'nominal_voltage_v'.", source_path=source_path)
+    normalized["nominal_voltage_v"] = nominal_voltage_v
+
+    nominal_capacity_ah = _coerce_optional_finite_float(
+        normalized.get("nominal_capacity_ah"),
+        "nominal_capacity_ah",
+        source_path=source_path,
+    )
+    if strict_metadata and nominal_capacity_ah is None:
+        raise _truth_dataset_error("Truth dataset metadata must define 'nominal_capacity_ah'.", source_path=source_path)
+    normalized["nominal_capacity_ah"] = nominal_capacity_ah
+
+    temperature_range = normalized.get("temperature_range_c")
+    if temperature_range in (None, ""):
+        normalized["temperature_range_c"] = ()
+    else:
+        if not isinstance(temperature_range, (list, tuple)) or len(temperature_range) != 2:
+            raise _truth_dataset_error(
+                "Truth dataset metadata field 'temperature_range_c' must contain [min_c, max_c].",
+                source_path=source_path,
+            )
+        low_c = _coerce_finite_float(temperature_range[0], "temperature_range_c[0]", source_path=source_path)
+        high_c = _coerce_finite_float(temperature_range[1], "temperature_range_c[1]", source_path=source_path)
+        if high_c < low_c:
+            raise _truth_dataset_error(
+                "Truth dataset metadata field 'temperature_range_c' must be ordered as [min_c, max_c].",
+                source_path=source_path,
+            )
+        normalized["temperature_range_c"] = (low_c, high_c)
+
+    current_profile_type = str(normalized.get("current_profile_type", "")).strip()
+    if strict_metadata and not current_profile_type:
+        raise _truth_dataset_error("Truth dataset metadata must define 'current_profile_type'.", source_path=source_path)
+    normalized["current_profile_type"] = current_profile_type
+
+    raw_tags = normalized.get("tags") or []
+    if isinstance(raw_tags, str):
+        tags = tuple(tag.strip() for tag in raw_tags.split(",") if tag.strip())
+    elif isinstance(raw_tags, (list, tuple)):
+        tags = tuple(str(tag).strip() for tag in raw_tags if str(tag).strip())
+    else:
+        raise _truth_dataset_error("Truth dataset metadata field 'tags' must be a list of strings.", source_path=source_path)
+    normalized["tags"] = tags
+
+    source = str(normalized.get("source", "")).strip()
+    if strict_metadata and not source:
+        raise _truth_dataset_error("Truth dataset metadata must define 'source'.", source_path=source_path)
+    normalized["source"] = source
+
+    status = str(normalized.get("status", "experimental")).strip().lower()
+    if status and status not in TRUTH_DATASET_STATUSES:
+        raise _truth_dataset_error(
+            f"Truth dataset metadata field 'status' must be one of: {', '.join(TRUTH_DATASET_STATUSES)}.",
+            source_path=source_path,
+        )
+    if strict_metadata and not status:
+        raise _truth_dataset_error("Truth dataset metadata must define 'status'.", source_path=source_path)
+    normalized["status"] = status or "experimental"
+
+    created_at = str(normalized.get("created_at", "")).strip()
+    normalized["created_at"] = created_at
+
+    notes = str(normalized.get("notes", "")).strip()
+    normalized["notes"] = notes
+
+    if strict_metadata:
+        missing_fields = [field_name for field_name in _TRUTH_DATASET_REQUIRED_METADATA_FIELDS if normalized.get(field_name) in (None, "", ())]
+        if missing_fields:
+            raise _truth_dataset_error(
+                "Truth dataset metadata is missing required field(s): " + ", ".join(missing_fields),
+                source_path=source_path,
+            )
+
+    return normalized
 
 
 def _median_or(values: Iterable[float], default: float) -> float:
@@ -240,26 +424,53 @@ def _fill_missing_soc(metadata: dict[str, Any], raw_records: Sequence[_RawTruthR
     return metadata_copy, tuple(records)
 
 
-def truth_dataset_from_dict(payload: dict[str, Any]) -> TruthDataset:
-    metadata = dict(payload.get("metadata") or {})
-    data = payload.get("data")
+def truth_dataset_from_dict(
+    payload: dict[str, Any],
+    *,
+    strict_metadata: bool = False,
+    source_path: str | None = None,
+) -> TruthDataset:
+    metadata = _normalize_truth_dataset_metadata(
+        dict(payload.get("metadata") or {}),
+        strict_metadata=strict_metadata,
+        source_path=source_path,
+    )
+    data = payload.get("records")
+    if data is None:
+        data = payload.get("data")
     if not isinstance(data, list) or not data:
-        raise ValueError("Truth dataset must contain a non-empty 'data' array.")
+        raise _truth_dataset_error("Truth dataset must contain a non-empty 'records' array.", source_path=source_path)
 
     raw_records: list[_RawTruthRecord] = []
     previous_time_s: float | None = None
-    for item in data:
+    for row_index, item in enumerate(data):
         if not isinstance(item, dict):
-            raise ValueError("Truth dataset rows must be objects.")
-        time_s = float(item["time_s"])
+            raise _truth_dataset_error(
+                f"Truth dataset {_row_label(row_index)} must be an object.",
+                source_path=source_path,
+            )
+        for required_field in ("time_s", "current_a", "voltage_v", "temp_c"):
+            if required_field not in item:
+                raise _truth_dataset_error(
+                    f"Truth dataset {_row_label(row_index)} is missing required field '{required_field}'.",
+                    source_path=source_path,
+                )
+        time_s = _coerce_finite_float(item["time_s"], "time_s", source_path=source_path, row_index=row_index)
         if previous_time_s is not None and time_s <= previous_time_s:
-            raise ValueError("Truth dataset time_s values must be strictly increasing.")
+            raise _truth_dataset_error(
+                "Truth dataset time_s values must be strictly increasing.",
+                source_path=source_path,
+            )
         previous_time_s = time_s
 
-        current_a = float(item["current_a"])
-        voltage_v = float(item["voltage_v"])
-        temp_c = float(item["temp_c"])
-        soc = float(item["soc"]) if item.get("soc") is not None else None
+        current_a = _coerce_finite_float(item["current_a"], "current_a", source_path=source_path, row_index=row_index)
+        voltage_v = _coerce_finite_float(item["voltage_v"], "voltage_v", source_path=source_path, row_index=row_index)
+        temp_c = _coerce_finite_float(item["temp_c"], "temp_c", source_path=source_path, row_index=row_index)
+        soc = (
+            _coerce_finite_float(item["soc"], "soc", source_path=source_path, row_index=row_index)
+            if item.get("soc") is not None
+            else None
+        )
         extras = {key: value for key, value in item.items() if key not in {"time_s", "current_a", "voltage_v", "temp_c", "soc"}}
         raw_records.append(
             _RawTruthRecord(
@@ -276,11 +487,12 @@ def truth_dataset_from_dict(payload: dict[str, Any]) -> TruthDataset:
     return TruthDataset(metadata=metadata_with_soc, records=records)
 
 
-def load_truth_dataset(path: str) -> TruthDataset:
-    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+def load_truth_dataset(path: str, *, strict_metadata: bool = False) -> TruthDataset:
+    expanded_path = Path(path).expanduser()
+    payload = json.loads(expanded_path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
-        raise ValueError("Truth dataset root must be a JSON object.")
-    return truth_dataset_from_dict(payload)
+        raise _truth_dataset_error("Truth dataset root must be a JSON object.", source_path=str(expanded_path))
+    return truth_dataset_from_dict(payload, strict_metadata=strict_metadata, source_path=str(expanded_path))
 
 
 def _fit_ocv_curve(records: Sequence[TruthRecord], low_current_threshold_a: float, bin_count: int = 11) -> tuple[OcvLookupPoint, ...]:
@@ -754,3 +966,29 @@ def compute_rmse_temp(result: SimulationResult, dataset: TruthDataset) -> float:
     aligned_temp_c = _interpolate_series(sim_times, sim_temp_c, truth_times)
     squared_errors = [(sim - truth) ** 2 for sim, truth in zip(aligned_temp_c, truth_temp_c)]
     return math.sqrt(sum(squared_errors) / max(len(squared_errors), 1))
+
+
+def compute_max_abs_voltage_error(result: SimulationResult, dataset: TruthDataset) -> float:
+    truth_times = [record.time_s for record in dataset.records]
+    truth_voltage_v = [record.voltage_v for record in dataset.records]
+    sim_times = [float(point.time_s) for point in result.time_series]
+    sim_voltage_v = [point.pack_voltage_v for point in result.time_series]
+    aligned_voltage_v = _interpolate_series(sim_times, sim_voltage_v, truth_times)
+    errors = [abs(sim - truth) for sim, truth in zip(aligned_voltage_v, truth_voltage_v)]
+    return max(errors, default=0.0)
+
+
+def compute_final_soc_error(result: SimulationResult, dataset: TruthDataset) -> float:
+    if not dataset.records or not result.time_series:
+        return 0.0
+    return abs(result.summary.final_soc_avg - dataset.records[-1].soc)
+
+
+def compute_final_voltage_error(result: SimulationResult, dataset: TruthDataset) -> float:
+    if not dataset.records or not result.time_series:
+        return 0.0
+    truth_time_s = dataset.records[-1].time_s
+    sim_times = [float(point.time_s) for point in result.time_series]
+    sim_voltage_v = [point.pack_voltage_v for point in result.time_series]
+    aligned_voltage_v = _interpolate_series(sim_times, sim_voltage_v, [truth_time_s])
+    return abs(aligned_voltage_v[0] - dataset.records[-1].voltage_v) if aligned_voltage_v else 0.0

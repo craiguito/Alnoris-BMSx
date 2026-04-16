@@ -122,15 +122,31 @@ PRIMARY_TEST_CATALOG: tuple[VirtualTestDefinition, ...] = (
         recommended_for_pack_level=True,
         supports_profile_input=True,
         parameters=(
-            _param("dataset_path", "Truth dataset path", "string", "", tooltip="Path to the truth-set JSON file."),
+            _param(
+                "dataset_ids",
+                "Truth dataset ids",
+                "json",
+                [],
+                required=False,
+                tooltip="JSON list of registered truth dataset ids to score in one validation run.",
+            ),
+            _param(
+                "dataset_path",
+                "Truth dataset path",
+                "string",
+                "",
+                required=False,
+                tooltip="Legacy direct path to a truth-set JSON file. Still supported for one-off replay.",
+            ),
             _param(
                 "metrics",
                 "Metrics",
                 "json",
                 ["rmse_voltage", "energy_error", "temp_rmse"],
-                tooltip="JSON list of metric ids: rmse_voltage, energy_error, temp_rmse.",
+                tooltip="JSON list of metric ids: rmse_voltage, max_abs_voltage_error, energy_error, temp_rmse, final_soc_error, final_voltage_error.",
             ),
             _param("max_voltage_rmse_v", "Max voltage RMSE", "float", 1.0, min_value=0.0, unit="V"),
+            _param("max_abs_voltage_error_v", "Max abs voltage error", "float", 1.5, min_value=0.0, unit="V"),
             _param(
                 "max_energy_error_fraction",
                 "Max energy error",
@@ -140,6 +156,8 @@ PRIMARY_TEST_CATALOG: tuple[VirtualTestDefinition, ...] = (
                 unit="fraction",
             ),
             _param("max_temp_rmse_c", "Max temp RMSE", "float", 2.0, min_value=0.0, unit="C"),
+            _param("max_final_soc_error", "Max final SOC error", "float", 0.05, min_value=0.0, unit="fraction"),
+            _param("max_final_voltage_error_v", "Max final voltage error", "float", 0.15, min_value=0.0, unit="V"),
         ),
     ),
 )

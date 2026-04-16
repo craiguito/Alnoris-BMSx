@@ -3,7 +3,8 @@ from __future__ import annotations
 import unittest
 
 from backend.sim_core.bridge import run_simulation_from_dict, run_virtual_test_from_dict
-from backend.tests.helpers import make_config
+from backend.sim_core.engine import run_simulation
+from backend.tests.helpers import make_config, make_profile, temporary_workspace_dir, write_truth_dataset
 
 
 class ResultSchemaTests(unittest.TestCase):
@@ -70,6 +71,39 @@ class ResultSchemaTests(unittest.TestCase):
         self.assertIn("primary_result", result)
         self.assertIn("summary", result["primary_result"])
         self.assertIn("time_series", result["primary_result"])
+
+    def test_model_validation_result_includes_scorecards_and_summary(self) -> None:
+        config = make_config(
+            cells_in_series=4,
+            group_count=4,
+            discharge_current_a=0.0,
+            duration_s=40,
+            current_profile=make_profile((0, 0.0), (5, 2.0), (15, 0.0), (25, 1.0)),
+        )
+        truth_result = run_simulation(config)
+
+        with temporary_workspace_dir() as temp_dir:
+            dataset_path = write_truth_dataset(f"{temp_dir}/truth.json", config, truth_result)
+            payload = {
+                "test_id": "model_validation",
+                "base_config": self._payload(),
+                "parameters": {
+                    "dataset_path": str(dataset_path),
+                    "metrics": ["rmse_voltage", "energy_error", "temp_rmse"],
+                    "max_voltage_rmse_v": 0.01,
+                    "max_abs_voltage_error_v": 0.02,
+                    "max_energy_error_fraction": 0.01,
+                    "max_temp_rmse_c": 0.01,
+                    "max_final_soc_error": 0.02,
+                    "max_final_voltage_error_v": 0.02,
+                },
+            }
+            result = run_virtual_test_from_dict(payload)
+
+        self.assertIn("validation_scorecards", result)
+        self.assertIn("validation_summary", result)
+        self.assertEqual(result["validation_summary"]["dataset_count"], 1)
+        self.assertIn("metric_results", result["validation_scorecards"][0])
 
 
 if __name__ == "__main__":

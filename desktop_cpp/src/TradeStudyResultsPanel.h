@@ -14,6 +14,10 @@ public:
     explicit TradeStudyResultsPanel(QWidget* parent = nullptr);
 
     QLabel* summaryLabel = nullptr;
+    QLabel* validationSummaryLabel = nullptr;
+    QLabel* validationInterpretationLabel = nullptr;
+    QLabel* validationWarningsLabel = nullptr;
+    QTableWidget* validationTable = nullptr;
     QComboBox* overlayMetricCombo = nullptr;
     QSlider* resultTimeSlider = nullptr;
     QLabel* resultTimeLabel = nullptr;
@@ -29,4 +33,3 @@ public:
 private:
     static ChartWidget* createGraphWidget(QWidget* parent);
 };
-

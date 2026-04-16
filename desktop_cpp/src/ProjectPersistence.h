@@ -17,6 +17,8 @@ struct ProjectState
     QJsonObject baselineResult;
     QJsonObject activeResult;
     QJsonObject reportContext;
+    QJsonObject validationSettings;
+    QJsonObject validationResult;
     QJsonObject cadDocument;
 };
 
@@ -24,4 +26,3 @@ bool saveProjectState(const QString& path, const ProjectState& state, QString* e
 std::optional<ProjectState> loadProjectState(const QString& path, QString* error);
 
 } // namespace trade_study
-

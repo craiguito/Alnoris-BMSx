@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any
 
-from .calibration import load_truth_dataset
 from .reference_cells import REFERENCE_CELLS
 from .test_catalog import get_test_definition
 from .tests_framework import TestVettingResult
+from .truth_data_manager import resolve_truth_dataset_input
 from .types import SimulationConfig
+from .validation_scorecard import normalize_requested_metrics
 
 
 def _parse_parameter(param_type: str, value: Any) -> Any:
@@ -84,33 +84,73 @@ def vet_virtual_test(test_id: str, parameters: dict[str, Any], base_config: Simu
     if test_id == "rate_capability" and not normalized.get("current_list_a"):
         errors.append("Rate Capability Test requires at least one current value.")
     if test_id == "model_validation":
-        dataset_path = Path(str(normalized.get("dataset_path", ""))).expanduser()
-        if not dataset_path.exists():
-            errors.append("Model Validation Test requires a dataset_path that exists.")
-        else:
-            try:
-                dataset = load_truth_dataset(str(dataset_path))
-            except Exception as exc:
-                errors.append(f"Could not load truth dataset: {exc}")
+        raw_dataset_ids = normalized.get("dataset_ids", [])
+        dataset_ids: list[str] = []
+        if raw_dataset_ids not in (None, ""):
+            if not isinstance(raw_dataset_ids, list):
+                errors.append("Truth dataset ids must be a JSON list.")
             else:
-                normalized["dataset_path"] = str(dataset_path)
-                normalized["dataset_record_count"] = len(dataset.records)
-                metrics = normalized.get("metrics", [])
-                if not isinstance(metrics, list):
-                    errors.append("Metrics must be a JSON list.")
-                else:
-                    allowed_metrics = {"rmse_voltage", "energy_error", "temp_rmse"}
-                    invalid_metrics = [metric for metric in metrics if metric not in allowed_metrics]
-                    if invalid_metrics:
-                        errors.append(
-                            "Unsupported model validation metric(s): " + ", ".join(str(metric) for metric in invalid_metrics)
-                        )
-                    elif not metrics:
-                        errors.append("Model Validation Test requires at least one metric.")
-                dataset_chemistry = dataset.metadata.get("chemistry_name") or dataset.metadata.get("chemistry")
+                dataset_ids = [str(item).strip() for item in raw_dataset_ids if str(item).strip()]
+
+        dataset_path = str(normalized.get("dataset_path", "")).strip()
+        dataset_inputs = list(dataset_ids)
+        if dataset_path:
+            dataset_inputs.append(dataset_path)
+
+        if not dataset_inputs:
+            errors.append("Model Validation Test requires at least one dataset_id or a dataset_path.")
+        else:
+            resolved_datasets: list[dict[str, Any]] = []
+            seen_dataset_paths: set[str] = set()
+            for dataset_input in dataset_inputs:
+                try:
+                    resolved = resolve_truth_dataset_input(dataset_input)
+                except Exception as exc:
+                    errors.append(f"Could not resolve truth dataset '{dataset_input}': {exc}")
+                    continue
+
+                if resolved.dataset_path in seen_dataset_paths:
+                    continue
+                seen_dataset_paths.add(resolved.dataset_path)
+                resolved_datasets.append(
+                    {
+                        "dataset_id": resolved.dataset_id,
+                        "display_name": resolved.dataset_display_name,
+                        "dataset_path": resolved.dataset_path,
+                        "source_type": resolved.source_type,
+                        "record_count": len(resolved.dataset.records),
+                        "metadata": dict(resolved.metadata),
+                    }
+                )
+
+                dataset_chemistry = resolved.metadata.get("chemistry_name") or resolved.metadata.get("chemistry")
                 if dataset_chemistry and str(dataset_chemistry) != base_config.chemistry_name:
                     warnings.append(
-                        "Truth dataset chemistry metadata does not match the base configuration chemistry_name."
+                        f"Truth dataset '{resolved.dataset_display_name}' chemistry metadata does not match the base configuration chemistry_name."
                     )
+
+            if resolved_datasets:
+                normalized["dataset_ids"] = [
+                    item["dataset_id"]
+                    for item in resolved_datasets
+                    if item["source_type"] == "registry"
+                ]
+                normalized["dataset_path"] = (
+                    resolved_datasets[0]["dataset_path"]
+                    if len(resolved_datasets) == 1 and resolved_datasets[0]["source_type"] == "path"
+                    else dataset_path
+                )
+                normalized["dataset_count"] = len(resolved_datasets)
+                normalized["dataset_record_count"] = sum(int(item["record_count"]) for item in resolved_datasets)
+                normalized["resolved_datasets"] = resolved_datasets
+
+        metrics = normalized.get("metrics", [])
+        if not isinstance(metrics, list):
+            errors.append("Metrics must be a JSON list.")
+        else:
+            try:
+                normalized["metrics"] = list(normalize_requested_metrics([str(metric) for metric in metrics]))
+            except Exception as exc:
+                errors.append(str(exc))
 
     return TestVettingResult(is_valid=not errors, errors=errors, warnings=warnings, normalized_parameters=normalized)

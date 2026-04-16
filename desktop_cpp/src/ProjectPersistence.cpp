@@ -9,7 +9,7 @@ namespace trade_study {
 bool saveProjectState(const QString& path, const ProjectState& state, QString* error)
 {
     QJsonObject root;
-    root.insert("schema_version", 2);
+    root.insert("schema_version", 3);
     root.insert("saved_at", QDateTime::currentDateTime().toString(Qt::ISODate));
     root.insert("reference_preset_index", state.referencePresetIndex);
     root.insert("comparison_active", state.comparisonActive);
@@ -19,6 +19,8 @@ bool saveProjectState(const QString& path, const ProjectState& state, QString* e
     root.insert("baseline_result", state.baselineResult);
     root.insert("active_result", state.activeResult);
     root.insert("report_context", state.reportContext);
+    root.insert("validation_settings", state.validationSettings);
+    root.insert("validation_result", state.validationResult);
     root.insert("cad_document", state.cadDocument);
 
     QFile file(path);
@@ -62,6 +64,8 @@ std::optional<ProjectState> loadProjectState(const QString& path, QString* error
     state.baselineResult = root.value("baseline_result").toObject();
     state.activeResult = root.value("active_result").toObject();
     state.reportContext = root.value("report_context").toObject();
+    state.validationSettings = root.value("validation_settings").toObject();
+    state.validationResult = root.value("validation_result").toObject();
     state.cadDocument = root.value("cad_document").toObject();
     return state;
 }

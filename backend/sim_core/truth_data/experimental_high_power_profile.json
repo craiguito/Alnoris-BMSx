@@ -1,0 +1,27 @@
+{
+  "metadata": {
+    "dataset_id": "experimental_high_power_profile",
+    "display_name": "Experimental High-Power Profile",
+    "description": "Synthetic experimental truth set with sharper current pulses and stronger thermal response.",
+    "chemistry": "generic_liion",
+    "form_factor": "cylindrical",
+    "nominal_voltage_v": 14.8,
+    "nominal_capacity_ah": 3.0,
+    "temperature_range_c": [22.0, 40.0],
+    "current_profile_type": "high_power_pulse",
+    "tags": ["synthetic", "experimental", "high-power"],
+    "source": "Alnoris bundled synthetic truth data",
+    "status": "experimental",
+    "created_at": "2026-04-16T00:00:00Z",
+    "notes": "Synthetic example dataset. Use as a secondary directional reference, not a canonical gate."
+  },
+  "records": [
+    {"time_s": 0, "current_a": 0.0, "voltage_v": 14.98, "temp_c": 25.2, "soc": 1.00},
+    {"time_s": 4, "current_a": 3.8, "voltage_v": 14.65, "temp_c": 25.7, "soc": 0.99},
+    {"time_s": 8, "current_a": 3.8, "voltage_v": 14.36, "temp_c": 26.3, "soc": 0.97},
+    {"time_s": 14, "current_a": 0.0, "voltage_v": 14.55, "temp_c": 26.5, "soc": 0.97},
+    {"time_s": 20, "current_a": 4.2, "voltage_v": 14.20, "temp_c": 27.4, "soc": 0.95},
+    {"time_s": 26, "current_a": 4.2, "voltage_v": 13.96, "temp_c": 28.1, "soc": 0.93},
+    {"time_s": 34, "current_a": 0.0, "voltage_v": 14.18, "temp_c": 28.3, "soc": 0.93}
+  ]
+}
