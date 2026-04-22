@@ -1,0 +1,26 @@
+{
+  "manifest_id": "nasa_cold_canonical",
+  "display_name": "NASA Ames Cold Canonical Validation",
+  "description": "Canonical cold-condition single-cell validation basis for BMSx v1 using curated NASA Ames normalized datasets.",
+  "dataset_ids": [
+    "nasa_ames_b0045_discharge_0000",
+    "nasa_ames_b0045_discharge_0092",
+    "nasa_ames_b0045_discharge_0180",
+    "nasa_ames_b0046_discharge_0000",
+    "nasa_ames_b0046_discharge_0092",
+    "nasa_ames_b0046_discharge_0180"
+  ],
+  "recommended_threshold_profile": "single_cell_v1_nasa",
+  "calibration_dataset_id": "nasa_ames_b0045_discharge_0000",
+  "source": "NASA Ames Prognostics Center of Excellence",
+  "status": "canonical",
+  "tags": ["nasa-ames", "single-cell", "cold", "canonical", "bmsx-v1"],
+  "temperature_band": "cold",
+  "validation_basis_label": "NASA Ames cold single-cell canonical basis",
+  "validation_basis_description": "Canonical cold-condition single-cell validation basis anchored on B0045/B0046 NASA Ames discharge cycles.",
+  "validation_limits": [
+    "Validated at single-cell level only.",
+    "Not a direct pack layout or module-level validation basis.",
+    "Intended for comparative trade-study support only."
+  ]
+}

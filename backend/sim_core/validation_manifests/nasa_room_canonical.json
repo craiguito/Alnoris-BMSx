@@ -1,0 +1,32 @@
+{
+  "manifest_id": "nasa_room_canonical",
+  "display_name": "NASA Ames Room-Temperature Canonical Validation",
+  "description": "Canonical room-temperature single-cell validation basis for BMSx v1 using curated NASA Ames normalized datasets.",
+  "dataset_ids": [
+    "nasa_ames_b0005_discharge_0001",
+    "nasa_ames_b0005_discharge_0293",
+    "nasa_ames_b0005_discharge_0613",
+    "nasa_ames_b0006_discharge_0001",
+    "nasa_ames_b0006_discharge_0293",
+    "nasa_ames_b0006_discharge_0613",
+    "nasa_ames_b0007_discharge_0001",
+    "nasa_ames_b0007_discharge_0293",
+    "nasa_ames_b0007_discharge_0613",
+    "nasa_ames_b0018_discharge_0002",
+    "nasa_ames_b0018_discharge_0166",
+    "nasa_ames_b0018_discharge_0318"
+  ],
+  "recommended_threshold_profile": "single_cell_v1_nasa",
+  "calibration_dataset_id": "nasa_ames_b0005_discharge_0001",
+  "source": "NASA Ames Prognostics Center of Excellence",
+  "status": "canonical",
+  "tags": ["nasa-ames", "single-cell", "room-temp", "canonical", "bmsx-v1"],
+  "temperature_band": "room",
+  "validation_basis_label": "NASA Ames room-temperature single-cell canonical basis",
+  "validation_basis_description": "Canonical room-temperature single-cell validation basis anchored on B0005/B0006/B0007/B0018 NASA Ames discharge cycles.",
+  "validation_limits": [
+    "Validated at single-cell level only.",
+    "Not a direct pack layout or module-level validation basis.",
+    "Intended for comparative trade-study support only."
+  ]
+}

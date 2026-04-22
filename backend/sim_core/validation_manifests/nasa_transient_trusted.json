@@ -1,0 +1,26 @@
+{
+  "manifest_id": "nasa_transient_trusted",
+  "display_name": "NASA Ames Transient Trusted Validation",
+  "description": "Trusted transient single-cell validation basis for BMSx v1 using curated NASA Ames pulse-oriented datasets.",
+  "dataset_ids": [
+    "nasa_ames_b0025_discharge_0003",
+    "nasa_ames_b0025_discharge_0040",
+    "nasa_ames_b0025_discharge_0077",
+    "nasa_ames_b0026_discharge_0003",
+    "nasa_ames_b0026_discharge_0040",
+    "nasa_ames_b0026_discharge_0077"
+  ],
+  "recommended_threshold_profile": "single_cell_v1_nasa",
+  "calibration_dataset_id": "nasa_ames_b0025_discharge_0003",
+  "source": "NASA Ames Prognostics Center of Excellence",
+  "status": "trusted",
+  "tags": ["nasa-ames", "single-cell", "transient", "trusted", "bmsx-v1"],
+  "temperature_band": "room",
+  "validation_basis_label": "NASA Ames transient single-cell trusted basis",
+  "validation_basis_description": "Trusted transient single-cell validation basis anchored on B0025/B0026 NASA Ames pulse-discharge cycles.",
+  "validation_limits": [
+    "Validated at single-cell level only.",
+    "Not a direct pack layout or module-level validation basis.",
+    "Intended for comparative trade-study support only."
+  ]
+}

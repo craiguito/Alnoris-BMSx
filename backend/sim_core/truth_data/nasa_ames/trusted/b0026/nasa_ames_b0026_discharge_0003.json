@@ -1,0 +1,5809 @@
+{
+  "metadata": {
+    "dataset_id": "nasa_ames_b0026_discharge_0003",
+    "display_name": "NASA Ames B0026 discharge cycle 3",
+    "description": "Normalized NASA Ames single-cell discharge dataset for reduced-order calibration and single-cell validation. Intended for cell-model trust building, not direct pack-layout validation.",
+    "chemistry": "generic_liion",
+    "form_factor": "cylindrical",
+    "nominal_voltage_v": 3.3124,
+    "nominal_capacity_ah": 1.81325,
+    "temperature_range_c": [
+      26.416,
+      40.711
+    ],
+    "current_profile_type": "pulse_discharge",
+    "tags": [
+      "nasa",
+      "ames",
+      "cell",
+      "discharge",
+      "aging",
+      "pulse_discharge",
+      "room-temp"
+    ],
+    "source": "NASA Ames Battery Aging ARC",
+    "status": "trusted",
+    "created_at": "2009-02-13T23:12:28Z",
+    "notes": "Source battery=B0026, cycle_index=3, ambient_temp_c=24.0. Use for calibration and single-cell validation only.",
+    "ambient_temp_c": 24.0,
+    "initial_soc": 1.0,
+    "cells_in_series": 1,
+    "cells_in_parallel": 1,
+    "group_count": 1,
+    "source_battery_id": "B0026",
+    "source_cycle_index": 3,
+    "source_mat_path": "C:\\Users\\Craig\\OneDrive\\Desktop\\Alnoris BMSx\\Data\\_extracted\\nasa_ames\\3. BatteryAgingARC_25-44\\B0026.mat",
+    "recommended_use": "single_cell_validation"
+  },
+  "records": [
+    {
+      "time_s": 0.0,
+      "current_a": 0.000114635,
+      "voltage_v": 4.185453871,
+      "temp_c": 26.41934,
+      "soc": 1.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 9.36,
+      "current_a": 0.001528919,
+      "voltage_v": 4.185380317,
+      "temp_c": 26.416031,
+      "soc": 0.999999836,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 19.547,
+      "current_a": 4.024990313,
+      "voltage_v": 3.706702974,
+      "temp_c": 26.51114,
+      "soc": 0.99999745,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 29.5,
+      "current_a": 0.000281867,
+      "voltage_v": 4.154668572,
+      "temp_c": 26.736957,
+      "soc": 0.993860415,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 39.469,
+      "current_a": 4.025036106,
+      "voltage_v": 3.678286193,
+      "temp_c": 26.885367,
+      "soc": 0.993859985,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 49.375,
+      "current_a": 0.001178879,
+      "voltage_v": 4.135570243,
+      "temp_c": 27.091295,
+      "soc": 0.987751861,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 59.407,
+      "current_a": 4.025792787,
+      "voltage_v": 3.656994049,
+      "temp_c": 27.212787,
+      "soc": 0.98775005,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 69.375,
+      "current_a": 0.001312367,
+      "voltage_v": 4.120904403,
+      "temp_c": 27.402459,
+      "soc": 0.981602541,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 79.344,
+      "current_a": 4.023962574,
+      "voltage_v": 3.640713468,
+      "temp_c": 27.513132,
+      "soc": 0.981600537,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 89.375,
+      "current_a": 0.000178103,
+      "voltage_v": 4.108984465,
+      "temp_c": 27.667899,
+      "soc": 0.975416987,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 99.391,
+      "current_a": 4.026005008,
+      "voltage_v": 3.626988078,
+      "temp_c": 27.760659,
+      "soc": 0.975416713,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 109.422,
+      "current_a": 0.000132645,
+      "voltage_v": 4.098163542,
+      "temp_c": 27.922649,
+      "soc": 0.969230025,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 119.407,
+      "current_a": 4.025040048,
+      "voltage_v": 3.616065015,
+      "temp_c": 28.003923,
+      "soc": 0.969229822,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 129.438,
+      "current_a": 0.002058975,
+      "voltage_v": 4.088730483,
+      "temp_c": 28.171463,
+      "soc": 0.963044616,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 139.391,
+      "current_a": 4.024506661,
+      "voltage_v": 3.606731495,
+      "temp_c": 28.254532,
+      "soc": 0.963041477,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 149.407,
+      "current_a": 0.001883506,
+      "voltage_v": 4.079912153,
+      "temp_c": 28.393693,
+      "soc": 0.956866339,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 159.36,
+      "current_a": 4.025401555,
+      "voltage_v": 3.598626676,
+      "temp_c": 28.475348,
+      "soc": 0.956863467,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 169.36,
+      "current_a": 0.001789518,
+      "voltage_v": 4.071547758,
+      "temp_c": 28.623659,
+      "soc": 0.950696822,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 179.36,
+      "current_a": 4.026028439,
+      "voltage_v": 3.591466594,
+      "temp_c": 28.701316,
+      "soc": 0.950694081,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 189.313,
+      "current_a": 0.000187146,
+      "voltage_v": 4.063843905,
+      "temp_c": 28.851434,
+      "soc": 0.944555464,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 199.282,
+      "current_a": 4.02563464,
+      "voltage_v": 3.584783072,
+      "temp_c": 28.912997,
+      "soc": 0.944555178,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 209.235,
+      "current_a": 0.000880979,
+      "voltage_v": 4.056351388,
+      "temp_c": 29.06276,
+      "soc": 0.938417161,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 219.282,
+      "current_a": 4.026193557,
+      "voltage_v": 3.57848264,
+      "temp_c": 29.131212,
+      "soc": 0.938415805,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 229.266,
+      "current_a": 0.0,
+      "voltage_v": 4.049070899,
+      "temp_c": 29.275613,
+      "soc": 0.932257816,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 239.266,
+      "current_a": 4.024592429,
+      "voltage_v": 3.573080993,
+      "temp_c": 29.330496,
+      "soc": 0.932257816,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 249.204,
+      "current_a": 0.003452028,
+      "voltage_v": 4.042002082,
+      "temp_c": 29.469501,
+      "soc": 0.926130636,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 259.172,
+      "current_a": 4.024704444,
+      "voltage_v": 3.56789989,
+      "temp_c": 29.543456,
+      "soc": 0.926125365,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 269.219,
+      "current_a": 0.00161354,
+      "voltage_v": 4.035446007,
+      "temp_c": 29.653511,
+      "soc": 0.91993081,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 279.141,
+      "current_a": 4.025647092,
+      "voltage_v": 3.563087385,
+      "temp_c": 29.742461,
+      "soc": 0.919928357,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 289.079,
+      "current_a": 0.0,
+      "voltage_v": 4.028738292,
+      "temp_c": 29.874736,
+      "soc": 0.913799572,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 299.032,
+      "current_a": 4.021970351,
+      "voltage_v": 3.558123457,
+      "temp_c": 29.924379,
+      "soc": 0.913799572,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 309.094,
+      "current_a": 0.000448649,
+      "voltage_v": 4.022631771,
+      "temp_c": 30.045334,
+      "soc": 0.907599983,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 319.11,
+      "current_a": 4.025022994,
+      "voltage_v": 3.553533479,
+      "temp_c": 30.092911,
+      "soc": 0.907599295,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 329.11,
+      "current_a": 0.0,
+      "voltage_v": 4.016470712,
+      "temp_c": 30.233102,
+      "soc": 0.90143323,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 339.079,
+      "current_a": 4.02547894,
+      "voltage_v": 3.549396977,
+      "temp_c": 30.299124,
+      "soc": 0.90143323,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 349.079,
+      "current_a": 0.001180944,
+      "voltage_v": 4.010599843,
+      "temp_c": 30.416703,
+      "soc": 0.895266467,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 359.032,
+      "current_a": 4.025589156,
+      "voltage_v": 3.545275479,
+      "temp_c": 30.468203,
+      "soc": 0.895264666,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 368.969,
+      "current_a": 0.0,
+      "voltage_v": 4.004818622,
+      "temp_c": 30.557993,
+      "soc": 0.889136586,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 378.922,
+      "current_a": 4.024334267,
+      "voltage_v": 3.541064602,
+      "temp_c": 30.618461,
+      "soc": 0.889136586,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 388.86,
+      "current_a": 0.001518528,
+      "voltage_v": 3.999059613,
+      "temp_c": 30.733139,
+      "soc": 0.8830098,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 398.875,
+      "current_a": 4.024325652,
+      "voltage_v": 3.536737939,
+      "temp_c": 30.788538,
+      "soc": 0.88300747,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 408.829,
+      "current_a": 0.002060727,
+      "voltage_v": 3.993450165,
+      "temp_c": 30.89932,
+      "soc": 0.876870832,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 418.766,
+      "current_a": 4.027078481,
+      "voltage_v": 3.533017865,
+      "temp_c": 30.966563,
+      "soc": 0.876867695,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 428.735,
+      "current_a": 0.000221345,
+      "voltage_v": 3.987916578,
+      "temp_c": 31.082175,
+      "soc": 0.870717606,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 438.735,
+      "current_a": 4.024771884,
+      "voltage_v": 3.528925615,
+      "temp_c": 31.130235,
+      "soc": 0.870717267,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 448.704,
+      "current_a": 0.00043215,
+      "voltage_v": 3.982224183,
+      "temp_c": 31.208078,
+      "soc": 0.864570701,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 458.657,
+      "current_a": 4.025910725,
+      "voltage_v": 3.524881385,
+      "temp_c": 31.264689,
+      "soc": 0.864570042,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 468.594,
+      "current_a": 0.001632954,
+      "voltage_v": 3.976631406,
+      "temp_c": 31.370728,
+      "soc": 0.858441472,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 478.532,
+      "current_a": 4.026359563,
+      "voltage_v": 3.520826796,
+      "temp_c": 31.425516,
+      "soc": 0.858438986,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 488.532,
+      "current_a": 4.4616e-05,
+      "voltage_v": 3.971417063,
+      "temp_c": 31.525858,
+      "soc": 0.852270874,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 498.485,
+      "current_a": 4.023759189,
+      "voltage_v": 3.516792566,
+      "temp_c": 31.562306,
+      "soc": 0.852270806,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 508.422,
+      "current_a": 0.000556458,
+      "voltage_v": 3.966017115,
+      "temp_c": 31.67507,
+      "soc": 0.846145511,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 518.485,
+      "current_a": 4.024698299,
+      "voltage_v": 3.51228075,
+      "temp_c": 31.724188,
+      "soc": 0.846144653,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 528.422,
+      "current_a": 0.001195096,
+      "voltage_v": 3.960184021,
+      "temp_c": 31.802493,
+      "soc": 0.840017929,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 538.485,
+      "current_a": 4.026045643,
+      "voltage_v": 3.50787048,
+      "temp_c": 31.888938,
+      "soc": 0.840016087,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 548.485,
+      "current_a": 7.6898e-05,
+      "voltage_v": 3.955050189,
+      "temp_c": 31.960424,
+      "soc": 0.833848456,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 558.485,
+      "current_a": 4.024176392,
+      "voltage_v": 3.504371829,
+      "temp_c": 31.98952,
+      "soc": 0.833848338,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 568.422,
+      "current_a": 0.001375316,
+      "voltage_v": 3.949862904,
+      "temp_c": 32.096255,
+      "soc": 0.827722408,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 578.36,
+      "current_a": 4.027549643,
+      "voltage_v": 3.500198946,
+      "temp_c": 32.152853,
+      "soc": 0.827720314,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 588.266,
+      "current_a": 0.000772349,
+      "voltage_v": 3.944660069,
+      "temp_c": 32.204264,
+      "soc": 0.821608376,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 598.266,
+      "current_a": 4.023273346,
+      "voltage_v": 3.495950502,
+      "temp_c": 32.255864,
+      "soc": 0.821607193,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 608.313,
+      "current_a": 0.000532153,
+      "voltage_v": 3.939916248,
+      "temp_c": 32.35231,
+      "soc": 0.815414841,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 618.266,
+      "current_a": 4.026236732,
+      "voltage_v": 3.492219825,
+      "temp_c": 32.395015,
+      "soc": 0.81541403,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 628.219,
+      "current_a": 0.0,
+      "voltage_v": 3.934897627,
+      "temp_c": 32.460113,
+      "soc": 0.809275095,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 638.219,
+      "current_a": 4.022268319,
+      "voltage_v": 3.488364875,
+      "temp_c": 32.492378,
+      "soc": 0.809275095,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 648.141,
+      "current_a": 0.0,
+      "voltage_v": 3.929859983,
+      "temp_c": 32.574669,
+      "soc": 0.803161312,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 658.079,
+      "current_a": 4.025861839,
+      "voltage_v": 3.484221555,
+      "temp_c": 32.598684,
+      "soc": 0.803161312,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 668.016,
+      "current_a": 0.000964391,
+      "voltage_v": 3.925262806,
+      "temp_c": 32.631492,
+      "soc": 0.797032817,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 677.985,
+      "current_a": 4.025477476,
+      "voltage_v": 3.48007932,
+      "temp_c": 32.685776,
+      "soc": 0.797031344,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 687.969,
+      "current_a": 0.000872911,
+      "voltage_v": 3.920481279,
+      "temp_c": 32.726436,
+      "soc": 0.79087445,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 697.922,
+      "current_a": 4.026588,
+      "voltage_v": 3.476146451,
+      "temp_c": 32.757814,
+      "soc": 0.790873119,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 707.86,
+      "current_a": 0.00067394,
+      "voltage_v": 3.915959452,
+      "temp_c": 32.798306,
+      "soc": 0.784742901,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 717.797,
+      "current_a": 4.026551067,
+      "voltage_v": 3.472201596,
+      "temp_c": 32.836819,
+      "soc": 0.784741876,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 727.75,
+      "current_a": 0.001999037,
+      "voltage_v": 3.911332271,
+      "temp_c": 32.883489,
+      "soc": 0.778602461,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 737.719,
+      "current_a": 4.025502161,
+      "voltage_v": 3.468075685,
+      "temp_c": 32.952155,
+      "soc": 0.778599409,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 747.719,
+      "current_a": 0.001641889,
+      "voltage_v": 3.9069789,
+      "temp_c": 32.96627,
+      "soc": 0.77243261,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 757.641,
+      "current_a": 4.025271502,
+      "voltage_v": 3.464339316,
+      "temp_c": 33.008566,
+      "soc": 0.772430114,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 767.579,
+      "current_a": 0.002502959,
+      "voltage_v": 3.90247417,
+      "temp_c": 33.04359,
+      "soc": 0.766301901,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 777.594,
+      "current_a": 4.024484275,
+      "voltage_v": 3.460100862,
+      "temp_c": 33.037186,
+      "soc": 0.766298061,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 787.532,
+      "current_a": 0.002721329,
+      "voltage_v": 3.897687262,
+      "temp_c": 33.08124,
+      "soc": 0.760171046,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 797.5,
+      "current_a": 4.024132128,
+      "voltage_v": 3.456020987,
+      "temp_c": 33.107801,
+      "soc": 0.76016689,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 807.5,
+      "current_a": 0.0,
+      "voltage_v": 3.89356738,
+      "temp_c": 33.150833,
+      "soc": 0.75400219,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 817.516,
+      "current_a": 4.024975625,
+      "voltage_v": 3.452033864,
+      "temp_c": 33.135398,
+      "soc": 0.75400219,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 827.438,
+      "current_a": 0.000969388,
+      "voltage_v": 3.888963499,
+      "temp_c": 33.201372,
+      "soc": 0.747884293,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 837.375,
+      "current_a": 4.025229219,
+      "voltage_v": 3.448206928,
+      "temp_c": 33.178805,
+      "soc": 0.747882817,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 847.36,
+      "current_a": 0.000996932,
+      "voltage_v": 3.884637189,
+      "temp_c": 33.261113,
+      "soc": 0.741725686,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 857.375,
+      "current_a": 4.025702961,
+      "voltage_v": 3.444207794,
+      "temp_c": 33.289287,
+      "soc": 0.741724157,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 867.36,
+      "current_a": 0.00069485,
+      "voltage_v": 3.880308342,
+      "temp_c": 33.317408,
+      "soc": 0.735566301,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 877.329,
+      "current_a": 4.023632116,
+      "voltage_v": 3.440319363,
+      "temp_c": 33.313771,
+      "soc": 0.73556524,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 887.36,
+      "current_a": 0.001276911,
+      "voltage_v": 3.876250401,
+      "temp_c": 33.365699,
+      "soc": 0.729382198,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 897.297,
+      "current_a": 4.025050748,
+      "voltage_v": 3.436863432,
+      "temp_c": 33.354338,
+      "soc": 0.729380254,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 907.313,
+      "current_a": 2.25e-05,
+      "voltage_v": 3.872032829,
+      "temp_c": 33.415044,
+      "soc": 0.723204281,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 917.235,
+      "current_a": 4.024361515,
+      "voltage_v": 3.433130758,
+      "temp_c": 33.417203,
+      "soc": 0.723204247,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 927.172,
+      "current_a": 0.000412945,
+      "voltage_v": 3.86782346,
+      "temp_c": 33.45124,
+      "soc": 0.717078035,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 937.125,
+      "current_a": 4.024973615,
+      "voltage_v": 3.429255633,
+      "temp_c": 33.50413,
+      "soc": 0.717077406,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 947.063,
+      "current_a": 0.001816157,
+      "voltage_v": 3.863494729,
+      "temp_c": 33.53923,
+      "soc": 0.710949646,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 957.0,
+      "current_a": 4.025789516,
+      "voltage_v": 3.42554295,
+      "temp_c": 33.55086,
+      "soc": 0.710946881,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 966.954,
+      "current_a": 0.000496554,
+      "voltage_v": 3.859430667,
+      "temp_c": 33.607852,
+      "soc": 0.704808011,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 976.954,
+      "current_a": 4.025529605,
+      "voltage_v": 3.421478264,
+      "temp_c": 33.59602,
+      "soc": 0.704807251,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 986.954,
+      "current_a": 0.001253077,
+      "voltage_v": 3.85537829,
+      "temp_c": 33.644043,
+      "soc": 0.69864041,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 997.016,
+      "current_a": 4.024912924,
+      "voltage_v": 3.417514806,
+      "temp_c": 33.644652,
+      "soc": 0.698638478,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1006.969,
+      "current_a": 0.001448677,
+      "voltage_v": 3.851132947,
+      "temp_c": 33.729466,
+      "soc": 0.692501562,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1016.938,
+      "current_a": 4.024747054,
+      "voltage_v": 3.413972122,
+      "temp_c": 33.727308,
+      "soc": 0.69249935,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1026.86,
+      "current_a": 0.003335128,
+      "voltage_v": 3.846962453,
+      "temp_c": 33.787575,
+      "soc": 0.6863818,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1036.86,
+      "current_a": 4.025808766,
+      "voltage_v": 3.410379497,
+      "temp_c": 33.7641,
+      "soc": 0.68637669,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1046.829,
+      "current_a": 0.0,
+      "voltage_v": 3.843053558,
+      "temp_c": 33.845203,
+      "soc": 0.680228541,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1056.766,
+      "current_a": 4.026452588,
+      "voltage_v": 3.406868073,
+      "temp_c": 33.851575,
+      "soc": 0.680228541,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1066.735,
+      "current_a": 0.001680225,
+      "voltage_v": 3.839244088,
+      "temp_c": 33.936184,
+      "soc": 0.674079407,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1076.719,
+      "current_a": 4.025667663,
+      "voltage_v": 3.403201303,
+      "temp_c": 33.916232,
+      "soc": 0.674076838,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1086.657,
+      "current_a": 0.000893383,
+      "voltage_v": 3.835276129,
+      "temp_c": 33.978282,
+      "soc": 0.667948021,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1096.75,
+      "current_a": 4.023474288,
+      "voltage_v": 3.399022955,
+      "temp_c": 33.961399,
+      "soc": 0.66794664,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1106.704,
+      "current_a": 0.002269345,
+      "voltage_v": 3.831206052,
+      "temp_c": 34.036103,
+      "soc": 0.661811301,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1116.688,
+      "current_a": 4.022874394,
+      "voltage_v": 3.395793158,
+      "temp_c": 34.046423,
+      "soc": 0.66180783,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1126.641,
+      "current_a": 0.0,
+      "voltage_v": 3.827279295,
+      "temp_c": 34.102154,
+      "soc": 0.655674021,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1136.61,
+      "current_a": 4.025801779,
+      "voltage_v": 3.392076906,
+      "temp_c": 34.132214,
+      "soc": 0.655674021,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1146.594,
+      "current_a": 0.000775484,
+      "voltage_v": 3.823392426,
+      "temp_c": 34.183597,
+      "soc": 0.649516631,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1156.547,
+      "current_a": 4.025176674,
+      "voltage_v": 3.388777641,
+      "temp_c": 34.182,
+      "soc": 0.649515449,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1166.516,
+      "current_a": 0.00128036,
+      "voltage_v": 3.819610614,
+      "temp_c": 34.22558,
+      "soc": 0.643368264,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1176.594,
+      "current_a": 4.023816447,
+      "voltage_v": 3.384888746,
+      "temp_c": 34.235407,
+      "soc": 0.643366288,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1186.516,
+      "current_a": 0.0,
+      "voltage_v": 3.815563584,
+      "temp_c": 34.303517,
+      "soc": 0.637250152,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1196.532,
+      "current_a": 4.025088628,
+      "voltage_v": 3.381509243,
+      "temp_c": 34.302286,
+      "soc": 0.637250152,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1206.485,
+      "current_a": 0.0,
+      "voltage_v": 3.81184736,
+      "temp_c": 34.377921,
+      "soc": 0.631112968,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1216.438,
+      "current_a": 4.024529151,
+      "voltage_v": 3.378174481,
+      "temp_c": 34.3647,
+      "soc": 0.631112968,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1226.391,
+      "current_a": 0.000305054,
+      "voltage_v": 3.808022815,
+      "temp_c": 34.432531,
+      "soc": 0.624976637,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1236.36,
+      "current_a": 4.024249772,
+      "voltage_v": 3.374566437,
+      "temp_c": 34.432446,
+      "soc": 0.624976171,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1246.375,
+      "current_a": 0.0,
+      "voltage_v": 3.804460489,
+      "temp_c": 34.489046,
+      "soc": 0.618802043,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1256.391,
+      "current_a": 4.02509445,
+      "voltage_v": 3.371128622,
+      "temp_c": 34.481395,
+      "soc": 0.618802043,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1266.391,
+      "current_a": 0.003484575,
+      "voltage_v": 3.800874301,
+      "temp_c": 34.550852,
+      "soc": 0.612635869,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1276.344,
+      "current_a": 4.024705747,
+      "voltage_v": 3.367906895,
+      "temp_c": 34.527309,
+      "soc": 0.612630556,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1286.329,
+      "current_a": 0.000941461,
+      "voltage_v": 3.797202306,
+      "temp_c": 34.616841,
+      "soc": 0.606474226,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1296.297,
+      "current_a": 4.024636277,
+      "voltage_v": 3.364402993,
+      "temp_c": 34.608313,
+      "soc": 0.606472788,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1306.375,
+      "current_a": 0.000132052,
+      "voltage_v": 3.793752814,
+      "temp_c": 34.662524,
+      "soc": 0.600259225,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1316.329,
+      "current_a": 4.024414966,
+      "voltage_v": 3.361115875,
+      "temp_c": 34.662421,
+      "soc": 0.600259024,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1326.266,
+      "current_a": 0.001202211,
+      "voltage_v": 3.790069748,
+      "temp_c": 34.735918,
+      "soc": 0.594132731,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1336.266,
+      "current_a": 4.026158831,
+      "voltage_v": 3.357552453,
+      "temp_c": 34.724696,
+      "soc": 0.594130889,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1346.235,
+      "current_a": 0.0,
+      "voltage_v": 3.786467454,
+      "temp_c": 34.781979,
+      "soc": 0.587982205,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1356.204,
+      "current_a": 4.025800832,
+      "voltage_v": 3.354189654,
+      "temp_c": 34.778733,
+      "soc": 0.587982205,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1366.188,
+      "current_a": 0.001225906,
+      "voltage_v": 3.782965952,
+      "temp_c": 34.838695,
+      "soc": 0.581824816,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1376.11,
+      "current_a": 4.027079916,
+      "voltage_v": 3.35104672,
+      "temp_c": 34.847827,
+      "soc": 0.581822953,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1386.079,
+      "current_a": 0.001783626,
+      "voltage_v": 3.779604314,
+      "temp_c": 34.908461,
+      "soc": 0.575672862,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1396.047,
+      "current_a": 4.026022832,
+      "voltage_v": 3.347575558,
+      "temp_c": 34.887628,
+      "soc": 0.575670138,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1405.985,
+      "current_a": 0.000349059,
+      "voltage_v": 3.775965831,
+      "temp_c": 34.959685,
+      "soc": 0.569540781,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1415.938,
+      "current_a": 4.02508746,
+      "voltage_v": 3.344267397,
+      "temp_c": 34.944435,
+      "soc": 0.569540249,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1425.86,
+      "current_a": 0.003930051,
+      "voltage_v": 3.772675919,
+      "temp_c": 35.009548,
+      "soc": 0.563422181,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1435.86,
+      "current_a": 4.023270357,
+      "voltage_v": 3.340784148,
+      "temp_c": 35.007573,
+      "soc": 0.563416161,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1445.797,
+      "current_a": 0.001972542,
+      "voltage_v": 3.768989922,
+      "temp_c": 35.044737,
+      "soc": 0.55729161,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1455.797,
+      "current_a": 4.02328581,
+      "voltage_v": 3.337431117,
+      "temp_c": 35.081968,
+      "soc": 0.557288588,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1465.797,
+      "current_a": 0.001606365,
+      "voltage_v": 3.765817195,
+      "temp_c": 35.116589,
+      "soc": 0.551125185,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1475.75,
+      "current_a": 4.025470518,
+      "voltage_v": 3.334355389,
+      "temp_c": 35.122387,
+      "soc": 0.551122736,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1485.672,
+      "current_a": 0.001425528,
+      "voltage_v": 3.762265753,
+      "temp_c": 35.15381,
+      "soc": 0.545004086,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1495.75,
+      "current_a": 4.025030662,
+      "voltage_v": 3.330798231,
+      "temp_c": 35.150628,
+      "soc": 0.545001885,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1505.844,
+      "current_a": 0.0024679,
+      "voltage_v": 3.759281114,
+      "temp_c": 35.224364,
+      "soc": 0.538777848,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1515.797,
+      "current_a": 4.026128274,
+      "voltage_v": 3.328150652,
+      "temp_c": 35.217895,
+      "soc": 0.538774085,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1525.766,
+      "current_a": 0.001977936,
+      "voltage_v": 3.755933387,
+      "temp_c": 35.259986,
+      "soc": 0.532625447,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1535.782,
+      "current_a": 4.024600004,
+      "voltage_v": 3.325048925,
+      "temp_c": 35.238777,
+      "soc": 0.532622412,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1545.75,
+      "current_a": 0.000236515,
+      "voltage_v": 3.7526686,
+      "temp_c": 35.318,
+      "soc": 0.526476725,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1555.719,
+      "current_a": 4.023543459,
+      "voltage_v": 3.321810127,
+      "temp_c": 35.287867,
+      "soc": 0.526476363,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1565.641,
+      "current_a": 0.0,
+      "voltage_v": 3.749391212,
+      "temp_c": 35.360483,
+      "soc": 0.520360643,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1575.657,
+      "current_a": 4.025918394,
+      "voltage_v": 3.318590086,
+      "temp_c": 35.340808,
+      "soc": 0.520360643,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1585.625,
+      "current_a": 0.000357651,
+      "voltage_v": 3.74634181,
+      "temp_c": 35.390957,
+      "soc": 0.514212942,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1595.657,
+      "current_a": 4.024379319,
+      "voltage_v": 3.315312678,
+      "temp_c": 35.379757,
+      "soc": 0.514212393,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1605.641,
+      "current_a": 0.001146726,
+      "voltage_v": 3.743164165,
+      "temp_c": 35.434671,
+      "soc": 0.508057178,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1615.547,
+      "current_a": 4.025065416,
+      "voltage_v": 3.312693633,
+      "temp_c": 35.41295,
+      "soc": 0.508055438,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1625.594,
+      "current_a": 0.003089028,
+      "voltage_v": 3.74035706,
+      "temp_c": 35.467663,
+      "soc": 0.501860328,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1635.61,
+      "current_a": 4.027388624,
+      "voltage_v": 3.309578872,
+      "temp_c": 35.467407,
+      "soc": 0.501855588,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1645.61,
+      "current_a": 0.0,
+      "voltage_v": 3.737273712,
+      "temp_c": 35.510948,
+      "soc": 0.495685899,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1655.563,
+      "current_a": 4.026382723,
+      "voltage_v": 3.306465895,
+      "temp_c": 35.523558,
+      "soc": 0.495685899,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1665.625,
+      "current_a": 0.0,
+      "voltage_v": 3.734112028,
+      "temp_c": 35.571184,
+      "soc": 0.489479509,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1675.594,
+      "current_a": 4.024807003,
+      "voltage_v": 3.303294958,
+      "temp_c": 35.558505,
+      "soc": 0.489479509,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1685.547,
+      "current_a": 0.0,
+      "voltage_v": 3.731234338,
+      "temp_c": 35.634139,
+      "soc": 0.483342754,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1695.579,
+      "current_a": 4.023986866,
+      "voltage_v": 3.300081373,
+      "temp_c": 35.636046,
+      "soc": 0.483342754,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1705.532,
+      "current_a": 8.4281e-05,
+      "voltage_v": 3.728053628,
+      "temp_c": 35.658894,
+      "soc": 0.47720725,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1715.516,
+      "current_a": 4.024983759,
+      "voltage_v": 3.297339181,
+      "temp_c": 35.649934,
+      "soc": 0.477207121,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1725.454,
+      "current_a": 0.000271515,
+      "voltage_v": 3.725302457,
+      "temp_c": 35.701542,
+      "soc": 0.471079346,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1735.5,
+      "current_a": 4.024604367,
+      "voltage_v": 3.294277793,
+      "temp_c": 35.701866,
+      "soc": 0.471078928,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1745.516,
+      "current_a": 0.000396234,
+      "voltage_v": 3.72246951,
+      "temp_c": 35.734906,
+      "soc": 0.46490364,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1755.532,
+      "current_a": 4.026712384,
+      "voltage_v": 3.291454912,
+      "temp_c": 35.734263,
+      "soc": 0.464903032,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1765.469,
+      "current_a": 6.9508e-05,
+      "voltage_v": 3.719466502,
+      "temp_c": 35.783102,
+      "soc": 0.458773241,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1775.485,
+      "current_a": 4.026747297,
+      "voltage_v": 3.288540575,
+      "temp_c": 35.773866,
+      "soc": 0.458773135,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1785.422,
+      "current_a": 6.7083e-05,
+      "voltage_v": 3.716727032,
+      "temp_c": 35.820728,
+      "soc": 0.452643291,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1795.36,
+      "current_a": 4.025332797,
+      "voltage_v": 3.285930349,
+      "temp_c": 35.812131,
+      "soc": 0.452643189,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1805.391,
+      "current_a": 0.000385628,
+      "voltage_v": 3.714271146,
+      "temp_c": 35.845195,
+      "soc": 0.446457534,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1815.375,
+      "current_a": 4.023925057,
+      "voltage_v": 3.283264861,
+      "temp_c": 35.834554,
+      "soc": 0.446456944,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1825.438,
+      "current_a": 0.000881836,
+      "voltage_v": 3.711784656,
+      "temp_c": 35.897201,
+      "soc": 0.440253726,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1835.375,
+      "current_a": 4.024914266,
+      "voltage_v": 3.281039808,
+      "temp_c": 35.880719,
+      "soc": 0.440252383,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1845.391,
+      "current_a": 0.0,
+      "voltage_v": 3.709141523,
+      "temp_c": 35.935373,
+      "soc": 0.43407662,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1855.313,
+      "current_a": 4.022948296,
+      "voltage_v": 3.278389324,
+      "temp_c": 35.94695,
+      "soc": 0.43407662,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1865.36,
+      "current_a": 0.0,
+      "voltage_v": 3.706735824,
+      "temp_c": 35.953114,
+      "soc": 0.427884768,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1875.313,
+      "current_a": 4.026826826,
+      "voltage_v": 3.275775012,
+      "temp_c": 35.958619,
+      "soc": 0.427884768,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1885.313,
+      "current_a": 0.000483783,
+      "voltage_v": 3.704085492,
+      "temp_c": 36.020147,
+      "soc": 0.42171594,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1895.266,
+      "current_a": 4.024054472,
+      "voltage_v": 3.27299092,
+      "temp_c": 36.007704,
+      "soc": 0.421715202,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1905.235,
+      "current_a": 0.000778437,
+      "voltage_v": 3.701405013,
+      "temp_c": 36.017784,
+      "soc": 0.415569731,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1915.235,
+      "current_a": 4.024126548,
+      "voltage_v": 3.270278494,
+      "temp_c": 36.029431,
+      "soc": 0.415568539,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1925.172,
+      "current_a": 0.0,
+      "voltage_v": 3.699031901,
+      "temp_c": 36.063539,
+      "soc": 0.409442685,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1935.172,
+      "current_a": 4.026589675,
+      "voltage_v": 3.267532917,
+      "temp_c": 36.075562,
+      "soc": 0.409442685,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1945.204,
+      "current_a": 0.000429569,
+      "voltage_v": 3.696675477,
+      "temp_c": 36.128387,
+      "soc": 0.403254481,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1955.157,
+      "current_a": 4.025644277,
+      "voltage_v": 3.265323263,
+      "temp_c": 36.117046,
+      "soc": 0.403253826,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1965.125,
+      "current_a": 0.0,
+      "voltage_v": 3.694519494,
+      "temp_c": 36.181846,
+      "soc": 0.397106544,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1975.11,
+      "current_a": 4.024787264,
+      "voltage_v": 3.26287182,
+      "temp_c": 36.130457,
+      "soc": 0.397106544,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1985.079,
+      "current_a": 0.001093069,
+      "voltage_v": 3.692164711,
+      "temp_c": 36.211488,
+      "soc": 0.390959954,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 1995.11,
+      "current_a": 4.025249576,
+      "voltage_v": 3.26039207,
+      "temp_c": 36.175356,
+      "soc": 0.390958275,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2005.125,
+      "current_a": 0.004050218,
+      "voltage_v": 3.689787915,
+      "temp_c": 36.228784,
+      "soc": 0.384782613,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2015.063,
+      "current_a": 4.024801138,
+      "voltage_v": 3.258087693,
+      "temp_c": 36.255702,
+      "soc": 0.384776447,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2025.157,
+      "current_a": 0.001021284,
+      "voltage_v": 3.687805369,
+      "temp_c": 36.283855,
+      "soc": 0.378552764,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2035.125,
+      "current_a": 4.026283414,
+      "voltage_v": 3.256064719,
+      "temp_c": 36.272309,
+      "soc": 0.378551205,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2045.094,
+      "current_a": 0.002696632,
+      "voltage_v": 3.685651958,
+      "temp_c": 36.268111,
+      "soc": 0.37240233,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2055.079,
+      "current_a": 4.023616885,
+      "voltage_v": 3.253664737,
+      "temp_c": 36.291807,
+      "soc": 0.372398205,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2065.032,
+      "current_a": 0.002841595,
+      "voltage_v": 3.683468798,
+      "temp_c": 36.344386,
+      "soc": 0.366263265,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2074.985,
+      "current_a": 4.025275409,
+      "voltage_v": 3.251332669,
+      "temp_c": 36.344907,
+      "soc": 0.366258932,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2084.938,
+      "current_a": 0.002554744,
+      "voltage_v": 3.681483236,
+      "temp_c": 36.405224,
+      "soc": 0.360121463,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2094.954,
+      "current_a": 4.024940234,
+      "voltage_v": 3.249038004,
+      "temp_c": 36.369988,
+      "soc": 0.360117543,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2104.891,
+      "current_a": 0.000431322,
+      "voltage_v": 3.679409098,
+      "temp_c": 36.441236,
+      "soc": 0.353990451,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2114.844,
+      "current_a": 4.025056801,
+      "voltage_v": 3.246959153,
+      "temp_c": 36.414974,
+      "soc": 0.353989793,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2124.813,
+      "current_a": 0.002124285,
+      "voltage_v": 3.677575498,
+      "temp_c": 36.459838,
+      "soc": 0.347842792,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2134.782,
+      "current_a": 4.022974799,
+      "voltage_v": 3.24503943,
+      "temp_c": 36.464652,
+      "soc": 0.347839548,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2144.75,
+      "current_a": 0.000790145,
+      "voltage_v": 3.675700915,
+      "temp_c": 36.462419,
+      "soc": 0.341696342,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2154.688,
+      "current_a": 4.025263317,
+      "voltage_v": 3.243012416,
+      "temp_c": 36.507688,
+      "soc": 0.341695139,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2164.641,
+      "current_a": 0.000968212,
+      "voltage_v": 3.673695479,
+      "temp_c": 36.537839,
+      "soc": 0.335557688,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2174.688,
+      "current_a": 4.025911649,
+      "voltage_v": 3.240888498,
+      "temp_c": 36.502613,
+      "soc": 0.335556198,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2184.657,
+      "current_a": 0.0,
+      "voltage_v": 3.672058393,
+      "temp_c": 36.563877,
+      "soc": 0.329407891,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2194.688,
+      "current_a": 4.026747617,
+      "voltage_v": 3.238540799,
+      "temp_c": 36.560881,
+      "soc": 0.329407891,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2204.61,
+      "current_a": 0.000174661,
+      "voltage_v": 3.669960779,
+      "temp_c": 36.629369,
+      "soc": 0.3232873,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2214.563,
+      "current_a": 4.027213697,
+      "voltage_v": 3.236605142,
+      "temp_c": 36.653995,
+      "soc": 0.323287034,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2224.594,
+      "current_a": 0.00029005,
+      "voltage_v": 3.668409678,
+      "temp_c": 36.670376,
+      "soc": 0.317098488,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2234.547,
+      "current_a": 4.024890854,
+      "voltage_v": 3.23481725,
+      "temp_c": 36.638216,
+      "soc": 0.317098046,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2244.532,
+      "current_a": 0.001155271,
+      "voltage_v": 3.666633412,
+      "temp_c": 36.676039,
+      "soc": 0.310941432,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2254.485,
+      "current_a": 4.024313682,
+      "voltage_v": 3.232626869,
+      "temp_c": 36.685884,
+      "soc": 0.310939671,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2264.516,
+      "current_a": 0.000953838,
+      "voltage_v": 3.665061228,
+      "temp_c": 36.720188,
+      "soc": 0.304755582,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2274.485,
+      "current_a": 4.02593465,
+      "voltage_v": 3.230667298,
+      "temp_c": 36.720908,
+      "soc": 0.304754125,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2284.438,
+      "current_a": 0.001973027,
+      "voltage_v": 3.663213995,
+      "temp_c": 36.76233,
+      "soc": 0.298615651,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2294.5,
+      "current_a": 4.025115584,
+      "voltage_v": 3.228443441,
+      "temp_c": 36.778689,
+      "soc": 0.298612609,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2304.516,
+      "current_a": 0.001469328,
+      "voltage_v": 3.661566621,
+      "temp_c": 36.774611,
+      "soc": 0.292436537,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2314.5,
+      "current_a": 4.027935565,
+      "voltage_v": 3.226457555,
+      "temp_c": 36.81407,
+      "soc": 0.29243429,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2324.438,
+      "current_a": 0.000761877,
+      "voltage_v": 3.659563017,
+      "temp_c": 36.846217,
+      "soc": 0.28630202,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2334.375,
+      "current_a": 4.026563082,
+      "voltage_v": 3.224176688,
+      "temp_c": 36.828421,
+      "soc": 0.286300861,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2344.407,
+      "current_a": 0.00042177,
+      "voltage_v": 3.658080543,
+      "temp_c": 36.874786,
+      "soc": 0.280112698,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2354.375,
+      "current_a": 4.023524074,
+      "voltage_v": 3.222187365,
+      "temp_c": 36.86439,
+      "soc": 0.280112054,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2364.329,
+      "current_a": 0.001409616,
+      "voltage_v": 3.656130103,
+      "temp_c": 36.913674,
+      "soc": 0.273976638,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2374.375,
+      "current_a": 4.024151702,
+      "voltage_v": 3.219557382,
+      "temp_c": 36.871791,
+      "soc": 0.273974469,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2384.422,
+      "current_a": 0.001858805,
+      "voltage_v": 3.654247754,
+      "temp_c": 36.959113,
+      "soc": 0.267780765,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2394.375,
+      "current_a": 4.023650637,
+      "voltage_v": 3.217499097,
+      "temp_c": 36.991171,
+      "soc": 0.267777931,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2404.313,
+      "current_a": 0.000716465,
+      "voltage_v": 3.652288113,
+      "temp_c": 37.060406,
+      "soc": 0.261652185,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2414.266,
+      "current_a": 4.024642533,
+      "voltage_v": 3.215383035,
+      "temp_c": 37.062935,
+      "soc": 0.261651093,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2424.204,
+      "current_a": 0.0,
+      "voltage_v": 3.650497346,
+      "temp_c": 37.066167,
+      "soc": 0.255523837,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2434.172,
+      "current_a": 4.025318675,
+      "voltage_v": 3.21282538,
+      "temp_c": 37.095273,
+      "soc": 0.255523837,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2444.172,
+      "current_a": 0.0,
+      "voltage_v": 3.648789523,
+      "temp_c": 37.135247,
+      "soc": 0.249357319,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2454.157,
+      "current_a": 4.025453424,
+      "voltage_v": 3.210552379,
+      "temp_c": 37.068293,
+      "soc": 0.249357319,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2464.188,
+      "current_a": 0.000546412,
+      "voltage_v": 3.64676449,
+      "temp_c": 37.153889,
+      "soc": 0.243171478,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2474.11,
+      "current_a": 4.027477092,
+      "voltage_v": 3.208302613,
+      "temp_c": 37.114832,
+      "soc": 0.243170648,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2484.047,
+      "current_a": 0.008644441,
+      "voltage_v": 3.645173931,
+      "temp_c": 37.218589,
+      "soc": 0.237039693,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2494.0,
+      "current_a": 4.016362522,
+      "voltage_v": 3.206037411,
+      "temp_c": 37.156177,
+      "soc": 0.237026513,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2503.954,
+      "current_a": 0.000911763,
+      "voltage_v": 3.642711885,
+      "temp_c": 37.252946,
+      "soc": 0.230902018,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2513.891,
+      "current_a": 4.025069613,
+      "voltage_v": 3.203411048,
+      "temp_c": 37.237661,
+      "soc": 0.23090063,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2523.844,
+      "current_a": 0.000673651,
+      "voltage_v": 3.640811804,
+      "temp_c": 37.284385,
+      "soc": 0.224763475,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2533.75,
+      "current_a": 4.025245978,
+      "voltage_v": 3.200880832,
+      "temp_c": 37.281746,
+      "soc": 0.224762453,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2543.672,
+      "current_a": 0.0,
+      "voltage_v": 3.638723639,
+      "temp_c": 37.339283,
+      "soc": 0.218644145,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2553.672,
+      "current_a": 4.025290861,
+      "voltage_v": 3.197633124,
+      "temp_c": 37.353576,
+      "soc": 0.218644145,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2563.641,
+      "current_a": 0.001269854,
+      "voltage_v": 3.636500307,
+      "temp_c": 37.421331,
+      "soc": 0.212496786,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2573.563,
+      "current_a": 4.022260432,
+      "voltage_v": 3.195230635,
+      "temp_c": 37.409212,
+      "soc": 0.212494855,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2583.563,
+      "current_a": 0.0,
+      "voltage_v": 3.634749448,
+      "temp_c": 37.463934,
+      "soc": 0.206333023,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2593.594,
+      "current_a": 4.026558225,
+      "voltage_v": 3.192188505,
+      "temp_c": 37.441436,
+      "soc": 0.206333023,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2603.625,
+      "current_a": 0.001812537,
+      "voltage_v": 3.632260983,
+      "temp_c": 37.511024,
+      "soc": 0.200145484,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2613.563,
+      "current_a": 4.025677123,
+      "voltage_v": 3.189656984,
+      "temp_c": 37.504264,
+      "soc": 0.200142725,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2623.516,
+      "current_a": 0.002214882,
+      "voltage_v": 3.629876058,
+      "temp_c": 37.587245,
+      "soc": 0.194004643,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2633.547,
+      "current_a": 4.024932302,
+      "voltage_v": 3.186298666,
+      "temp_c": 37.553379,
+      "soc": 0.19400124,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2643.516,
+      "current_a": 0.0,
+      "voltage_v": 3.627330473,
+      "temp_c": 37.6073,
+      "soc": 0.187854428,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2653.469,
+      "current_a": 4.024740196,
+      "voltage_v": 3.183279012,
+      "temp_c": 37.589462,
+      "soc": 0.187854428,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2663.469,
+      "current_a": 0.0,
+      "voltage_v": 3.624528032,
+      "temp_c": 37.666001,
+      "soc": 0.181688797,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2673.438,
+      "current_a": 4.023689731,
+      "voltage_v": 3.179937027,
+      "temp_c": 37.648307,
+      "soc": 0.181688797,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2683.422,
+      "current_a": 0.002075426,
+      "voltage_v": 3.622138453,
+      "temp_c": 37.733877,
+      "soc": 0.175534637,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2693.407,
+      "current_a": 4.023941457,
+      "voltage_v": 3.176536563,
+      "temp_c": 37.681611,
+      "soc": 0.175531462,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2703.391,
+      "current_a": 0.000425768,
+      "voltage_v": 3.619315462,
+      "temp_c": 37.744003,
+      "soc": 0.169376918,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2713.36,
+      "current_a": 4.024804781,
+      "voltage_v": 3.173272099,
+      "temp_c": 37.730467,
+      "soc": 0.169376267,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2723.391,
+      "current_a": 0.0,
+      "voltage_v": 3.616765335,
+      "temp_c": 37.807732,
+      "soc": 0.163191423,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2733.36,
+      "current_a": 4.024677708,
+      "voltage_v": 3.169713442,
+      "temp_c": 37.841172,
+      "soc": 0.163191423,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2743.297,
+      "current_a": 0.0,
+      "voltage_v": 3.61360557,
+      "temp_c": 37.85227,
+      "soc": 0.15706473,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2753.313,
+      "current_a": 4.023689742,
+      "voltage_v": 3.165572382,
+      "temp_c": 37.868107,
+      "soc": 0.15706473,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2763.266,
+      "current_a": 0.0,
+      "voltage_v": 3.610318878,
+      "temp_c": 37.921484,
+      "soc": 0.150929679,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2773.25,
+      "current_a": 4.024885919,
+      "voltage_v": 3.161622721,
+      "temp_c": 37.95542,
+      "soc": 0.150929679,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2783.266,
+      "current_a": 0.000714192,
+      "voltage_v": 3.607221242,
+      "temp_c": 37.979174,
+      "soc": 0.144753959,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2793.157,
+      "current_a": 4.026484045,
+      "voltage_v": 3.157942604,
+      "temp_c": 37.970594,
+      "soc": 0.144752877,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2803.125,
+      "current_a": 0.000283269,
+      "voltage_v": 3.603994923,
+      "temp_c": 37.999058,
+      "soc": 0.138604312,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2813.094,
+      "current_a": 4.024687085,
+      "voltage_v": 3.153241716,
+      "temp_c": 38.009029,
+      "soc": 0.13860388,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2823.047,
+      "current_a": 0.002200323,
+      "voltage_v": 3.600271361,
+      "temp_c": 38.064044,
+      "soc": 0.132467308,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2833.032,
+      "current_a": 4.025295367,
+      "voltage_v": 3.148243754,
+      "temp_c": 38.105705,
+      "soc": 0.132463942,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2842.985,
+      "current_a": 0.000361366,
+      "voltage_v": 3.596372078,
+      "temp_c": 38.139118,
+      "soc": 0.126326443,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2852.922,
+      "current_a": 4.025442243,
+      "voltage_v": 3.143235166,
+      "temp_c": 38.167698,
+      "soc": 0.126325893,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2862.875,
+      "current_a": 0.000123956,
+      "voltage_v": 3.592359858,
+      "temp_c": 38.188203,
+      "soc": 0.120188169,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2872.922,
+      "current_a": 4.024567098,
+      "voltage_v": 3.137202637,
+      "temp_c": 38.248857,
+      "soc": 0.120187978,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2882.844,
+      "current_a": 0.000945014,
+      "voltage_v": 3.587671456,
+      "temp_c": 38.265454,
+      "soc": 0.114070702,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2892.829,
+      "current_a": 4.026145499,
+      "voltage_v": 3.13147176,
+      "temp_c": 38.274599,
+      "soc": 0.114069256,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2902.829,
+      "current_a": 0.0,
+      "voltage_v": 3.583020471,
+      "temp_c": 38.304713,
+      "soc": 0.107901472,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2912.829,
+      "current_a": 4.024696722,
+      "voltage_v": 3.12504762,
+      "temp_c": 38.329188,
+      "soc": 0.107901472,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2922.782,
+      "current_a": 0.000827817,
+      "voltage_v": 3.577896643,
+      "temp_c": 38.375551,
+      "soc": 0.101764885,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2932.829,
+      "current_a": 4.026352331,
+      "voltage_v": 3.117698623,
+      "temp_c": 38.405334,
+      "soc": 0.101763611,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2942.75,
+      "current_a": 0.001563154,
+      "voltage_v": 3.571900699,
+      "temp_c": 38.457984,
+      "soc": 0.095644238,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2952.735,
+      "current_a": 4.025934072,
+      "voltage_v": 3.109793526,
+      "temp_c": 38.442969,
+      "soc": 0.095641847,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2962.75,
+      "current_a": 0.002822526,
+      "voltage_v": 3.565622275,
+      "temp_c": 38.491286,
+      "soc": 0.089465136,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2972.782,
+      "current_a": 4.023200986,
+      "voltage_v": 3.101160703,
+      "temp_c": 38.508782,
+      "soc": 0.089460798,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2982.813,
+      "current_a": 0.000554091,
+      "voltage_v": 3.558545961,
+      "temp_c": 38.557079,
+      "soc": 0.083278418,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 2992.766,
+      "current_a": 4.024075639,
+      "voltage_v": 3.09173946,
+      "temp_c": 38.564108,
+      "soc": 0.083277573,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3002.782,
+      "current_a": 0.000247887,
+      "voltage_v": 3.550511874,
+      "temp_c": 38.644662,
+      "soc": 0.077103097,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3012.719,
+      "current_a": 4.025343005,
+      "voltage_v": 3.080828519,
+      "temp_c": 38.655247,
+      "soc": 0.077102719,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3022.704,
+      "current_a": 0.001206735,
+      "voltage_v": 3.541047859,
+      "temp_c": 38.748386,
+      "soc": 0.070945414,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3032.735,
+      "current_a": 4.026066568,
+      "voltage_v": 3.06748015,
+      "temp_c": 38.722623,
+      "soc": 0.07094356,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3042.641,
+      "current_a": 0.000735094,
+      "voltage_v": 3.529741716,
+      "temp_c": 38.796907,
+      "soc": 0.064833872,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3052.579,
+      "current_a": 4.025838442,
+      "voltage_v": 3.052824722,
+      "temp_c": 38.814665,
+      "soc": 0.064832753,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3062.5,
+      "current_a": 0.0,
+      "voltage_v": 3.517275553,
+      "temp_c": 38.882867,
+      "soc": 0.058714161,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3072.454,
+      "current_a": 4.025431305,
+      "voltage_v": 3.035777707,
+      "temp_c": 38.893921,
+      "soc": 0.058714161,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3082.5,
+      "current_a": 0.000355377,
+      "voltage_v": 3.503094852,
+      "temp_c": 38.963175,
+      "soc": 0.052519104,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3092.469,
+      "current_a": 4.026273673,
+      "voltage_v": 3.016258204,
+      "temp_c": 38.949519,
+      "soc": 0.052518562,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3102.422,
+      "current_a": 0.001418911,
+      "voltage_v": 3.486105371,
+      "temp_c": 39.069962,
+      "soc": 0.04637957,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3112.469,
+      "current_a": 4.025170053,
+      "voltage_v": 2.99290512,
+      "temp_c": 39.056767,
+      "soc": 0.046377387,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3122.391,
+      "current_a": 0.0,
+      "voltage_v": 3.466083449,
+      "temp_c": 39.085038,
+      "soc": 0.040259194,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3132.438,
+      "current_a": 4.025529594,
+      "voltage_v": 2.96601218,
+      "temp_c": 39.1375,
+      "soc": 0.040259194,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3142.422,
+      "current_a": 0.001470939,
+      "voltage_v": 3.443366527,
+      "temp_c": 39.214667,
+      "soc": 0.03410222,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3152.422,
+      "current_a": 4.025991073,
+      "voltage_v": 2.936211738,
+      "temp_c": 39.250071,
+      "soc": 0.034099966,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3162.391,
+      "current_a": 0.001696781,
+      "voltage_v": 3.416589334,
+      "temp_c": 39.336749,
+      "soc": 0.027951538,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3172.375,
+      "current_a": 4.025863077,
+      "voltage_v": 2.901274485,
+      "temp_c": 39.365916,
+      "soc": 0.027948943,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3182.344,
+      "current_a": 0.001994771,
+      "voltage_v": 3.386076259,
+      "temp_c": 39.438539,
+      "soc": 0.02180071,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3192.329,
+      "current_a": 4.025468382,
+      "voltage_v": 2.861149573,
+      "temp_c": 39.4616,
+      "soc": 0.021797659,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3202.313,
+      "current_a": 0.0,
+      "voltage_v": 3.350010899,
+      "temp_c": 39.54143,
+      "soc": 0.015640779,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3212.266,
+      "current_a": 4.023715893,
+      "voltage_v": 2.814232767,
+      "temp_c": 39.532043,
+      "soc": 0.015640779,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3222.25,
+      "current_a": 0.0,
+      "voltage_v": 3.307924687,
+      "temp_c": 39.642499,
+      "soc": 0.009486579,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3232.25,
+      "current_a": 4.026815772,
+      "voltage_v": 2.757536524,
+      "temp_c": 39.656905,
+      "soc": 0.009486579,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3242.219,
+      "current_a": 0.002906302,
+      "voltage_v": 3.257179331,
+      "temp_c": 39.744225,
+      "soc": 0.003336891,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3252.219,
+      "current_a": 4.02613694,
+      "voltage_v": 2.687328671,
+      "temp_c": 39.808198,
+      "soc": 0.003332439,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3262.235,
+      "current_a": 0.000775243,
+      "voltage_v": 3.195884714,
+      "temp_c": 39.915461,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3272.266,
+      "current_a": 4.026442449,
+      "voltage_v": 2.591775014,
+      "temp_c": 39.982531,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3282.25,
+      "current_a": 0.000789429,
+      "voltage_v": 3.118306333,
+      "temp_c": 40.094213,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3292.313,
+      "current_a": 4.025828067,
+      "voltage_v": 2.444488357,
+      "temp_c": 40.124895,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3302.313,
+      "current_a": 0.002256081,
+      "voltage_v": 3.014856413,
+      "temp_c": 40.253982,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3312.344,
+      "current_a": 4.025697134,
+      "voltage_v": 2.214769584,
+      "temp_c": 40.299767,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3322.297,
+      "current_a": 0.001321845,
+      "voltage_v": 2.898551273,
+      "temp_c": 40.473795,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3332.266,
+      "current_a": 4.022810788,
+      "voltage_v": 1.980690373,
+      "temp_c": 40.547833,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3342.438,
+      "current_a": 0.002683139,
+      "voltage_v": 2.804455846,
+      "temp_c": 40.711455,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3352.532,
+      "current_a": 0.003005051,
+      "voltage_v": 2.890486298,
+      "temp_c": 40.663341,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3362.672,
+      "current_a": 0.001683852,
+      "voltage_v": 2.938777355,
+      "temp_c": 40.442124,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3372.75,
+      "current_a": 0.000298733,
+      "voltage_v": 2.973529378,
+      "temp_c": 40.291426,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3383.063,
+      "current_a": 0.002048902,
+      "voltage_v": 3.001579786,
+      "temp_c": 40.113975,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3393.329,
+      "current_a": 0.004861652,
+      "voltage_v": 3.025011817,
+      "temp_c": 39.950297,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3403.719,
+      "current_a": 0.0,
+      "voltage_v": 3.04569596,
+      "temp_c": 39.831621,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3414.157,
+      "current_a": 0.00015165,
+      "voltage_v": 3.063578869,
+      "temp_c": 39.711391,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3424.5,
+      "current_a": 0.002385869,
+      "voltage_v": 3.079329805,
+      "temp_c": 39.549535,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3434.922,
+      "current_a": 0.00342567,
+      "voltage_v": 3.093155057,
+      "temp_c": 39.384941,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3445.313,
+      "current_a": 0.004715132,
+      "voltage_v": 3.105651992,
+      "temp_c": 39.227825,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3455.719,
+      "current_a": 0.00189143,
+      "voltage_v": 3.116881988,
+      "temp_c": 39.053963,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3466.094,
+      "current_a": 0.001442404,
+      "voltage_v": 3.126764129,
+      "temp_c": 38.912162,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3476.516,
+      "current_a": 0.0,
+      "voltage_v": 3.135594117,
+      "temp_c": 38.760293,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3486.922,
+      "current_a": 0.003290462,
+      "voltage_v": 3.143720498,
+      "temp_c": 38.578235,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3497.313,
+      "current_a": 0.002476975,
+      "voltage_v": 3.150888413,
+      "temp_c": 38.429782,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3507.797,
+      "current_a": 0.002816287,
+      "voltage_v": 3.157542031,
+      "temp_c": 38.270453,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3518.188,
+      "current_a": 0.000764004,
+      "voltage_v": 3.163656354,
+      "temp_c": 38.123754,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3528.594,
+      "current_a": 0.00102613,
+      "voltage_v": 3.16918006,
+      "temp_c": 37.973143,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3538.985,
+      "current_a": 0.001696337,
+      "voltage_v": 3.174367058,
+      "temp_c": 37.817433,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3549.391,
+      "current_a": 0.0,
+      "voltage_v": 3.178892066,
+      "temp_c": 37.68255,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3559.766,
+      "current_a": 0.001244137,
+      "voltage_v": 3.183577295,
+      "temp_c": 37.514966,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3570.094,
+      "current_a": 0.002544508,
+      "voltage_v": 3.187547052,
+      "temp_c": 37.353944,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3580.532,
+      "current_a": 0.000269257,
+      "voltage_v": 3.19170412,
+      "temp_c": 37.230203,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3590.922,
+      "current_a": 0.00160981,
+      "voltage_v": 3.195205405,
+      "temp_c": 37.093614,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3601.344,
+      "current_a": 0.003687049,
+      "voltage_v": 3.198823719,
+      "temp_c": 36.945834,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3611.704,
+      "current_a": 0.000439663,
+      "voltage_v": 3.201868942,
+      "temp_c": 36.807647,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3622.11,
+      "current_a": 0.002196001,
+      "voltage_v": 3.205010507,
+      "temp_c": 36.686509,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3632.516,
+      "current_a": 0.001885712,
+      "voltage_v": 3.207745765,
+      "temp_c": 36.542515,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3642.891,
+      "current_a": 0.000660785,
+      "voltage_v": 3.21062521,
+      "temp_c": 36.40772,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3653.313,
+      "current_a": 0.00362896,
+      "voltage_v": 3.213074078,
+      "temp_c": 36.283435,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3663.719,
+      "current_a": 0.003066226,
+      "voltage_v": 3.215705818,
+      "temp_c": 36.157631,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3674.11,
+      "current_a": 0.001575938,
+      "voltage_v": 3.218001323,
+      "temp_c": 36.030662,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3684.547,
+      "current_a": 0.000853583,
+      "voltage_v": 3.219968954,
+      "temp_c": 35.899776,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3694.969,
+      "current_a": 0.001471097,
+      "voltage_v": 3.222089258,
+      "temp_c": 35.779031,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3705.313,
+      "current_a": 0.0001817,
+      "voltage_v": 3.224365782,
+      "temp_c": 35.659627,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3715.719,
+      "current_a": 0.001182492,
+      "voltage_v": 3.226221544,
+      "temp_c": 35.540067,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3726.141,
+      "current_a": 0.003170155,
+      "voltage_v": 3.22810285,
+      "temp_c": 35.423807,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3736.672,
+      "current_a": 0.000187042,
+      "voltage_v": 3.229987078,
+      "temp_c": 35.318129,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3747.032,
+      "current_a": 0.0,
+      "voltage_v": 3.231732322,
+      "temp_c": 35.194204,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3757.422,
+      "current_a": 0.00106818,
+      "voltage_v": 3.2332619,
+      "temp_c": 35.091455,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3767.875,
+      "current_a": 0.000288152,
+      "voltage_v": 3.234908424,
+      "temp_c": 34.989352,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3778.219,
+      "current_a": 0.000222671,
+      "voltage_v": 3.236497145,
+      "temp_c": 34.877134,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3788.657,
+      "current_a": 0.002887828,
+      "voltage_v": 3.23799162,
+      "temp_c": 34.771523,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3799.063,
+      "current_a": 0.002233996,
+      "voltage_v": 3.239140328,
+      "temp_c": 34.668067,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3809.454,
+      "current_a": 0.001166513,
+      "voltage_v": 3.240623407,
+      "temp_c": 34.568554,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3819.891,
+      "current_a": 0.000968955,
+      "voltage_v": 3.24205373,
+      "temp_c": 34.472417,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3830.297,
+      "current_a": 0.000617292,
+      "voltage_v": 3.243128286,
+      "temp_c": 34.374914,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3840.735,
+      "current_a": 0.000880133,
+      "voltage_v": 3.244431789,
+      "temp_c": 34.261979,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3851.11,
+      "current_a": 0.002337469,
+      "voltage_v": 3.245551077,
+      "temp_c": 34.175677,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3861.469,
+      "current_a": 0.001745901,
+      "voltage_v": 3.246821196,
+      "temp_c": 34.079714,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3871.891,
+      "current_a": 0.000178035,
+      "voltage_v": 3.247862787,
+      "temp_c": 33.998424,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3882.297,
+      "current_a": 0.003735089,
+      "voltage_v": 3.248942956,
+      "temp_c": 33.891273,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3892.672,
+      "current_a": 0.004482883,
+      "voltage_v": 3.250027095,
+      "temp_c": 33.809402,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3903.079,
+      "current_a": 0.002476402,
+      "voltage_v": 3.251242784,
+      "temp_c": 33.722834,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3913.5,
+      "current_a": 0.000778527,
+      "voltage_v": 3.252153876,
+      "temp_c": 33.627302,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3923.875,
+      "current_a": 0.004231137,
+      "voltage_v": 3.253111425,
+      "temp_c": 33.539366,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3934.25,
+      "current_a": 0.001092012,
+      "voltage_v": 3.253911537,
+      "temp_c": 33.449826,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3944.641,
+      "current_a": 0.00041859,
+      "voltage_v": 3.254959205,
+      "temp_c": 33.366312,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3955.0,
+      "current_a": 0.000893142,
+      "voltage_v": 3.255737975,
+      "temp_c": 33.282059,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3965.375,
+      "current_a": 0.002147386,
+      "voltage_v": 3.256557467,
+      "temp_c": 33.210029,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3975.844,
+      "current_a": 0.000218433,
+      "voltage_v": 3.257493272,
+      "temp_c": 33.127282,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3986.235,
+      "current_a": 0.000692928,
+      "voltage_v": 3.258489527,
+      "temp_c": 33.051449,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 3996.625,
+      "current_a": 0.000576072,
+      "voltage_v": 3.258979737,
+      "temp_c": 32.968653,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4007.047,
+      "current_a": 0.001529721,
+      "voltage_v": 3.259867479,
+      "temp_c": 32.893103,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4017.391,
+      "current_a": 0.001388023,
+      "voltage_v": 3.260689584,
+      "temp_c": 32.813112,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4027.813,
+      "current_a": 0.001393173,
+      "voltage_v": 3.261328112,
+      "temp_c": 32.737512,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4038.204,
+      "current_a": 0.002670558,
+      "voltage_v": 3.26216704,
+      "temp_c": 32.677752,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4048.641,
+      "current_a": 0.00319192,
+      "voltage_v": 3.262909838,
+      "temp_c": 32.593726,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4059.079,
+      "current_a": 8.1414e-05,
+      "voltage_v": 3.263572669,
+      "temp_c": 32.524292,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4069.469,
+      "current_a": 0.002518286,
+      "voltage_v": 3.264155334,
+      "temp_c": 32.45984,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4079.875,
+      "current_a": 0.00017108,
+      "voltage_v": 3.264978426,
+      "temp_c": 32.380324,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4090.282,
+      "current_a": 0.002825051,
+      "voltage_v": 3.265754922,
+      "temp_c": 32.315891,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4100.672,
+      "current_a": 0.0,
+      "voltage_v": 3.266373276,
+      "temp_c": 32.252576,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4111.047,
+      "current_a": 0.001780055,
+      "voltage_v": 3.266955949,
+      "temp_c": 32.188195,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4121.469,
+      "current_a": 0.0,
+      "voltage_v": 3.267704838,
+      "temp_c": 32.110969,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4131.844,
+      "current_a": 0.001767988,
+      "voltage_v": 3.268194248,
+      "temp_c": 32.05287,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4142.266,
+      "current_a": 0.002808568,
+      "voltage_v": 3.268812401,
+      "temp_c": 31.981304,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4152.766,
+      "current_a": 0.000430149,
+      "voltage_v": 3.269415356,
+      "temp_c": 31.926892,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4163.219,
+      "current_a": 0.002960175,
+      "voltage_v": 3.270102122,
+      "temp_c": 31.853389,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4173.625,
+      "current_a": 0.002562348,
+      "voltage_v": 3.270753339,
+      "temp_c": 31.78262,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4184.0,
+      "current_a": 0.001550447,
+      "voltage_v": 3.271206636,
+      "temp_c": 31.730209,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4194.407,
+      "current_a": 0.001681343,
+      "voltage_v": 3.271648729,
+      "temp_c": 31.679599,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4204.86,
+      "current_a": 0.001568822,
+      "voltage_v": 3.272312518,
+      "temp_c": 31.616018,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4215.329,
+      "current_a": 0.002655823,
+      "voltage_v": 3.272922947,
+      "temp_c": 31.553354,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4225.688,
+      "current_a": 0.001981508,
+      "voltage_v": 3.27337171,
+      "temp_c": 31.485116,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4236.11,
+      "current_a": 0.001686731,
+      "voltage_v": 3.273960261,
+      "temp_c": 31.435974,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4246.485,
+      "current_a": 0.003032787,
+      "voltage_v": 3.274362651,
+      "temp_c": 31.365181,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4256.938,
+      "current_a": 0.000582147,
+      "voltage_v": 3.274778877,
+      "temp_c": 31.323714,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4267.36,
+      "current_a": 0.002697203,
+      "voltage_v": 3.275790425,
+      "temp_c": 31.259947,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4277.782,
+      "current_a": 0.00116636,
+      "voltage_v": 3.276025398,
+      "temp_c": 31.20556,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4288.172,
+      "current_a": 0.0,
+      "voltage_v": 3.276231219,
+      "temp_c": 31.157689,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4298.563,
+      "current_a": 0.0,
+      "voltage_v": 3.276796085,
+      "temp_c": 31.105624,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4308.938,
+      "current_a": 0.0,
+      "voltage_v": 3.277217314,
+      "temp_c": 31.045752,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4319.313,
+      "current_a": 0.0,
+      "voltage_v": 3.277878508,
+      "temp_c": 30.9986,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4329.766,
+      "current_a": 0.0,
+      "voltage_v": 3.278301105,
+      "temp_c": 30.972255,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4340.172,
+      "current_a": 0.0,
+      "voltage_v": 3.278651053,
+      "temp_c": 30.909271,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4350.641,
+      "current_a": 0.000183544,
+      "voltage_v": 3.279307043,
+      "temp_c": 30.857065,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4361.047,
+      "current_a": 0.001103786,
+      "voltage_v": 3.279690664,
+      "temp_c": 30.805598,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4371.407,
+      "current_a": 0.001666686,
+      "voltage_v": 3.280053866,
+      "temp_c": 30.756648,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4381.766,
+      "current_a": 0.001530389,
+      "voltage_v": 3.280378695,
+      "temp_c": 30.722132,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4392.219,
+      "current_a": 0.000723405,
+      "voltage_v": 3.280961526,
+      "temp_c": 30.662668,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4402.579,
+      "current_a": 0.002426583,
+      "voltage_v": 3.281521539,
+      "temp_c": 30.626547,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4413.0,
+      "current_a": 0.000819267,
+      "voltage_v": 3.281907446,
+      "temp_c": 30.59032,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4423.344,
+      "current_a": 0.0,
+      "voltage_v": 3.282279995,
+      "temp_c": 30.538129,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4433.797,
+      "current_a": 0.001040624,
+      "voltage_v": 3.282763938,
+      "temp_c": 30.487156,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4444.204,
+      "current_a": 0.000533663,
+      "voltage_v": 3.283186229,
+      "temp_c": 30.428705,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4454.579,
+      "current_a": 7.7837e-05,
+      "voltage_v": 3.283445233,
+      "temp_c": 30.386105,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4464.938,
+      "current_a": 0.001115349,
+      "voltage_v": 3.283979809,
+      "temp_c": 30.339332,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4475.313,
+      "current_a": 0.001293414,
+      "voltage_v": 3.284127684,
+      "temp_c": 30.306784,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4485.75,
+      "current_a": 0.001660626,
+      "voltage_v": 3.284677896,
+      "temp_c": 30.268871,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4496.11,
+      "current_a": 0.0,
+      "voltage_v": 3.285085607,
+      "temp_c": 30.213525,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4506.563,
+      "current_a": 0.002070664,
+      "voltage_v": 3.285336152,
+      "temp_c": 30.177324,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4516.969,
+      "current_a": 0.0,
+      "voltage_v": 3.285754686,
+      "temp_c": 30.147766,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4527.344,
+      "current_a": 0.0,
+      "voltage_v": 3.286142613,
+      "temp_c": 30.098702,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4537.797,
+      "current_a": 0.002877502,
+      "voltage_v": 3.286473126,
+      "temp_c": 30.049892,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4548.219,
+      "current_a": 0.004999587,
+      "voltage_v": 3.286747758,
+      "temp_c": 30.026508,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4558.625,
+      "current_a": 0.003348265,
+      "voltage_v": 3.287031135,
+      "temp_c": 29.980265,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4569.063,
+      "current_a": 0.0,
+      "voltage_v": 3.28741238,
+      "temp_c": 29.943766,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4579.422,
+      "current_a": 0.0,
+      "voltage_v": 3.287869815,
+      "temp_c": 29.904278,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4589.813,
+      "current_a": 0.0,
+      "voltage_v": 3.288268954,
+      "temp_c": 29.849151,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4600.235,
+      "current_a": 0.001985344,
+      "voltage_v": 3.288565399,
+      "temp_c": 29.817874,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4610.579,
+      "current_a": 0.002184966,
+      "voltage_v": 3.288914562,
+      "temp_c": 29.780376,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4621.016,
+      "current_a": 0.000701911,
+      "voltage_v": 3.289149707,
+      "temp_c": 29.752938,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4631.391,
+      "current_a": 0.003300716,
+      "voltage_v": 3.289551517,
+      "temp_c": 29.71796,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4641.766,
+      "current_a": 0.000559259,
+      "voltage_v": 3.289975963,
+      "temp_c": 29.684865,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4652.188,
+      "current_a": 0.002160167,
+      "voltage_v": 3.290265778,
+      "temp_c": 29.640376,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4662.594,
+      "current_a": 0.001521105,
+      "voltage_v": 3.290559797,
+      "temp_c": 29.607985,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4672.938,
+      "current_a": 0.001846875,
+      "voltage_v": 3.290834478,
+      "temp_c": 29.568408,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4683.407,
+      "current_a": 0.002817426,
+      "voltage_v": 3.291303375,
+      "temp_c": 29.544118,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4693.875,
+      "current_a": 0.002815366,
+      "voltage_v": 3.291368645,
+      "temp_c": 29.509464,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4704.25,
+      "current_a": 0.00212547,
+      "voltage_v": 3.291802464,
+      "temp_c": 29.473051,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4714.641,
+      "current_a": 1.742e-05,
+      "voltage_v": 3.29208782,
+      "temp_c": 29.446021,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4725.11,
+      "current_a": 0.000793463,
+      "voltage_v": 3.292460536,
+      "temp_c": 29.418452,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4735.563,
+      "current_a": 0.003695603,
+      "voltage_v": 3.292627726,
+      "temp_c": 29.387862,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4746.063,
+      "current_a": 0.001661151,
+      "voltage_v": 3.293036114,
+      "temp_c": 29.36257,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4756.516,
+      "current_a": 0.000990174,
+      "voltage_v": 3.29296976,
+      "temp_c": 29.326354,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4766.985,
+      "current_a": 0.000175502,
+      "voltage_v": 3.293646848,
+      "temp_c": 29.295795,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4777.344,
+      "current_a": 0.0,
+      "voltage_v": 3.293897684,
+      "temp_c": 29.266179,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4787.704,
+      "current_a": 0.001212207,
+      "voltage_v": 3.294306313,
+      "temp_c": 29.237231,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4798.172,
+      "current_a": 0.001712278,
+      "voltage_v": 3.294388604,
+      "temp_c": 29.197749,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4808.625,
+      "current_a": 0.0013064,
+      "voltage_v": 3.294779048,
+      "temp_c": 29.180301,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4819.016,
+      "current_a": 0.001417728,
+      "voltage_v": 3.294905282,
+      "temp_c": 29.13747,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4829.422,
+      "current_a": 0.002078133,
+      "voltage_v": 3.295355449,
+      "temp_c": 29.126221,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4839.782,
+      "current_a": 0.002061584,
+      "voltage_v": 3.295524933,
+      "temp_c": 29.097979,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4850.204,
+      "current_a": 0.000430762,
+      "voltage_v": 3.295679679,
+      "temp_c": 29.075323,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4860.579,
+      "current_a": 0.001113011,
+      "voltage_v": 3.296045165,
+      "temp_c": 29.034963,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4870.985,
+      "current_a": 0.001482485,
+      "voltage_v": 3.296149818,
+      "temp_c": 29.010791,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4881.422,
+      "current_a": 0.0,
+      "voltage_v": 3.296487035,
+      "temp_c": 28.988474,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4891.813,
+      "current_a": 0.000754643,
+      "voltage_v": 3.296854428,
+      "temp_c": 28.962818,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4902.219,
+      "current_a": 0.00305351,
+      "voltage_v": 3.296995311,
+      "temp_c": 28.941267,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4912.704,
+      "current_a": 0.002109082,
+      "voltage_v": 3.297329504,
+      "temp_c": 28.912097,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4923.157,
+      "current_a": 0.0,
+      "voltage_v": 3.297596601,
+      "temp_c": 28.888643,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4933.579,
+      "current_a": 0.000344412,
+      "voltage_v": 3.297833445,
+      "temp_c": 28.864678,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4943.954,
+      "current_a": 0.001026563,
+      "voltage_v": 3.298109138,
+      "temp_c": 28.834133,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4954.375,
+      "current_a": 0.001345505,
+      "voltage_v": 3.298339473,
+      "temp_c": 28.807659,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4964.844,
+      "current_a": 0.003099249,
+      "voltage_v": 3.298564326,
+      "temp_c": 28.794048,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4975.266,
+      "current_a": 0.000947663,
+      "voltage_v": 3.298737798,
+      "temp_c": 28.764284,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4985.672,
+      "current_a": 0.000547777,
+      "voltage_v": 3.29916724,
+      "temp_c": 28.735226,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 4996.047,
+      "current_a": 0.001322612,
+      "voltage_v": 3.299364937,
+      "temp_c": 28.716781,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5006.485,
+      "current_a": 0.0,
+      "voltage_v": 3.299483505,
+      "temp_c": 28.69093,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5016.86,
+      "current_a": 0.001792491,
+      "voltage_v": 3.299809888,
+      "temp_c": 28.675995,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5027.235,
+      "current_a": 0.001427448,
+      "voltage_v": 3.299968653,
+      "temp_c": 28.646638,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5037.641,
+      "current_a": 0.002257463,
+      "voltage_v": 3.300249046,
+      "temp_c": 28.631127,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5048.032,
+      "current_a": 0.00111889,
+      "voltage_v": 3.30050016,
+      "temp_c": 28.609408,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5058.438,
+      "current_a": 0.002190879,
+      "voltage_v": 3.300658134,
+      "temp_c": 28.581955,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5068.813,
+      "current_a": 0.002459413,
+      "voltage_v": 3.301044794,
+      "temp_c": 28.568575,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5079.204,
+      "current_a": 0.001472684,
+      "voltage_v": 3.301103839,
+      "temp_c": 28.536478,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5089.594,
+      "current_a": 0.001316197,
+      "voltage_v": 3.301294873,
+      "temp_c": 28.513973,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5100.016,
+      "current_a": 0.000172046,
+      "voltage_v": 3.301646784,
+      "temp_c": 28.506835,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5110.407,
+      "current_a": 0.002530638,
+      "voltage_v": 3.301762735,
+      "temp_c": 28.482401,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5120.985,
+      "current_a": 0.000341337,
+      "voltage_v": 3.302082898,
+      "temp_c": 28.453502,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5131.375,
+      "current_a": 0.002084734,
+      "voltage_v": 3.302170386,
+      "temp_c": 28.441893,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5141.766,
+      "current_a": 0.001726032,
+      "voltage_v": 3.302557247,
+      "temp_c": 28.424869,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5152.172,
+      "current_a": 0.000618103,
+      "voltage_v": 3.302589872,
+      "temp_c": 28.406672,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5162.579,
+      "current_a": 0.001232875,
+      "voltage_v": 3.302835761,
+      "temp_c": 28.380927,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5173.0,
+      "current_a": 0.0,
+      "voltage_v": 3.302972602,
+      "temp_c": 28.36633,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5183.422,
+      "current_a": 0.001576713,
+      "voltage_v": 3.303413623,
+      "temp_c": 28.345859,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5193.86,
+      "current_a": 0.0,
+      "voltage_v": 3.303551173,
+      "temp_c": 28.318079,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5204.282,
+      "current_a": 0.003811106,
+      "voltage_v": 3.303663338,
+      "temp_c": 28.302686,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5214.594,
+      "current_a": 0.000846215,
+      "voltage_v": 3.304024603,
+      "temp_c": 28.283705,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5225.032,
+      "current_a": 0.000965813,
+      "voltage_v": 3.304045589,
+      "temp_c": 28.268768,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5235.391,
+      "current_a": 0.0,
+      "voltage_v": 3.304269201,
+      "temp_c": 28.249566,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5245.797,
+      "current_a": 0.003104073,
+      "voltage_v": 3.304418264,
+      "temp_c": 28.232221,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5256.204,
+      "current_a": 0.0,
+      "voltage_v": 3.304713801,
+      "temp_c": 28.223604,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5266.594,
+      "current_a": 0.000776688,
+      "voltage_v": 3.304982386,
+      "temp_c": 28.208439,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5276.969,
+      "current_a": 0.001566819,
+      "voltage_v": 3.305118972,
+      "temp_c": 28.184568,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5287.391,
+      "current_a": 0.001360157,
+      "voltage_v": 3.305385797,
+      "temp_c": 28.163826,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5297.813,
+      "current_a": 0.0,
+      "voltage_v": 3.305421871,
+      "temp_c": 28.141694,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5308.204,
+      "current_a": 0.001302918,
+      "voltage_v": 3.305902276,
+      "temp_c": 28.134233,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5318.688,
+      "current_a": 0.004123803,
+      "voltage_v": 3.305900973,
+      "temp_c": 28.115444,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5329.063,
+      "current_a": 0.001793188,
+      "voltage_v": 3.306020962,
+      "temp_c": 28.099468,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5339.485,
+      "current_a": 4.2307e-05,
+      "voltage_v": 3.306312283,
+      "temp_c": 28.080581,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5349.891,
+      "current_a": 0.002933055,
+      "voltage_v": 3.30649258,
+      "temp_c": 28.068596,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5360.344,
+      "current_a": 0.00063303,
+      "voltage_v": 3.306643299,
+      "temp_c": 28.043128,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5370.766,
+      "current_a": 0.002273518,
+      "voltage_v": 3.306931766,
+      "temp_c": 28.042712,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5381.188,
+      "current_a": 0.001872244,
+      "voltage_v": 3.306968344,
+      "temp_c": 28.024901,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5391.594,
+      "current_a": 0.002304101,
+      "voltage_v": 3.30727003,
+      "temp_c": 28.009798,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5402.047,
+      "current_a": 0.00171028,
+      "voltage_v": 3.307379293,
+      "temp_c": 27.995641,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5412.516,
+      "current_a": 0.00235807,
+      "voltage_v": 3.307604901,
+      "temp_c": 27.979857,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5422.954,
+      "current_a": 0.000707744,
+      "voltage_v": 3.307725979,
+      "temp_c": 27.965001,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5433.344,
+      "current_a": 0.001373933,
+      "voltage_v": 3.307943814,
+      "temp_c": 27.956177,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5443.688,
+      "current_a": 0.000487865,
+      "voltage_v": 3.30800007,
+      "temp_c": 27.935738,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5454.079,
+      "current_a": 0.000373957,
+      "voltage_v": 3.308259283,
+      "temp_c": 27.912235,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5464.485,
+      "current_a": 0.001694742,
+      "voltage_v": 3.308478057,
+      "temp_c": 27.901702,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5474.938,
+      "current_a": 0.00203088,
+      "voltage_v": 3.308639206,
+      "temp_c": 27.883962,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5485.313,
+      "current_a": 0.000830203,
+      "voltage_v": 3.308810774,
+      "temp_c": 27.878233,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5495.704,
+      "current_a": 0.0,
+      "voltage_v": 3.309096572,
+      "temp_c": 27.863638,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5506.141,
+      "current_a": 0.003112143,
+      "voltage_v": 3.309161833,
+      "temp_c": 27.854322,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5516.516,
+      "current_a": 0.000790549,
+      "voltage_v": 3.309256646,
+      "temp_c": 27.836418,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5526.891,
+      "current_a": 0.001556124,
+      "voltage_v": 3.309606918,
+      "temp_c": 27.824011,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5537.266,
+      "current_a": 0.0,
+      "voltage_v": 3.309735591,
+      "temp_c": 27.817006,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5547.688,
+      "current_a": 0.002022545,
+      "voltage_v": 3.309861691,
+      "temp_c": 27.7972,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5558.079,
+      "current_a": 0.000380447,
+      "voltage_v": 3.310162937,
+      "temp_c": 27.779239,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5568.469,
+      "current_a": 0.000448948,
+      "voltage_v": 3.310220538,
+      "temp_c": 27.765697,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5578.829,
+      "current_a": 8.9881e-05,
+      "voltage_v": 3.310328696,
+      "temp_c": 27.768803,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5589.219,
+      "current_a": 0.000720217,
+      "voltage_v": 3.310595628,
+      "temp_c": 27.763318,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5599.672,
+      "current_a": 0.000740552,
+      "voltage_v": 3.310723636,
+      "temp_c": 27.741992,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5610.063,
+      "current_a": 0.001863829,
+      "voltage_v": 3.3107903,
+      "temp_c": 27.723388,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5620.547,
+      "current_a": 0.001918032,
+      "voltage_v": 3.310923074,
+      "temp_c": 27.70938,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5630.954,
+      "current_a": 0.001377115,
+      "voltage_v": 3.311183407,
+      "temp_c": 27.710511,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5641.36,
+      "current_a": 0.002151736,
+      "voltage_v": 3.311253759,
+      "temp_c": 27.69711,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5651.75,
+      "current_a": 0.0,
+      "voltage_v": 3.311687256,
+      "temp_c": 27.683103,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5662.125,
+      "current_a": 0.0,
+      "voltage_v": 3.311799277,
+      "temp_c": 27.670837,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5672.532,
+      "current_a": 0.00161456,
+      "voltage_v": 3.311716737,
+      "temp_c": 27.667366,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5682.875,
+      "current_a": 0.001920566,
+      "voltage_v": 3.311968308,
+      "temp_c": 27.647867,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5693.235,
+      "current_a": 0.002059603,
+      "voltage_v": 3.31207748,
+      "temp_c": 27.636568,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5703.625,
+      "current_a": 0.002825735,
+      "voltage_v": 3.312384901,
+      "temp_c": 27.627073,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5714.016,
+      "current_a": 0.001765815,
+      "voltage_v": 3.312434718,
+      "temp_c": 27.616639,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5724.438,
+      "current_a": 0.002804699,
+      "voltage_v": 3.312673981,
+      "temp_c": 27.614378,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5734.907,
+      "current_a": 0.001643966,
+      "voltage_v": 3.312767063,
+      "temp_c": 27.596483,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5745.297,
+      "current_a": 0.000503725,
+      "voltage_v": 3.312934324,
+      "temp_c": 27.589706,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5755.688,
+      "current_a": 0.0022851,
+      "voltage_v": 3.313009246,
+      "temp_c": 27.574861,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5766.047,
+      "current_a": 0.00119467,
+      "voltage_v": 3.313372033,
+      "temp_c": 27.568051,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5776.422,
+      "current_a": 0.002318918,
+      "voltage_v": 3.313274364,
+      "temp_c": 27.554596,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5786.766,
+      "current_a": 0.001358428,
+      "voltage_v": 3.313617191,
+      "temp_c": 27.541997,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5797.125,
+      "current_a": 0.000757283,
+      "voltage_v": 3.313775055,
+      "temp_c": 27.530298,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5807.563,
+      "current_a": 0.001966099,
+      "voltage_v": 3.313788736,
+      "temp_c": 27.515597,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5817.922,
+      "current_a": 0.000649602,
+      "voltage_v": 3.313989257,
+      "temp_c": 27.52091,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5828.438,
+      "current_a": 0.001685992,
+      "voltage_v": 3.314001941,
+      "temp_c": 27.510987,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5838.829,
+      "current_a": 0.002723572,
+      "voltage_v": 3.314378503,
+      "temp_c": 27.501925,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5849.25,
+      "current_a": 0.002119477,
+      "voltage_v": 3.314476857,
+      "temp_c": 27.490769,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5859.657,
+      "current_a": 0.002097487,
+      "voltage_v": 3.314520336,
+      "temp_c": 27.479653,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5870.079,
+      "current_a": 0.001740353,
+      "voltage_v": 3.314730639,
+      "temp_c": 27.466119,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5880.547,
+      "current_a": 0.001397078,
+      "voltage_v": 3.315003208,
+      "temp_c": 27.450155,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5891.032,
+      "current_a": 0.000834283,
+      "voltage_v": 3.315036044,
+      "temp_c": 27.45043,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5901.485,
+      "current_a": 0.001711575,
+      "voltage_v": 3.315059716,
+      "temp_c": 27.43954,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5911.844,
+      "current_a": 0.000749798,
+      "voltage_v": 3.315416623,
+      "temp_c": 27.416389,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5922.266,
+      "current_a": 0.001551958,
+      "voltage_v": 3.315497297,
+      "temp_c": 27.412857,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5932.704,
+      "current_a": 0.002404607,
+      "voltage_v": 3.315639994,
+      "temp_c": 27.408336,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5943.079,
+      "current_a": 0.003191104,
+      "voltage_v": 3.315684845,
+      "temp_c": 27.406614,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5953.469,
+      "current_a": 0.00160824,
+      "voltage_v": 3.315967296,
+      "temp_c": 27.402661,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5963.86,
+      "current_a": 0.001776406,
+      "voltage_v": 3.316341975,
+      "temp_c": 27.401264,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5974.266,
+      "current_a": 0.000179385,
+      "voltage_v": 3.316259788,
+      "temp_c": 27.390492,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5984.672,
+      "current_a": 0.00196658,
+      "voltage_v": 3.316249921,
+      "temp_c": 27.381166,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 5995.188,
+      "current_a": 0.002274553,
+      "voltage_v": 3.316561261,
+      "temp_c": 27.366181,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6005.641,
+      "current_a": 0.000308738,
+      "voltage_v": 3.316537357,
+      "temp_c": 27.362065,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6016.0,
+      "current_a": 0.005527857,
+      "voltage_v": 3.316571361,
+      "temp_c": 27.345733,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6026.469,
+      "current_a": 0.0,
+      "voltage_v": 3.316909401,
+      "temp_c": 27.333844,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6036.875,
+      "current_a": 0.001809693,
+      "voltage_v": 3.31700594,
+      "temp_c": 27.341288,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6047.25,
+      "current_a": 0.002520854,
+      "voltage_v": 3.317262929,
+      "temp_c": 27.336516,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6057.625,
+      "current_a": 0.001225782,
+      "voltage_v": 3.317298392,
+      "temp_c": 27.321634,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6068.016,
+      "current_a": 0.001387761,
+      "voltage_v": 3.317421549,
+      "temp_c": 27.311767,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6078.375,
+      "current_a": 0.0,
+      "voltage_v": 3.317668788,
+      "temp_c": 27.306184,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6088.829,
+      "current_a": 0.002636499,
+      "voltage_v": 3.317697252,
+      "temp_c": 27.303491,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6099.204,
+      "current_a": 0.0,
+      "voltage_v": 3.317784414,
+      "temp_c": 27.295987,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6109.563,
+      "current_a": 0.001044709,
+      "voltage_v": 3.318115531,
+      "temp_c": 27.288854,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6119.985,
+      "current_a": 0.001334848,
+      "voltage_v": 3.3181697,
+      "temp_c": 27.270376,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6130.36,
+      "current_a": 0.002169883,
+      "voltage_v": 3.318213538,
+      "temp_c": 27.271564,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6140.735,
+      "current_a": 0.002911751,
+      "voltage_v": 3.318341293,
+      "temp_c": 27.261194,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6151.125,
+      "current_a": 0.002858652,
+      "voltage_v": 3.318495837,
+      "temp_c": 27.258588,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6161.5,
+      "current_a": 0.0,
+      "voltage_v": 3.318504082,
+      "temp_c": 27.242599,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6171.907,
+      "current_a": 0.003273523,
+      "voltage_v": 3.318428644,
+      "temp_c": 27.233799,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6182.36,
+      "current_a": 0.0,
+      "voltage_v": 3.318963938,
+      "temp_c": 27.239116,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6192.797,
+      "current_a": 0.002477878,
+      "voltage_v": 3.319086954,
+      "temp_c": 27.226298,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6203.219,
+      "current_a": 0.003898374,
+      "voltage_v": 3.319250425,
+      "temp_c": 27.230026,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6213.61,
+      "current_a": 0.001264176,
+      "voltage_v": 3.319133315,
+      "temp_c": 27.214472,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6224.079,
+      "current_a": 0.001964765,
+      "voltage_v": 3.319369522,
+      "temp_c": 27.200671,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6234.532,
+      "current_a": 0.0,
+      "voltage_v": 3.319378558,
+      "temp_c": 27.199421,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6244.922,
+      "current_a": 0.0,
+      "voltage_v": 3.319592932,
+      "temp_c": 27.191609,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6255.313,
+      "current_a": 0.000716951,
+      "voltage_v": 3.319712158,
+      "temp_c": 27.190146,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6265.75,
+      "current_a": 0.0,
+      "voltage_v": 3.319915178,
+      "temp_c": 27.178368,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6276.125,
+      "current_a": 0.00027707,
+      "voltage_v": 3.320161469,
+      "temp_c": 27.168367,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6286.516,
+      "current_a": 0.0,
+      "voltage_v": 3.320156806,
+      "temp_c": 27.161521,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6296.891,
+      "current_a": 0.002242132,
+      "voltage_v": 3.320178238,
+      "temp_c": 27.164939,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6307.282,
+      "current_a": 0.003747668,
+      "voltage_v": 3.320536042,
+      "temp_c": 27.157149,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6317.704,
+      "current_a": 0.001501597,
+      "voltage_v": 3.32060057,
+      "temp_c": 27.149823,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6328.094,
+      "current_a": 0.001159446,
+      "voltage_v": 3.320822956,
+      "temp_c": 27.15085,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6338.485,
+      "current_a": 0.000785931,
+      "voltage_v": 3.320719114,
+      "temp_c": 27.136745,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6348.844,
+      "current_a": 0.002070601,
+      "voltage_v": 3.320949022,
+      "temp_c": 27.127743,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6359.266,
+      "current_a": 0.001625527,
+      "voltage_v": 3.321029342,
+      "temp_c": 27.116502,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6369.704,
+      "current_a": 0.001009744,
+      "voltage_v": 3.321154332,
+      "temp_c": 27.112235,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6380.141,
+      "current_a": 0.004309838,
+      "voltage_v": 3.321306731,
+      "temp_c": 27.116451,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6390.5,
+      "current_a": 0.000709798,
+      "voltage_v": 3.321419757,
+      "temp_c": 27.10556,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6400.969,
+      "current_a": 0.002499854,
+      "voltage_v": 3.321544547,
+      "temp_c": 27.096179,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6411.36,
+      "current_a": 0.00300333,
+      "voltage_v": 3.321485632,
+      "temp_c": 27.083963,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6421.75,
+      "current_a": 0.002435708,
+      "voltage_v": 3.321812826,
+      "temp_c": 27.092713,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6432.188,
+      "current_a": 0.001501977,
+      "voltage_v": 3.321991483,
+      "temp_c": 27.086555,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6442.579,
+      "current_a": 0.0,
+      "voltage_v": 3.321983999,
+      "temp_c": 27.088896,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6452.969,
+      "current_a": 0.0,
+      "voltage_v": 3.322077475,
+      "temp_c": 27.076313,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6463.438,
+      "current_a": 0.004104661,
+      "voltage_v": 3.322067976,
+      "temp_c": 27.073594,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6473.844,
+      "current_a": 5.776e-05,
+      "voltage_v": 3.322326178,
+      "temp_c": 27.068216,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6484.235,
+      "current_a": 0.0,
+      "voltage_v": 3.322505202,
+      "temp_c": 27.063065,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6494.594,
+      "current_a": 0.000776769,
+      "voltage_v": 3.322541695,
+      "temp_c": 27.052722,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6504.969,
+      "current_a": 0.001627876,
+      "voltage_v": 3.322704206,
+      "temp_c": 27.051095,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    },
+    {
+      "time_s": 6515.422,
+      "current_a": 0.001918962,
+      "voltage_v": 3.3226569,
+      "temp_c": 27.037201,
+      "soc": 0.0,
+      "source_cycle_type": "discharge",
+      "ambient_temp_c": 24.0
+    }
+  ]
+}

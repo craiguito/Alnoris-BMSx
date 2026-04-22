@@ -111,8 +111,32 @@ QString buildMarkdownReport(const ComparisonSummary& summary)
         if (!recommendation.isEmpty()) {
             lines << QString("- Recommendation: %1").arg(recommendation);
         }
+        const QString validationBasisLabel = summary.candidate.validationSummary.value("validation_basis_label").toString();
+        if (!validationBasisLabel.isEmpty()) {
+            lines << QString("- Validation basis: %1").arg(validationBasisLabel);
+        } else {
+            lines << "- Validation basis: Single-cell truth-data replay";
+        }
         lines << QString("- Strongest dataset: %1").arg(summary.candidate.validationSummary.value("strongest_dataset_display_name").toString("n/a"));
         lines << QString("- Weakest dataset: %1").arg(summary.candidate.validationSummary.value("weakest_dataset_display_name").toString("n/a"));
+        const QString validationBasisDescription = summary.candidate.validationSummary.value("validation_basis_description").toString();
+        if (!validationBasisDescription.isEmpty()) {
+            lines << QString("- Basis description: %1").arg(validationBasisDescription);
+        }
+        lines << "";
+        lines << "### Validation Limits";
+        lines << "";
+        QJsonArray validationLimits = summary.candidate.validationSummary.value("validation_limits").toArray();
+        if (validationLimits.isEmpty()) {
+            validationLimits = QJsonArray{
+                "Validated at single-cell level only.",
+                "Not a direct pack layout or module-level validation basis.",
+                "Intended for comparative trade-study support only."
+            };
+        }
+        for (const QJsonValue& limit : validationLimits) {
+            lines << QString("- %1").arg(limit.toString());
+        }
         lines << "";
         lines << "| Dataset | Metric | Value | Threshold | Status |";
         lines << "| --- | --- | --- | --- | --- |";
