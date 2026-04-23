@@ -254,10 +254,12 @@ def _run_manifest_case(
         payload["validation_summary"]["calibration_anchor_dataset_id"] = anchor_dataset_id
         if calibration_metadata:
             payload["validation_summary"]["calibration_profile_id"] = calibration_metadata.get("calibration_profile_id")
+            payload["validation_summary"]["search_plan_id"] = calibration_metadata.get("search_plan_id")
             payload["validation_summary"]["objective_weights"] = calibration_metadata.get("objective_weights")
             payload["validation_summary"]["calibration_objective"] = calibration_metadata.get("calibration_objective")
     if calibration_metadata:
         payload["calibration_profile_id"] = calibration_metadata.get("calibration_profile_id")
+        payload["search_plan_id"] = calibration_metadata.get("search_plan_id")
         payload["objective_weights"] = calibration_metadata.get("objective_weights")
         payload["calibration_objective"] = calibration_metadata.get("calibration_objective")
     return payload
@@ -338,9 +340,12 @@ def _build_comparison_markdown(
         f"- Validation basis: {manifest.validation_basis_label or profile.validation_basis_label}",
     ]
     calibration_profile_id = default_payload.get("validation_summary", {}).get("calibration_profile_id")
+    search_plan_id = default_payload.get("validation_summary", {}).get("search_plan_id")
     objective_weights = default_payload.get("validation_summary", {}).get("objective_weights")
     if calibration_profile_id:
         lines.append(f"- Calibration profile: `{calibration_profile_id}`")
+    if search_plan_id:
+        lines.append(f"- Search plan: `{search_plan_id}`")
     if objective_weights:
         lines.append(f"- Objective weights: `{json.dumps(objective_weights, sort_keys=True)}`")
     lines.extend(
@@ -451,6 +456,7 @@ def run_validation_pack(
             truth_data_dir=str(registry.truth_data_dir),
             calibration_metadata={
                 "calibration_profile_id": "anchored_single_dataset",
+                "search_plan_id": "anchored_single_dataset",
                 "objective_weights": {},
                 "calibration_objective": None,
             },

@@ -11,8 +11,16 @@ from .calibration_profiles import (
     get_calibration_profile,
     list_calibration_profiles,
 )
+from .calibration_search_plans import (
+    get_calibration_search_plan,
+    list_calibration_search_plans,
+)
 from .engine import run_simulation
-from .room_envelope_calibration import calibrate_room_envelope
+from .room_envelope_calibration import (
+    build_room_envelope_benchmark,
+    calibrate_room_envelope,
+    set_room_envelope_artifact_paths,
+)
 from .truth_data_manager import (
     get_truth_dataset,
     list_truth_datasets,
@@ -61,12 +69,15 @@ __all__ = [
     "TruthRecord",
     "apply_calibration_to_configs",
     "apply_calibration_to_simulation_config",
+    "build_room_envelope_benchmark",
     "calibrate_room_envelope",
     "calibrate_parameters",
     "get_calibration_profile",
+    "get_calibration_search_plan",
     "get_truth_dataset",
     "get_validation_threshold_profile",
     "list_calibration_profiles",
+    "list_calibration_search_plans",
     "list_truth_datasets",
     "list_validation_manifests",
     "list_validation_threshold_profiles",
@@ -75,5 +86,6 @@ __all__ = [
     "resolve_truth_dataset_input",
     "run_validation_pack",
     "run_simulation",
+    "set_room_envelope_artifact_paths",
     "validate_truth_dataset_file",
 ]

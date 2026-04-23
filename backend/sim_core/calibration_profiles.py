@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any, Sequence
 
+from .calibration_search_plans import get_default_search_plan_id
+
 
 @dataclass(frozen=True)
 class CalibrationObjectiveWeights:
@@ -28,11 +30,7 @@ class CalibrationProfile:
     display_name: str
     description: str
     objective_weights: CalibrationObjectiveWeights
-    rc_branch_count_options: tuple[int, ...]
-    electro_blend_options: tuple[float, ...]
-    thermal_blend_options: tuple[float, ...]
-    use_family_median_candidate: bool = True
-    representative_anchor_strategy: str = "family_representatives"
+    default_search_plan_id: str
 
 
 @dataclass(frozen=True)
@@ -69,9 +67,7 @@ _PROFILES: dict[str, CalibrationProfile] = {
             energy_error_weight=0.20,
             temp_rmse_weight=0.05,
         ),
-        rc_branch_count_options=(0, 1, 2),
-        electro_blend_options=(0.15, 0.35, 0.65, 1.0),
-        thermal_blend_options=(0.0, 0.2),
+        default_search_plan_id=get_default_search_plan_id("electrical_first"),
     ),
     "balanced_electro_thermal": CalibrationProfile(
         profile_id="balanced_electro_thermal",
@@ -86,9 +82,7 @@ _PROFILES: dict[str, CalibrationProfile] = {
             energy_error_weight=0.20,
             temp_rmse_weight=0.20,
         ),
-        rc_branch_count_options=(0, 1, 2),
-        electro_blend_options=(0.35, 0.65, 1.0),
-        thermal_blend_options=(0.2, 0.6, 1.0),
+        default_search_plan_id=get_default_search_plan_id("balanced_electro_thermal"),
     ),
 }
 
@@ -113,6 +107,14 @@ def calibration_profile_to_dict(profile: CalibrationProfile) -> dict[str, Any]:
 
 def calibration_objective_result_to_dict(result: CalibrationObjectiveResult) -> dict[str, Any]:
     return asdict(result)
+
+
+def evaluate_scorecard_objective(
+    scorecard: dict[str, Any],
+    *,
+    weights: CalibrationObjectiveWeights,
+) -> CalibrationObjectiveResult:
+    return evaluate_calibration_objective([scorecard], weights=weights)
 
 
 def evaluate_calibration_objective(
