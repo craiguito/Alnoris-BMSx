@@ -8,6 +8,7 @@ from typing import Any, Sequence
 from .calibration import CalibratedParameters, apply_calibration_to_simulation_config, calibrate_parameters
 from .calibration_profiles import (
     CalibrationObjectiveResult,
+    CalibrationObjectiveWeights,
     CalibrationProfile,
     calibration_objective_result_to_dict,
     calibration_profile_to_dict,
@@ -69,6 +70,9 @@ class CandidateEvaluationSummary:
     screening_dataset_ids: tuple[str, ...]
     screening_objective_score: float
     full_objective_score: float
+    low_soc_objective_score: float
+    average_low_soc_voltage_rmse_v: float = 0.0
+    average_last_10_percent_voltage_rmse_v: float = 0.0
     validation_summary: dict[str, Any] = field(default_factory=dict)
 
 
@@ -83,6 +87,11 @@ class DatasetTransitionSummary:
     baseline_objective_score: float
     candidate_objective_score: float
     objective_delta: float
+    aging_stage: str = "unknown"
+    baseline_segmented_metrics: dict[str, dict[str, Any]] = field(default_factory=dict)
+    candidate_segmented_metrics: dict[str, dict[str, Any]] = field(default_factory=dict)
+    baseline_tail_metrics: dict[str, Any] = field(default_factory=dict)
+    candidate_tail_metrics: dict[str, Any] = field(default_factory=dict)
     metric_deltas: dict[str, dict[str, Any]] = field(default_factory=dict)
     biggest_metric_improvement: str = ""
     biggest_metric_regression: str = ""
@@ -114,9 +123,12 @@ class RoomEnvelopeBenchmarkRow:
     failed_count: int
     objective_score: float
     average_voltage_rmse_v: float
+    average_low_soc_voltage_rmse_v: float
+    average_last_10_percent_voltage_rmse_v: float
     average_final_voltage_error_v: float
     average_energy_error_fraction: float
     average_temp_rmse_c: float
+    aging_stage_status_counts: dict[str, dict[str, int]] = field(default_factory=dict)
     most_improved_dataset: str = ""
     most_worsened_dataset: str = ""
 
@@ -144,6 +156,19 @@ class CandidateSearchPreview:
 
 
 @dataclass(frozen=True)
+class TailCandidateComparison:
+    aggregate_best_candidate_id: str
+    aggregate_best_objective_score: float
+    aggregate_best_low_soc_objective_score: float
+    low_soc_best_candidate_id: str
+    low_soc_best_objective_score: float
+    low_soc_best_low_soc_objective_score: float
+    same_candidate: bool
+    aggregate_best_candidate_summary: dict[str, Any] = field(default_factory=dict)
+    low_soc_best_candidate_summary: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class RoomEnvelopeSummary:
     calibration_profile_id: str
     search_plan_id: str
@@ -155,7 +180,12 @@ class RoomEnvelopeSummary:
     best_candidate_id: str
     baseline_status_counts: dict[str, int] = field(default_factory=dict)
     selected_status_counts: dict[str, int] = field(default_factory=dict)
+    baseline_aging_stage_summaries: tuple[dict[str, Any], ...] = ()
+    selected_aging_stage_summaries: tuple[dict[str, Any], ...] = ()
+    baseline_low_soc_objective_score: float = 0.0
+    selected_low_soc_objective_score: float = 0.0
     candidate_search_preview: CandidateSearchPreview | None = None
+    tail_candidate_comparison: TailCandidateComparison | None = None
     improvement_summary: RoomEnvelopeImprovementSummary | None = None
     benchmark_comparison: RoomEnvelopeBenchmarkComparison | None = None
     artifact_paths: RoomEnvelopeArtifactPaths = field(default_factory=RoomEnvelopeArtifactPaths)
@@ -221,6 +251,17 @@ def _metric_map(scorecard: dict[str, Any]) -> dict[str, dict[str, Any]]:
     }
 
 
+def _segmented_metric_map(scorecard: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {
+        str(metric.get("segment_id", "")): metric
+        for metric in scorecard.get("segmented_metrics", [])
+    }
+
+
+def _tail_metric_map(scorecard: dict[str, Any]) -> dict[str, Any]:
+    return dict(scorecard.get("tail_metrics") or {})
+
+
 def _average_metric(scorecards: Sequence[dict[str, Any]], metric_id: str) -> float:
     values: list[float] = []
     for scorecard in scorecards:
@@ -228,6 +269,39 @@ def _average_metric(scorecards: Sequence[dict[str, Any]], metric_id: str) -> flo
             if str(metric.get("metric_id", "")) == metric_id and metric.get("value") is not None:
                 values.append(float(metric["value"]))
     return sum(values) / len(values) if values else 0.0
+
+
+def _average_segment_metric(scorecards: Sequence[dict[str, Any]], segment_id: str, field_name: str) -> float:
+    values: list[float] = []
+    for scorecard in scorecards:
+        for segment in scorecard.get("segmented_metrics", []):
+            if str(segment.get("segment_id", "")) == segment_id and segment.get(field_name) is not None:
+                values.append(float(segment[field_name]))
+    return sum(values) / len(values) if values else 0.0
+
+
+def _average_tail_metric(scorecards: Sequence[dict[str, Any]], field_name: str) -> float:
+    values: list[float] = []
+    for scorecard in scorecards:
+        tail_metrics = scorecard.get("tail_metrics") or {}
+        if tail_metrics.get(field_name) is not None:
+            values.append(float(tail_metrics[field_name]))
+    return sum(values) / len(values) if values else 0.0
+
+
+def _aging_stage_status_counts(validation_payload: dict[str, Any]) -> dict[str, dict[str, int]]:
+    summaries = validation_payload.get("validation_summary", {}).get("aging_stage_summaries", [])
+    result: dict[str, dict[str, int]] = {}
+    for summary in summaries:
+        stage = str(summary.get("aging_stage", "")).strip()
+        if not stage:
+            continue
+        result[stage] = {
+            "pass": int(summary.get("passed_count", 0)),
+            "warning": int(summary.get("warning_count", 0)),
+            "fail": int(summary.get("failed_count", 0)),
+        }
+    return result
 
 
 def _safe_weight(value: float) -> float:
@@ -330,6 +404,7 @@ def combine_calibrated_parameters(
             [item.calendar_resistance_growth_per_hour for item in parameters],
             weights,
         ),
+        rc_low_soc_multiplier=_weighted_mean([item.rc_low_soc_multiplier for item in parameters], weights),
         diagnostics={
             "source": "weighted_combination",
             "source_count": len(parameters),
@@ -453,6 +528,7 @@ def _build_anchor_calibration_cache(
                 resistance_growth_per_throughput_ah=calibrated.resistance_growth_per_throughput_ah,
                 calendar_capacity_fade_per_hour=calibrated.calendar_capacity_fade_per_hour,
                 calendar_resistance_growth_per_hour=calibrated.calendar_resistance_growth_per_hour,
+                rc_low_soc_multiplier=calibrated.rc_low_soc_multiplier,
                 diagnostics={
                     **dict(calibrated.diagnostics),
                     "dataset_id": dataset_id,
@@ -577,6 +653,7 @@ def _candidate_sanity_issues(candidate: CalibrationCandidate) -> tuple[str, ...]
         "core_thermal_mass_j_per_k": calibrated.core_thermal_mass_j_per_k,
         "surface_thermal_mass_j_per_k": calibrated.surface_thermal_mass_j_per_k,
         "cooling_coeff_w_per_k": calibrated.cooling_coeff_w_per_k,
+        "rc_low_soc_multiplier": calibrated.rc_low_soc_multiplier,
     }
     for key, value in scalar_checks.items():
         if not math.isfinite(value) or value <= 0.0:
@@ -691,9 +768,12 @@ def _benchmark_row_from_payload(
         failed_count=counts["fail"],
         objective_score=objective_score,
         average_voltage_rmse_v=_average_metric(scorecards, "rmse_voltage"),
+        average_low_soc_voltage_rmse_v=_average_segment_metric(scorecards, "low_soc", "voltage_rmse_v"),
+        average_last_10_percent_voltage_rmse_v=_average_tail_metric(scorecards, "last_10_percent_voltage_rmse_v"),
         average_final_voltage_error_v=_average_metric(scorecards, "final_voltage_error"),
         average_energy_error_fraction=_average_metric(scorecards, "energy_error"),
         average_temp_rmse_c=_average_metric(scorecards, "temp_rmse"),
+        aging_stage_status_counts=_aging_stage_status_counts(validation_payload),
         most_improved_dataset=(
             improvement_summary.most_improved_dataset_display_name if improvement_summary is not None else ""
         ),
@@ -707,13 +787,22 @@ def build_room_envelope_benchmark_markdown(benchmark: RoomEnvelopeBenchmarkCompa
     lines = [
         "# Room-Envelope Benchmark",
         "",
-        "| Result Set | Profile | Search Plan | Candidates | Pass | Warn | Fail | Objective | Avg Voltage RMSE | Avg Final Voltage Error | Avg Energy Error | Avg Temp RMSE | Most Improved | Most Worsened |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Result Set | Profile | Search Plan | Candidates | Pass | Warn | Fail | Objective | Avg Voltage RMSE | Avg Low-SOC RMSE | Avg Last 10% RMSE | Avg Final Voltage Error | Avg Energy Error | Avg Temp RMSE | Life Status E/M/L | Most Improved | Most Worsened |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in benchmark.rows:
+        early = row.aging_stage_status_counts.get("early_life", {})
+        mid = row.aging_stage_status_counts.get("mid_life", {})
+        late = row.aging_stage_status_counts.get("late_life", {})
+        life_status = (
+            f"E {early.get('pass', 0)}/{early.get('warning', 0)}/{early.get('fail', 0)}; "
+            f"M {mid.get('pass', 0)}/{mid.get('warning', 0)}/{mid.get('fail', 0)}; "
+            f"L {late.get('pass', 0)}/{late.get('warning', 0)}/{late.get('fail', 0)}"
+        )
         lines.append(
             "| {label} | {profile} | {plan} | {candidate_count} | {passed} | {warning} | {failed} | "
-            "{objective:.4f} | {rmse:.4f} | {final_v:.4f} | {energy:.4f} | {temp:.4f} | {improved} | {worsened} |".format(
+            "{objective:.4f} | {rmse:.4f} | {low_soc_rmse:.4f} | {tail_rmse:.4f} | {final_v:.4f} | {energy:.4f} | "
+            "{temp:.4f} | {life_status} | {improved} | {worsened} |".format(
                 label=row.label,
                 profile=row.calibration_profile_id,
                 plan=row.search_plan_id,
@@ -723,9 +812,12 @@ def build_room_envelope_benchmark_markdown(benchmark: RoomEnvelopeBenchmarkCompa
                 failed=row.failed_count,
                 objective=row.objective_score,
                 rmse=row.average_voltage_rmse_v,
+                low_soc_rmse=row.average_low_soc_voltage_rmse_v,
+                tail_rmse=row.average_last_10_percent_voltage_rmse_v,
                 final_v=row.average_final_voltage_error_v,
                 energy=row.average_energy_error_fraction,
                 temp=row.average_temp_rmse_c,
+                life_status=life_status,
                 improved=row.most_improved_dataset or "n/a",
                 worsened=row.most_worsened_dataset or "n/a",
             )
@@ -766,6 +858,71 @@ def build_room_envelope_benchmark(
     return replace(benchmark, markdown=build_room_envelope_benchmark_markdown(benchmark))
 
 
+def _tail_objective_weights(calibration_profile: CalibrationProfile) -> CalibrationObjectiveWeights:
+    base = calibration_profile.objective_weights
+    derived_low_soc_weight = base.low_soc_voltage_rmse_weight if base.low_soc_voltage_rmse_weight > 0.0 else base.voltage_rmse_weight * 0.75
+    derived_last_10_weight = (
+        base.last_10_percent_voltage_rmse_weight
+        if base.last_10_percent_voltage_rmse_weight > 0.0
+        else base.final_voltage_error_weight * 0.60
+    )
+    return CalibrationObjectiveWeights(
+        voltage_rmse_weight=base.voltage_rmse_weight * 0.40,
+        final_voltage_error_weight=base.final_voltage_error_weight,
+        energy_error_weight=base.energy_error_weight * 0.20,
+        temp_rmse_weight=0.0,
+        low_soc_voltage_rmse_weight=derived_low_soc_weight,
+        last_10_percent_voltage_rmse_weight=derived_last_10_weight,
+    )
+
+
+def _candidate_comparison_summary(
+    evaluation: CandidateEvaluationSummary,
+    candidate: CalibrationCandidate | None,
+) -> dict[str, Any]:
+    return {
+        "candidate_id": evaluation.candidate_id,
+        "candidate_mode": evaluation.candidate_mode,
+        "recipe_id": evaluation.recipe_id,
+        "rc_branch_count": evaluation.rc_branch_count,
+        "anchor_dataset_ids": list(evaluation.anchor_dataset_ids),
+        "electro_blend": evaluation.electro_blend,
+        "thermal_blend": evaluation.thermal_blend,
+        "full_objective_score": evaluation.full_objective_score,
+        "low_soc_objective_score": evaluation.low_soc_objective_score,
+        "average_low_soc_voltage_rmse_v": evaluation.average_low_soc_voltage_rmse_v,
+        "average_last_10_percent_voltage_rmse_v": evaluation.average_last_10_percent_voltage_rmse_v,
+        "rc_low_soc_multiplier": (
+            float(candidate.calibrated_parameters.rc_low_soc_multiplier)
+            if candidate is not None
+            else 0.0
+        ),
+    }
+
+
+def _build_tail_candidate_comparison(
+    candidate_evaluations: Sequence[CandidateEvaluationSummary],
+    candidate_lookup: dict[str, CalibrationCandidate],
+) -> TailCandidateComparison | None:
+    if not candidate_evaluations:
+        return None
+    aggregate_best = min(candidate_evaluations, key=lambda item: (item.full_objective_score, item.candidate_id))
+    low_soc_best = min(candidate_evaluations, key=lambda item: (item.low_soc_objective_score, item.candidate_id))
+    aggregate_candidate = candidate_lookup.get(aggregate_best.candidate_id)
+    low_soc_candidate = candidate_lookup.get(low_soc_best.candidate_id)
+    return TailCandidateComparison(
+        aggregate_best_candidate_id=aggregate_best.candidate_id,
+        aggregate_best_objective_score=aggregate_best.full_objective_score,
+        aggregate_best_low_soc_objective_score=aggregate_best.low_soc_objective_score,
+        low_soc_best_candidate_id=low_soc_best.candidate_id,
+        low_soc_best_objective_score=low_soc_best.full_objective_score,
+        low_soc_best_low_soc_objective_score=low_soc_best.low_soc_objective_score,
+        same_candidate=aggregate_best.candidate_id == low_soc_best.candidate_id,
+        aggregate_best_candidate_summary=_candidate_comparison_summary(aggregate_best, aggregate_candidate),
+        low_soc_best_candidate_summary=_candidate_comparison_summary(low_soc_best, low_soc_candidate),
+    )
+
+
 def _screen_and_select_candidates(
     candidates: Sequence[CalibrationCandidate],
     initial_filtered: Sequence[FilteredCandidateRecord],
@@ -782,6 +939,7 @@ def _screen_and_select_candidates(
     filtered: list[FilteredCandidateRecord] = list(initial_filtered)
     screen_evaluations: list[tuple[CalibrationCandidate, float]] = []
     screening_manifest = _manifest_subset(manifest, screening_dataset_ids)
+    tail_weights = _tail_objective_weights(calibration_profile)
 
     for candidate in candidates:
         issues = _candidate_sanity_issues(candidate)
@@ -842,8 +1000,13 @@ def _screen_and_select_candidates(
             full_payload.get("validation_scorecards", []),
             weights=calibration_profile.objective_weights,
         )
+        low_soc_objective = evaluate_calibration_objective(
+            full_payload.get("validation_scorecards", []),
+            weights=tail_weights,
+        )
         full_payload.setdefault("validation_summary", {})
         full_payload["validation_summary"]["calibration_objective"] = calibration_objective_result_to_dict(full_objective)
+        full_payload["validation_summary"]["low_soc_calibration_objective"] = calibration_objective_result_to_dict(low_soc_objective)
         full_payload["validation_summary"]["search_plan_id"] = search_plan.plan_id
         evaluations.append(
             CandidateEvaluationSummary(
@@ -858,6 +1021,16 @@ def _screen_and_select_candidates(
                 screening_dataset_ids=tuple(screening_dataset_ids),
                 screening_objective_score=screening_objective,
                 full_objective_score=full_objective.total_score,
+                low_soc_objective_score=low_soc_objective.total_score,
+                average_low_soc_voltage_rmse_v=_average_segment_metric(
+                    full_payload.get("validation_scorecards", []),
+                    "low_soc",
+                    "voltage_rmse_v",
+                ),
+                average_last_10_percent_voltage_rmse_v=_average_tail_metric(
+                    full_payload.get("validation_scorecards", []),
+                    "last_10_percent_voltage_rmse_v",
+                ),
                 validation_summary=dict(full_payload.get("validation_summary", {})),
             )
         )
@@ -874,11 +1047,16 @@ def _compare_dataset_diagnostics(
     baseline_by_dataset = _scorecards_by_dataset(baseline_payload)
     candidate_by_dataset = _scorecards_by_dataset(candidate_payload)
     diagnostics: list[DatasetTransitionSummary] = []
+    tail_weights = _tail_objective_weights(calibration_profile)
 
     for dataset_id, candidate_scorecard in candidate_by_dataset.items():
         baseline_scorecard = baseline_by_dataset.get(dataset_id, {})
         baseline_metrics = _metric_map(baseline_scorecard)
         candidate_metrics = _metric_map(candidate_scorecard)
+        baseline_segmented = _segmented_metric_map(baseline_scorecard)
+        candidate_segmented = _segmented_metric_map(candidate_scorecard)
+        baseline_tail = _tail_metric_map(baseline_scorecard)
+        candidate_tail = _tail_metric_map(candidate_scorecard)
         metric_deltas: dict[str, dict[str, Any]] = {}
         ranked_changes: list[tuple[float, str]] = []
         for metric_id, candidate_metric in candidate_metrics.items():
@@ -902,6 +1080,51 @@ def _compare_dataset_diagnostics(
                 "candidate_passed": candidate_metric.get("passed"),
             }
 
+        for segment_id, candidate_segment in candidate_segmented.items():
+            baseline_segment = baseline_segmented.get(segment_id)
+            if baseline_segment is None:
+                continue
+            baseline_value = baseline_segment.get("voltage_rmse_v")
+            candidate_value = candidate_segment.get("voltage_rmse_v")
+            threshold = abs(float(candidate_segment.get("threshold_voltage_rmse_v") or baseline_segment.get("threshold_voltage_rmse_v") or 1.0))
+            if baseline_value is not None and candidate_value is not None:
+                delta = float(candidate_value) - float(baseline_value)
+                normalized_delta = delta / max(threshold, 1.0e-9)
+                metric_id = f"{segment_id}_voltage_rmse"
+                ranked_changes.append((normalized_delta, metric_id))
+                metric_deltas[metric_id] = {
+                    "display_name": f"{segment_id.replace('_', ' ').title()} voltage RMSE",
+                    "baseline_value": float(baseline_value),
+                    "candidate_value": float(candidate_value),
+                    "delta": delta,
+                    "normalized_delta": normalized_delta,
+                    "threshold_value": threshold,
+                    "baseline_passed": baseline_segment.get("voltage_rmse_passed"),
+                    "candidate_passed": candidate_segment.get("voltage_rmse_passed"),
+                }
+
+        for metric_id in ("last_10_percent_voltage_rmse_v", "cutoff_neighborhood_voltage_rmse_v"):
+            baseline_value = baseline_tail.get(metric_id)
+            candidate_value = candidate_tail.get(metric_id)
+            if baseline_value is None or candidate_value is None:
+                continue
+            threshold_key = "last_10_percent_threshold_v" if metric_id == "last_10_percent_voltage_rmse_v" else "cutoff_neighborhood_threshold_v"
+            threshold = abs(float(candidate_tail.get(threshold_key) or baseline_tail.get(threshold_key) or 1.0))
+            delta = float(candidate_value) - float(baseline_value)
+            normalized_delta = delta / max(threshold, 1.0e-9)
+            normalized_metric_id = metric_id.removesuffix("_v")
+            ranked_changes.append((normalized_delta, normalized_metric_id))
+            metric_deltas[normalized_metric_id] = {
+                "display_name": normalized_metric_id.replace("_", " ").title(),
+                "baseline_value": float(baseline_value),
+                "candidate_value": float(candidate_value),
+                "delta": delta,
+                "normalized_delta": normalized_delta,
+                "threshold_value": threshold,
+                "baseline_passed": baseline_tail.get("last_10_percent_passed" if metric_id == "last_10_percent_voltage_rmse_v" else "cutoff_neighborhood_passed"),
+                "candidate_passed": candidate_tail.get("last_10_percent_passed" if metric_id == "last_10_percent_voltage_rmse_v" else "cutoff_neighborhood_passed"),
+            }
+
         ranked_changes.sort(key=lambda item: item[0])
         baseline_objective = evaluate_scorecard_objective(
             baseline_scorecard,
@@ -910,6 +1133,14 @@ def _compare_dataset_diagnostics(
         candidate_objective = evaluate_scorecard_objective(
             candidate_scorecard,
             weights=calibration_profile.objective_weights,
+        ).total_score
+        baseline_low_soc_objective = evaluate_scorecard_objective(
+            baseline_scorecard,
+            weights=tail_weights,
+        ).total_score if baseline_scorecard else 0.0
+        candidate_low_soc_objective = evaluate_scorecard_objective(
+            candidate_scorecard,
+            weights=tail_weights,
         ).total_score
         baseline_status = str(baseline_scorecard.get("overall_status", ""))
         candidate_status = str(candidate_scorecard.get("overall_status", ""))
@@ -924,6 +1155,17 @@ def _compare_dataset_diagnostics(
                 baseline_objective_score=baseline_objective,
                 candidate_objective_score=candidate_objective,
                 objective_delta=candidate_objective - baseline_objective,
+                aging_stage=str(candidate_scorecard.get("aging_stage", baseline_scorecard.get("aging_stage", "unknown"))),
+                baseline_segmented_metrics=baseline_segmented,
+                candidate_segmented_metrics=candidate_segmented,
+                baseline_tail_metrics={
+                    **baseline_tail,
+                    "low_soc_objective_score": baseline_low_soc_objective,
+                },
+                candidate_tail_metrics={
+                    **candidate_tail,
+                    "low_soc_objective_score": candidate_low_soc_objective,
+                },
                 metric_deltas=metric_deltas,
                 biggest_metric_improvement=ranked_changes[0][1] if ranked_changes else "",
                 biggest_metric_regression=ranked_changes[-1][1] if ranked_changes else "",
@@ -967,6 +1209,7 @@ def _build_diagnostics_markdown(
     calibration_profile: CalibrationProfile,
     search_plan: CalibrationSearchPlan,
     diagnostics: Sequence[DatasetTransitionSummary],
+    tail_candidate_comparison: TailCandidateComparison | None,
     improvement_summary: RoomEnvelopeImprovementSummary,
     recommendation_text: str,
 ) -> str:
@@ -981,15 +1224,33 @@ def _build_diagnostics_markdown(
         f"- Regressed datasets: {improvement_summary.regressed_dataset_count}",
         f"- Status upgrades: {improvement_summary.status_upgrade_count}",
         f"- Status downgrades: {improvement_summary.status_downgrade_count}",
-        "",
-        "| Dataset | Baseline | Candidate | Transition | Biggest Improvement | Biggest Regression |",
-        "| --- | --- | --- | --- | --- | --- |",
     ]
+    if tail_candidate_comparison is not None:
+        lines.extend(
+            [
+                f"- Aggregate-best candidate: `{tail_candidate_comparison.aggregate_best_candidate_id}`",
+                f"- Tail-best candidate: `{tail_candidate_comparison.low_soc_best_candidate_id}`",
+                f"- Aggregate-best equals tail-best: `{str(tail_candidate_comparison.same_candidate).lower()}`",
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "| Dataset | Aging Stage | Baseline | Candidate | Transition | Biggest Improvement | Biggest Regression | Low-SOC RMSE (Base->Cand) | Tail RMSE (Base->Cand) |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        ]
+    )
     for item in diagnostics:
+        baseline_low_soc = item.baseline_segmented_metrics.get("low_soc", {}).get("voltage_rmse_v")
+        candidate_low_soc = item.candidate_segmented_metrics.get("low_soc", {}).get("voltage_rmse_v")
+        baseline_tail = item.baseline_tail_metrics.get("last_10_percent_voltage_rmse_v")
+        candidate_tail = item.candidate_tail_metrics.get("last_10_percent_voltage_rmse_v")
         lines.append(
-            f"| {item.dataset_display_name} | {item.baseline_status.upper()} | {item.candidate_status.upper()} | "
+            f"| {item.dataset_display_name} | {item.aging_stage} | {item.baseline_status.upper()} | {item.candidate_status.upper()} | "
             f"{item.status_transition} | {item.biggest_metric_improvement or 'n/a'} | "
-            f"{item.biggest_metric_regression or 'n/a'} |"
+            f"{item.biggest_metric_regression or 'n/a'} | "
+            f"{('n/a' if baseline_low_soc is None else f'{baseline_low_soc:.4f}')} -> {('n/a' if candidate_low_soc is None else f'{candidate_low_soc:.4f}')} | "
+            f"{('n/a' if baseline_tail is None else f'{baseline_tail:.4f}')} -> {('n/a' if candidate_tail is None else f'{candidate_tail:.4f}')} |"
         )
     return "\n".join(lines)
 
@@ -1050,6 +1311,7 @@ def calibrate_room_envelope(
     threshold_profile = get_validation_threshold_profile(threshold_profile_id or manifest.recommended_threshold_profile)
     calibration_profile = get_calibration_profile(calibration_profile_id)
     search_plan = get_calibration_search_plan(search_plan_id, calibration_profile_id=calibration_profile.profile_id)
+    tail_weights = _tail_objective_weights(calibration_profile)
     registry = TruthDatasetRegistry(truth_data_dir or DEFAULT_TRUTH_DATA_DIR)
     anchor = registry.get_truth_dataset(manifest.calibration_dataset_id)
     base_config = build_single_cell_validation_base_config(anchor.metadata)
@@ -1071,8 +1333,13 @@ def calibrate_room_envelope(
         baseline_payload.get("validation_scorecards", []),
         weights=calibration_profile.objective_weights,
     )
+    baseline_low_soc_objective = evaluate_calibration_objective(
+        baseline_payload.get("validation_scorecards", []),
+        weights=tail_weights,
+    )
     baseline_payload.setdefault("validation_summary", {})
     baseline_payload["validation_summary"]["calibration_objective"] = calibration_objective_result_to_dict(baseline_objective)
+    baseline_payload["validation_summary"]["low_soc_calibration_objective"] = calibration_objective_result_to_dict(baseline_low_soc_objective)
     baseline_payload["validation_summary"]["search_plan_id"] = search_plan.plan_id
 
     raw_candidate_count, candidates, prefiltered, preview = _generate_candidates(
@@ -1104,6 +1371,7 @@ def calibrate_room_envelope(
         "electro_blend": 0.0,
         "thermal_blend": 0.0,
         "objective": calibration_objective_result_to_dict(baseline_objective),
+        "low_soc_objective": calibration_objective_result_to_dict(baseline_low_soc_objective),
         "base_config_summary": {
             "chemistry_name": base_config.chemistry_name,
             "cell_nominal_voltage_v": base_config.cell_nominal_voltage,
@@ -1114,8 +1382,10 @@ def calibrate_room_envelope(
         "calibrated_parameters": None,
     }
     selected_objective = baseline_objective
+    selected_low_soc_objective = baseline_low_soc_objective
     selected_candidate = None
     candidate_lookup = {candidate.candidate_id: candidate for candidate in candidates}
+    tail_candidate_comparison = _build_tail_candidate_comparison(candidate_evaluations, candidate_lookup)
 
     if candidate_evaluations:
         best_evaluation = min(candidate_evaluations, key=lambda item: (item.full_objective_score, item.candidate_id))
@@ -1137,8 +1407,13 @@ def calibrate_room_envelope(
                     selected_payload.get("validation_scorecards", []),
                     weights=calibration_profile.objective_weights,
                 )
+                selected_low_soc_objective = evaluate_calibration_objective(
+                    selected_payload.get("validation_scorecards", []),
+                    weights=tail_weights,
+                )
                 selected_payload.setdefault("validation_summary", {})
                 selected_payload["validation_summary"]["calibration_objective"] = calibration_objective_result_to_dict(selected_objective)
+                selected_payload["validation_summary"]["low_soc_calibration_objective"] = calibration_objective_result_to_dict(selected_low_soc_objective)
                 selected_payload["validation_summary"]["search_plan_id"] = search_plan.plan_id
                 selected_candidate_payload = {
                     "candidate_id": selected_candidate.candidate_id,
@@ -1149,6 +1424,7 @@ def calibrate_room_envelope(
                     "electro_blend": selected_candidate.electro_blend,
                     "thermal_blend": selected_candidate.thermal_blend,
                     "objective": calibration_objective_result_to_dict(selected_objective),
+                    "low_soc_objective": calibration_objective_result_to_dict(selected_low_soc_objective),
                     "base_config_summary": {
                         "chemistry_name": base_config.chemistry_name,
                         "cell_nominal_voltage_v": base_config.cell_nominal_voltage,
@@ -1159,8 +1435,12 @@ def calibrate_room_envelope(
 
     selected_payload["validation_summary"]["calibration_profile_id"] = calibration_profile.profile_id
     selected_payload["validation_summary"]["objective_weights"] = calibration_profile.objective_weights.as_metric_weights()
+    selected_payload["validation_summary"]["tail_objective_weights"] = tail_weights.as_metric_weights()
     baseline_payload["validation_summary"]["calibration_profile_id"] = calibration_profile.profile_id
     baseline_payload["validation_summary"]["objective_weights"] = calibration_profile.objective_weights.as_metric_weights()
+    baseline_payload["validation_summary"]["tail_objective_weights"] = tail_weights.as_metric_weights()
+    if "low_soc_calibration_objective" not in selected_payload["validation_summary"]:
+        selected_payload["validation_summary"]["low_soc_calibration_objective"] = calibration_objective_result_to_dict(selected_low_soc_objective)
 
     diagnostics = _compare_dataset_diagnostics(
         baseline_payload,
@@ -1180,6 +1460,7 @@ def calibrate_room_envelope(
         calibration_profile,
         search_plan,
         diagnostics,
+        tail_candidate_comparison,
         improvement_summary,
         recommendation_text,
     )
@@ -1198,7 +1479,16 @@ def calibrate_room_envelope(
         best_candidate_id=str(selected_candidate_payload["candidate_id"]),
         baseline_status_counts=_status_counts(baseline_payload.get("validation_scorecards", [])),
         selected_status_counts=_status_counts(selected_payload.get("validation_scorecards", [])),
+        baseline_aging_stage_summaries=tuple(
+            dict(item) for item in baseline_payload.get("validation_summary", {}).get("aging_stage_summaries", [])
+        ),
+        selected_aging_stage_summaries=tuple(
+            dict(item) for item in selected_payload.get("validation_summary", {}).get("aging_stage_summaries", [])
+        ),
+        baseline_low_soc_objective_score=baseline_low_soc_objective.total_score,
+        selected_low_soc_objective_score=selected_low_soc_objective.total_score,
         candidate_search_preview=preview,
+        tail_candidate_comparison=tail_candidate_comparison,
         improvement_summary=improvement_summary,
     )
 

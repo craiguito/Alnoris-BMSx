@@ -138,8 +138,10 @@ class RoomEnvelopeCalibrationTests(unittest.TestCase):
     def test_search_plan_selection_and_defaults(self) -> None:
         fast = get_calibration_search_plan(None, calibration_profile_id="electrical_first")
         balanced = get_calibration_search_plan(None, calibration_profile_id="balanced_electro_thermal")
+        tail_guarded = get_calibration_profile("electrical_tail_guarded")
         self.assertEqual(fast.plan_id, "fast_product_default")
         self.assertEqual(balanced.plan_id, "balanced_default")
+        self.assertEqual(tail_guarded.default_search_plan_id, "fast_product_default")
 
     def test_weighted_anchor_scoring_changes_by_profile(self) -> None:
         manifest = ValidationPackManifest(
@@ -348,6 +350,8 @@ class RoomEnvelopeCalibrationTests(unittest.TestCase):
         self.assertIn("Baseline / Default Model", benchmark.markdown)
         self.assertIn("electrical_first", benchmark.markdown)
         self.assertIn("balanced_electro_thermal", benchmark.markdown)
+        self.assertTrue(hasattr(benchmark.rows[1], "average_low_soc_voltage_rmse_v"))
+        self.assertTrue(hasattr(benchmark.rows[1], "aging_stage_status_counts"))
 
     def test_status_transition_summary_generation(self) -> None:
         diagnostics = (
@@ -383,13 +387,13 @@ class RoomEnvelopeCalibrationTests(unittest.TestCase):
     def test_cli_parser_accepts_profile_and_search_plan(self) -> None:
         parser = _build_parser()
         args = parser.parse_args([
-            "--calibration-profile", "balanced_electro_thermal",
+            "--calibration-profile", "electrical_tail_guarded",
             "--search-plan", "balanced_default",
-            "--benchmark-profiles", "electrical_first", "balanced_electro_thermal",
+            "--benchmark-profiles", "electrical_first", "balanced_electro_thermal", "electrical_tail_guarded",
         ])
-        self.assertEqual(args.calibration_profile, "balanced_electro_thermal")
+        self.assertEqual(args.calibration_profile, "electrical_tail_guarded")
         self.assertEqual(args.search_plan, "balanced_default")
-        self.assertEqual(args.benchmark_profiles, ["electrical_first", "balanced_electro_thermal"])
+        self.assertEqual(args.benchmark_profiles, ["electrical_first", "balanced_electro_thermal", "electrical_tail_guarded"])
 
     def test_artifact_persists_profile_and_search_metadata(self) -> None:
         workspace, truth_dir, manifest_dir, temp_dir = _make_workspace(dataset_count=2)
@@ -406,6 +410,9 @@ class RoomEnvelopeCalibrationTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["calibration_profile_id"], "electrical_first")
         self.assertEqual(payload["summary"]["search_plan_id"], "fast_product_default")
         self.assertIn("benchmark_comparison", payload)
+        self.assertIn("tail_objective_weights", payload["baseline_validation"]["validation_summary"])
+        self.assertIn("baseline_low_soc_objective_score", payload["summary"])
+        self.assertIn("tail_candidate_comparison", payload["summary"])
 
     def test_single_anchor_manifest_still_runs(self) -> None:
         workspace, truth_dir, manifest_dir, temp_dir = _make_workspace(dataset_count=1)
@@ -435,7 +442,28 @@ class RoomEnvelopeCalibrationTests(unittest.TestCase):
         diagnostic = artifact.per_dataset_diagnostics[0]
         self.assertTrue(diagnostic.status_transition)
         self.assertIsInstance(diagnostic.metric_deltas, dict)
-        self.assertIn("baseline_status", room_envelope_calibration_to_dict(artifact)["per_dataset_diagnostics"][0])
+        payload = room_envelope_calibration_to_dict(artifact)["per_dataset_diagnostics"][0]
+        self.assertIn("baseline_status", payload)
+        self.assertIn("aging_stage", payload)
+        self.assertIn("baseline_segmented_metrics", payload)
+        self.assertIn("candidate_tail_metrics", payload)
+
+    def test_room_envelope_summary_carries_tail_candidate_comparison(self) -> None:
+        workspace, truth_dir, manifest_dir, temp_dir = _make_workspace(dataset_count=2)
+        try:
+            artifact = calibrate_room_envelope(
+                manifest_id_or_path="synthetic_room",
+                calibration_profile_id="electrical_tail_guarded",
+                truth_data_dir=truth_dir,
+                manifest_dir=manifest_dir,
+            )
+        finally:
+            temp_dir.__exit__(None, None, None)
+
+        self.assertIsNotNone(artifact.summary.tail_candidate_comparison)
+        self.assertGreaterEqual(artifact.summary.baseline_low_soc_objective_score, 0.0)
+        self.assertGreaterEqual(artifact.summary.selected_low_soc_objective_score, 0.0)
+        self.assertIsInstance(artifact.summary.selected_aging_stage_summaries, tuple)
 
 
 if __name__ == "__main__":

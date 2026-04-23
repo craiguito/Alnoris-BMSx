@@ -27,6 +27,13 @@ Where:
 
 This keeps electrical and thermal terms on a comparable scale and makes the weighting visible in artifacts.
 
+Segmented electrical metrics use the same normalized structure, but with tail-specific thresholds from the active validation threshold profile:
+
+- `high_soc_voltage_rmse`
+- `mid_soc_voltage_rmse`
+- `low_soc_voltage_rmse`
+- `last_10_percent_voltage_rmse`
+
 ## Profiles
 
 ### `electrical_first`
@@ -60,6 +67,23 @@ Intent:
 
 Default search plan: `balanced_default`
 
+### `electrical_tail_guarded`
+
+- Voltage RMSE weight: `0.22`
+- Final voltage error weight: `0.22`
+- Energy error weight: `0.08`
+- Temperature RMSE weight: `0.02`
+- Low-SOC voltage RMSE weight: `0.28`
+- Last 10% voltage RMSE weight: `0.18`
+
+Intent:
+
+- prioritize the last 10-20% of discharge
+- pull candidate selection toward the real room-envelope blocker
+- keep temperature fit from dominating tail-voltage fidelity
+
+Default search plan: `fast_product_default`
+
 ## Where Weighting Matters
 
 Weighting now affects more than final candidate selection.
@@ -67,6 +91,7 @@ Weighting now affects more than final candidate selection.
 - Per-dataset baseline scoring: used to rank room-temperature anchor datasets
 - Weighted family blending: higher-priority anchors get more influence in combined parameter sets
 - Screening and final ranking: candidates are kept or dropped by the same weighted normalized objective
+- Segmented tail scoring: `low_soc_voltage_rmse` and `last_10_percent_voltage_rmse` can influence profile-aware ranking directly
 
 What weighting does not do yet:
 

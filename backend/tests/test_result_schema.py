@@ -104,6 +104,9 @@ class ResultSchemaTests(unittest.TestCase):
         self.assertIn("validation_summary", result)
         self.assertEqual(result["validation_summary"]["dataset_count"], 1)
         self.assertIn("metric_results", result["validation_scorecards"][0])
+        self.assertIn("segmented_metrics", result["validation_scorecards"][0])
+        self.assertIn("tail_metrics", result["validation_scorecards"][0])
+        self.assertIn("aging_stage_summaries", result["validation_summary"])
 
 
 if __name__ == "__main__":

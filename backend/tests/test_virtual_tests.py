@@ -192,6 +192,9 @@ class VirtualTestFrameworkTests(unittest.TestCase):
         self.assertTrue(result["pass_fail_indicators"]["validation_passed"])
         self.assertEqual(len(result["validation_scorecards"]), 1)
         self.assertEqual(result["validation_summary"]["overall_status"], "pass")
+        self.assertIn("segmented_metrics", result["validation_scorecards"][0])
+        self.assertIn("tail_metrics", result["validation_scorecards"][0])
+        self.assertIn("aging_stage_summaries", result["validation_summary"])
 
     def test_model_validation_supports_multiple_registered_truth_datasets(self) -> None:
         config = make_config(
@@ -249,6 +252,7 @@ class VirtualTestFrameworkTests(unittest.TestCase):
         self.assertEqual(result["validation_summary"]["overall_status"], "warning")
         self.assertFalse(result["pass_fail_indicators"]["validation_passed"])
         self.assertIn("primary_result", result)
+        self.assertIn("warning_count", result["validation_summary"])
 
 
 if __name__ == "__main__":

@@ -34,6 +34,11 @@ NASA_SINGLE_CELL_V1_PROFILE = ValidationThresholdProfile(
         "max_final_voltage_error_v": 0.080,
         "max_energy_error_fraction": 0.080,
         "max_temp_rmse_c": 2.50,
+        "max_high_soc_voltage_rmse_v": 0.050,
+        "max_mid_soc_voltage_rmse_v": 0.050,
+        "max_low_soc_voltage_rmse_v": 0.060,
+        "max_last_10_percent_voltage_rmse_v": 0.070,
+        "max_cutoff_neighborhood_voltage_rmse_v": 0.080,
     },
     validation_basis_label="NASA Ames single-cell validation basis",
     validation_basis_description=(

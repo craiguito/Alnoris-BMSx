@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import unittest
+from pathlib import Path
 
 from backend.sim_core.calibration import (
     apply_calibration_to_simulation_config,
@@ -127,10 +128,13 @@ class CalibrationTests(unittest.TestCase):
 
         self.assertGreaterEqual(len(calibrated.ocv_curve), 5)
         self.assertGreater(calibrated.base_resistance_ohm_per_cell, 0.0)
+        self.assertGreaterEqual(len(calibrated.resistance_soc_curve), 8)
+        self.assertGreaterEqual(calibrated.rc_low_soc_multiplier, 1.0)
         self.assertEqual(len(calibrated.rc_branches), 1)
         self.assertTrue(calibrated_config.physics.ocv_curve)
         self.assertTrue(calibrated_config.physics.two_node_thermal_enabled)
         self.assertTrue(calibrated_config.physics.resistance_vs_soc_enabled)
+        self.assertGreaterEqual(calibrated_config.physics.rc_low_soc_multiplier, 1.0)
         self.assertEqual(calibrated_config.electrical_model.model_type, "1rc")
         self.assertAlmostEqual(
             calibrated_config.electrical_model.r0_ohm_per_cell,
@@ -142,6 +146,31 @@ class CalibrationTests(unittest.TestCase):
             calibrated.base_resistance_ohm_per_cell,
             places=9,
         )
+
+    def test_tail_voltage_depression_increases_low_soc_rc_multiplier(self) -> None:
+        config = make_config(
+            "panasonic_ncr18650b",
+            cells_in_series=1,
+            group_count=1,
+            discharge_current_a=0.0,
+            duration_s=4200,
+            time_step_s=5,
+            current_profile=make_profile((0, 0.0), (10, 3.0), (3600, 3.0), (3900, 1.0), (4195, 0.0)),
+        )
+        result = run_simulation(config)
+
+        with temporary_workspace_dir() as temp_dir:
+            dataset_path = write_truth_dataset(f"{temp_dir}/tail_truth.json", config, result)
+            payload = json.loads(Path(dataset_path).read_text(encoding="utf-8"))
+            for row in payload["data"]:
+                if float(row.get("soc", 1.0)) <= 0.25:
+                    row["voltage_v"] = float(row["voltage_v"]) - 0.18
+            Path(dataset_path).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            dataset = load_truth_dataset(str(dataset_path))
+
+        calibrated = calibrate_parameters(dataset, rc_branch_count=1)
+
+        self.assertGreater(calibrated.rc_low_soc_multiplier, 1.0)
 
 
 if __name__ == "__main__":

@@ -25,7 +25,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--manifest", default="nasa_room_canonical", help="Manifest id or path.")
     parser.add_argument("--calibration-profile", default="electrical_first", help="Calibration profile id.")
     parser.add_argument("--search-plan", default=None, help="Optional search plan override.")
-    parser.add_argument("--benchmark-profiles", nargs="*", default=["electrical_first", "balanced_electro_thermal"], help="Calibration profiles to include in benchmark comparison.")
+    parser.add_argument("--benchmark-profiles", nargs="*", default=["electrical_first", "balanced_electro_thermal", "electrical_tail_guarded"], help="Calibration profiles to include in benchmark comparison.")
     parser.add_argument("--threshold-profile", default=None, help="Optional threshold profile override.")
     parser.add_argument("--truth-data-dir", default=None, help="Optional truth-data directory override.")
     parser.add_argument("--manifest-dir", default=None, help="Optional validation-manifest directory override.")
@@ -35,6 +35,28 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--benchmark-output", default="build/room_envelope_benchmark.json", help="Benchmark JSON artifact path.")
     parser.add_argument("--benchmark-markdown", default="build/room_envelope_benchmark.md", help="Benchmark markdown artifact path.")
     return parser
+
+
+def _worst_tail_dataset_status(artifact: object) -> str:
+    diagnostics = getattr(artifact, "per_dataset_diagnostics", ())
+    if not diagnostics:
+        return "Worst tail dataset: n/a"
+    ranked = sorted(
+        diagnostics,
+        key=lambda item: float(item.baseline_tail_metrics.get("last_10_percent_voltage_rmse_v") or -1.0),
+        reverse=True,
+    )
+    worst = ranked[0]
+    baseline_tail = worst.baseline_tail_metrics.get("last_10_percent_voltage_rmse_v")
+    candidate_tail = worst.candidate_tail_metrics.get("last_10_percent_voltage_rmse_v")
+    if baseline_tail is None or candidate_tail is None:
+        return f"Worst tail dataset: {worst.dataset_id} (tail RMSE unavailable)"
+    improved = float(candidate_tail) < float(baseline_tail)
+    return (
+        f"Worst tail dataset: {worst.dataset_id} "
+        f"({'improved' if improved else 'not improved'}; "
+        f"{float(baseline_tail):.4f} -> {float(candidate_tail):.4f})"
+    )
 
 
 def _write_json(path: str, payload: dict[str, object]) -> str:
@@ -111,6 +133,11 @@ def main(argv: list[str] | None = None) -> int:
 
     before_counts = selected_artifact.summary.baseline_status_counts
     after_counts = selected_artifact.summary.selected_status_counts
+    baseline_objective = float(selected_artifact.summary.baseline_low_soc_objective_score)
+    selected_low_soc_objective = float(selected_artifact.summary.selected_low_soc_objective_score)
+    baseline_overall_objective = float(selected_artifact.baseline_validation.get("validation_summary", {}).get("calibration_objective", {}).get("total_score", 0.0))
+    selected_overall_objective = float(selected_artifact.selected_validation.get("validation_summary", {}).get("calibration_objective", {}).get("total_score", 0.0))
+    tail_candidate_comparison = selected_artifact.summary.tail_candidate_comparison
     print(f"Room Envelope Calibration")
     print(f"Manifest: {selected_artifact.manifest.manifest_id}")
     print(f"Calibration profile: {selected_artifact.calibration_profile.profile_id}")
@@ -138,6 +165,27 @@ def main(argv: list[str] | None = None) -> int:
             fail_count=after_counts.get("fail", 0),
         )
     )
+    print(
+        "Overall objective: {before:.4f} -> {after:.4f}".format(
+            before=baseline_overall_objective,
+            after=selected_overall_objective,
+        )
+    )
+    print(
+        "Low-SOC objective: {before:.4f} -> {after:.4f}".format(
+            before=baseline_objective,
+            after=selected_low_soc_objective,
+        )
+    )
+    if tail_candidate_comparison is not None:
+        print(
+            "Aggregate-best vs tail-best: {aggregate} vs {tail} ({relation})".format(
+                aggregate=tail_candidate_comparison.aggregate_best_candidate_id,
+                tail=tail_candidate_comparison.low_soc_best_candidate_id,
+                relation="same" if tail_candidate_comparison.same_candidate else "different",
+            )
+        )
+    print(_worst_tail_dataset_status(selected_artifact))
     print(f"Recommendation: {selected_artifact.recommendation_text}")
     print(f"Artifacts: {primary_json_path}")
     print(f"Diagnostics markdown: {markdown_path}")

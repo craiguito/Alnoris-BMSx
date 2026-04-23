@@ -39,6 +39,17 @@ class TruthDataset:
 
 
 @dataclass(frozen=True)
+class ValidationAlignment:
+    truth_times_s: tuple[float, ...]
+    truth_voltage_v: tuple[float, ...]
+    aligned_sim_voltage_v: tuple[float, ...]
+    truth_temp_c: tuple[float, ...]
+    aligned_sim_temp_c: tuple[float, ...]
+    truth_soc: tuple[float, ...]
+    normalized_progress: tuple[float, ...]
+
+
+@dataclass(frozen=True)
 class CalibratedParameters:
     ocv_curve: tuple[OcvLookupPoint, ...]
     base_resistance_ohm_per_cell: float
@@ -52,6 +63,7 @@ class CalibratedParameters:
     resistance_growth_per_throughput_ah: float
     calendar_capacity_fade_per_hour: float
     calendar_resistance_growth_per_hour: float
+    rc_low_soc_multiplier: float = 1.0
     diagnostics: dict[str, Any] = field(default_factory=dict)
 
 
@@ -91,6 +103,35 @@ _TRUTH_DATASET_REQUIRED_METADATA_FIELDS = (
     "source",
     "status",
 )
+_LOW_SOC_FOCUSED_OCV_SOC_KNOTS: tuple[float, ...] = (
+    0.0,
+    0.02,
+    0.05,
+    0.09,
+    0.14,
+    0.22,
+    0.33,
+    0.50,
+    0.66,
+    0.82,
+    0.94,
+    1.0,
+)
+_LOW_SOC_FOCUSED_RESISTANCE_SOC_KNOTS: tuple[float, ...] = (
+    0.0,
+    0.03,
+    0.08,
+    0.15,
+    0.25,
+    0.40,
+    0.55,
+    0.70,
+    0.85,
+    1.0,
+)
+_REFERENCE_RESISTANCE_SOC_MIN = 0.35
+_REFERENCE_RESISTANCE_SOC_MAX = 0.80
+_TAIL_RESISTANCE_SOC_MAX = 0.15
 
 
 def _clamp(value: float, low: float, high: float) -> float:
@@ -316,6 +357,13 @@ def _bin_center(index: int, bin_count: int) -> float:
     return index / float(bin_count - 1)
 
 
+def _nearest_knot_index(soc: float, knots: Sequence[float]) -> int:
+    if not knots:
+        return 0
+    clamped_soc = _clamp(soc, 0.0, 1.0)
+    return min(range(len(knots)), key=lambda index: abs(knots[index] - clamped_soc))
+
+
 def _fill_missing_bins(values: list[float | None], fallback_start: float, fallback_end: float) -> list[float]:
     if not values:
         return []
@@ -345,6 +393,15 @@ def _fill_missing_bins(values: list[float | None], fallback_start: float, fallba
         filled[index] = filled[last_known]
 
     return filled
+
+
+def _enforce_monotonic_non_decreasing(values: Sequence[float]) -> list[float]:
+    if not values:
+        return []
+    monotonic: list[float] = [float(values[0])]
+    for value in values[1:]:
+        monotonic.append(max(monotonic[-1], float(value)))
+    return monotonic
 
 
 def _dataset_capacity_ah(metadata: dict[str, Any], raw_records: Sequence[_RawTruthRecord]) -> float:
@@ -500,24 +557,59 @@ def load_truth_dataset(path: str, *, strict_metadata: bool = False) -> TruthData
     return truth_dataset_from_dict(payload, strict_metadata=strict_metadata, source_path=str(expanded_path))
 
 
-def _fit_ocv_curve(records: Sequence[TruthRecord], low_current_threshold_a: float, bin_count: int = 11) -> tuple[OcvLookupPoint, ...]:
+def _reference_resistance_ohm(estimates: Sequence[_ResistanceEstimate]) -> float:
+    preferred = [
+        item.resistance_ohm
+        for item in estimates
+        if _REFERENCE_RESISTANCE_SOC_MIN <= item.soc <= _REFERENCE_RESISTANCE_SOC_MAX
+    ]
+    return _median_or(preferred or (item.resistance_ohm for item in estimates), 0.01)
+
+
+def _estimate_rc_low_soc_multiplier(
+    estimates: Sequence[_ResistanceEstimate],
+    *,
+    reference_resistance_ohm: float,
+) -> float:
+    if len(estimates) < 3:
+        return 1.0
+    low_soc = [item.resistance_ohm for item in estimates if item.soc <= _TAIL_RESISTANCE_SOC_MAX]
+    reference = [
+        item.resistance_ohm
+        for item in estimates
+        if _REFERENCE_RESISTANCE_SOC_MIN <= item.soc <= _REFERENCE_RESISTANCE_SOC_MAX
+    ]
+    if len(low_soc) < 2 or len(reference) < 2:
+        return 1.0
+    return _clamp(
+        _median_or(low_soc, reference_resistance_ohm) / max(_median_or(reference, reference_resistance_ohm), 1.0e-9),
+        1.0,
+        2.5,
+    )
+
+
+def _fit_ocv_curve(
+    records: Sequence[TruthRecord],
+    low_current_threshold_a: float,
+    soc_knots: Sequence[float] = _LOW_SOC_FOCUSED_OCV_SOC_KNOTS,
+) -> tuple[OcvLookupPoint, ...]:
     candidates = [record for record in records if abs(record.current_a) <= low_current_threshold_a]
-    if len(candidates) < max(3, bin_count // 2):
+    if len(candidates) < max(3, len(soc_knots) // 2):
         candidates = list(records)
 
-    bins: list[list[float]] = [[] for _ in range(bin_count)]
+    bins: list[list[float]] = [[] for _ in range(len(soc_knots))]
     for record in candidates:
-        index = round(_clamp(record.soc, 0.0, 1.0) * (bin_count - 1))
+        index = _nearest_knot_index(record.soc, soc_knots)
         bins[index].append(record.voltage_v)
 
     observed = [median(values) if values else None for values in bins]
     fallback_start = min(record.voltage_v for record in candidates)
     fallback_end = max(record.voltage_v for record in candidates)
-    filled = _fill_missing_bins(observed, fallback_start, fallback_end)
+    filled = _enforce_monotonic_non_decreasing(_fill_missing_bins(observed, fallback_start, fallback_end))
 
     return tuple(
-        OcvLookupPoint(soc=_bin_center(index, bin_count), voltage_v=filled[index])
-        for index in range(bin_count)
+        OcvLookupPoint(soc=float(soc_knots[index]), voltage_v=filled[index])
+        for index in range(len(soc_knots))
     )
 
 
@@ -542,9 +634,6 @@ def _estimate_resistances(records: Sequence[TruthRecord], ocv_curve: Sequence[Oc
                     )
                 )
 
-    if estimates:
-        return estimates
-
     for record in records:
         if abs(record.current_a) < load_threshold_a:
             continue
@@ -562,21 +651,26 @@ def _estimate_resistances(records: Sequence[TruthRecord], ocv_curve: Sequence[Oc
     return estimates
 
 
-def _fit_resistance_soc_curve(estimates: Sequence[_ResistanceEstimate], bin_count: int = 5) -> tuple[SocLookupPoint, ...]:
+def _fit_resistance_soc_curve(
+    estimates: Sequence[_ResistanceEstimate],
+    *,
+    reference_resistance_ohm: float | None = None,
+    soc_knots: Sequence[float] = _LOW_SOC_FOCUSED_RESISTANCE_SOC_KNOTS,
+) -> tuple[SocLookupPoint, ...]:
     if not estimates:
         return PhysicsConfig().resistance_soc_curve
 
-    median_resistance = _median_or((item.resistance_ohm for item in estimates), 1.0)
-    bins: list[list[float]] = [[] for _ in range(bin_count)]
+    reference_resistance = reference_resistance_ohm or _reference_resistance_ohm(estimates)
+    bins: list[list[float]] = [[] for _ in range(len(soc_knots))]
     for item in estimates:
-        index = round(_clamp(item.soc, 0.0, 1.0) * (bin_count - 1))
-        bins[index].append(item.resistance_ohm / max(median_resistance, 1e-9))
+        index = _nearest_knot_index(item.soc, soc_knots)
+        bins[index].append(item.resistance_ohm / max(reference_resistance, 1e-9))
 
     observed = [median(values) if values else None for values in bins]
     filled = _fill_missing_bins(observed, 1.0, 1.0)
     return tuple(
-        SocLookupPoint(soc=_bin_center(index, bin_count), multiplier=max(filled[index], 0.05))
-        for index in range(bin_count)
+        SocLookupPoint(soc=float(soc_knots[index]), multiplier=max(filled[index], 0.05))
+        for index in range(len(soc_knots))
     )
 
 
@@ -775,8 +869,11 @@ def calibrate_parameters(dataset: TruthDataset, rc_branch_count: int = 1) -> Cal
 
     ocv_curve = _fit_ocv_curve(dataset.records, low_current_threshold_a=low_current_threshold_a)
     resistance_estimates = _estimate_resistances(dataset.records, ocv_curve)
-    base_resistance_ohm = _median_or((item.resistance_ohm for item in resistance_estimates), 0.01)
-    resistance_soc_curve = _fit_resistance_soc_curve(resistance_estimates)
+    base_resistance_ohm = _reference_resistance_ohm(resistance_estimates) if resistance_estimates else 0.01
+    resistance_soc_curve = _fit_resistance_soc_curve(
+        resistance_estimates,
+        reference_resistance_ohm=base_resistance_ohm,
+    )
     resistance_temperature_alpha_per_c = _fit_temperature_alpha(
         resistance_estimates,
         reference_temp_c=ambient_temp_c,
@@ -798,6 +895,10 @@ def calibrate_parameters(dataset: TruthDataset, rc_branch_count: int = 1) -> Cal
         calendar_capacity_fade_per_hour,
         calendar_resistance_growth_per_hour,
     ) = _fit_degradation_parameters(dataset.records, resistance_estimates)
+    rc_low_soc_multiplier = _estimate_rc_low_soc_multiplier(
+        resistance_estimates,
+        reference_resistance_ohm=base_resistance_ohm,
+    )
 
     return CalibratedParameters(
         ocv_curve=ocv_curve,
@@ -812,11 +913,16 @@ def calibrate_parameters(dataset: TruthDataset, rc_branch_count: int = 1) -> Cal
         resistance_growth_per_throughput_ah=resistance_growth_per_throughput_ah,
         calendar_capacity_fade_per_hour=calendar_capacity_fade_per_hour,
         calendar_resistance_growth_per_hour=calendar_resistance_growth_per_hour,
+        rc_low_soc_multiplier=rc_low_soc_multiplier,
         diagnostics={
             "record_count": len(dataset.records),
             "low_current_threshold_a": low_current_threshold_a,
             "base_resistance_ohm": base_resistance_ohm,
             "resistance_estimate_count": len(resistance_estimates),
+            "reference_resistance_ohm": base_resistance_ohm,
+            "rc_low_soc_multiplier": rc_low_soc_multiplier,
+            "ocv_soc_knot_count": len(ocv_curve),
+            "resistance_soc_knot_count": len(resistance_soc_curve),
         },
     )
 
@@ -842,6 +948,11 @@ def apply_calibration_to_configs(
         calibrated.resistance_temperature_alpha_per_c,
         thermal_alpha,
     )
+    blended_rc_low_soc_multiplier = _blend_scalar(
+        base_physics.rc_low_soc_multiplier,
+        calibrated.rc_low_soc_multiplier,
+        electro_alpha,
+    )
     physics = replace(
         base_physics,
         ocv_curve=calibrated.ocv_curve if electro_alpha >= 0.5 else base_physics.ocv_curve,
@@ -849,6 +960,11 @@ def apply_calibration_to_configs(
         resistance_vs_soc_enabled=(electro_alpha >= 0.5) or base_physics.resistance_vs_soc_enabled,
         resistance_soc_curve=calibrated.resistance_soc_curve if electro_alpha >= 0.5 else base_physics.resistance_soc_curve,
         resistance_temperature_alpha_per_c=blended_temp_alpha,
+        rc_state_dependence_enabled=(
+            (electro_alpha >= 0.5 and bool(calibrated.rc_branches) and calibrated.rc_low_soc_multiplier > 1.01)
+            or base_physics.rc_state_dependence_enabled
+        ),
+        rc_low_soc_multiplier=blended_rc_low_soc_multiplier,
         core_thermal_mass_j_per_k=_blend_scalar(
             base_physics.core_thermal_mass_j_per_k or calibrated.core_thermal_mass_j_per_k,
             calibrated.core_thermal_mass_j_per_k,
@@ -953,6 +1069,37 @@ def build_validation_config(base_config: SimulationConfig, dataset: TruthDataset
     )
 
 
+def build_validation_alignment(result: SimulationResult, dataset: TruthDataset) -> ValidationAlignment:
+    truth_times = tuple(record.time_s for record in dataset.records)
+    truth_voltage_v = tuple(record.voltage_v for record in dataset.records)
+    truth_temp_c = tuple(record.temp_c for record in dataset.records)
+    truth_soc = tuple(_clamp(record.soc, 0.0, 1.0) for record in dataset.records)
+    sim_times = [float(point.time_s) for point in result.time_series]
+    sim_voltage_v = [point.pack_voltage_v for point in result.time_series]
+    sim_temp_c = [point.pack_temp_avg_c for point in result.time_series]
+    aligned_voltage_v = tuple(_interpolate_series(sim_times, sim_voltage_v, truth_times))
+    aligned_temp_c = tuple(_interpolate_series(sim_times, sim_temp_c, truth_times))
+
+    if len(truth_times) <= 1:
+        normalized_progress = tuple(0.0 for _ in truth_times)
+    else:
+        total_duration_s = max(truth_times[-1] - truth_times[0], 1.0e-9)
+        normalized_progress = tuple(
+            _clamp((time_s - truth_times[0]) / total_duration_s, 0.0, 1.0)
+            for time_s in truth_times
+        )
+
+    return ValidationAlignment(
+        truth_times_s=truth_times,
+        truth_voltage_v=truth_voltage_v,
+        aligned_sim_voltage_v=aligned_voltage_v,
+        truth_temp_c=truth_temp_c,
+        aligned_sim_temp_c=aligned_temp_c,
+        truth_soc=truth_soc,
+        normalized_progress=normalized_progress,
+    )
+
+
 def _interpolate_series(xs: Sequence[float], ys: Sequence[float], targets: Sequence[float]) -> list[float]:
     if not xs or not ys or len(xs) != len(ys):
         return [0.0 for _ in targets]
@@ -978,44 +1125,40 @@ def _interpolate_series(xs: Sequence[float], ys: Sequence[float], targets: Seque
 
 
 def compute_rmse_voltage(result: SimulationResult, dataset: TruthDataset) -> float:
-    truth_times = [record.time_s for record in dataset.records]
-    truth_voltage_v = [record.voltage_v for record in dataset.records]
-    sim_times = [float(point.time_s) for point in result.time_series]
-    sim_voltage_v = [point.pack_voltage_v for point in result.time_series]
-    aligned_voltage_v = _interpolate_series(sim_times, sim_voltage_v, truth_times)
-    squared_errors = [(sim - truth) ** 2 for sim, truth in zip(aligned_voltage_v, truth_voltage_v)]
+    alignment = build_validation_alignment(result, dataset)
+    squared_errors = [
+        (sim - truth) ** 2
+        for sim, truth in zip(alignment.aligned_sim_voltage_v, alignment.truth_voltage_v)
+    ]
     return math.sqrt(sum(squared_errors) / max(len(squared_errors), 1))
 
 
 def compute_energy_error(result: SimulationResult, dataset: TruthDataset) -> float:
-    truth_times = [record.time_s for record in dataset.records]
+    alignment = build_validation_alignment(result, dataset)
+    truth_times = list(alignment.truth_times_s)
     truth_current_a = [record.current_a for record in dataset.records]
-    truth_voltage_v = [record.voltage_v for record in dataset.records]
-    sim_times = [float(point.time_s) for point in result.time_series]
-    sim_voltage_v = [point.pack_voltage_v for point in result.time_series]
-    aligned_voltage_v = _interpolate_series(sim_times, sim_voltage_v, truth_times)
+    truth_voltage_v = list(alignment.truth_voltage_v)
+    aligned_voltage_v = list(alignment.aligned_sim_voltage_v)
     energy_true_wh = _trapz(truth_times, [voltage * current for voltage, current in zip(truth_voltage_v, truth_current_a)]) / 3600.0
     energy_sim_wh = _trapz(truth_times, [voltage * current for voltage, current in zip(aligned_voltage_v, truth_current_a)]) / 3600.0
     return abs(energy_sim_wh - energy_true_wh) / max(abs(energy_true_wh), 1e-9)
 
 
 def compute_rmse_temp(result: SimulationResult, dataset: TruthDataset) -> float:
-    truth_times = [record.time_s for record in dataset.records]
-    truth_temp_c = [record.temp_c for record in dataset.records]
-    sim_times = [float(point.time_s) for point in result.time_series]
-    sim_temp_c = [point.pack_temp_avg_c for point in result.time_series]
-    aligned_temp_c = _interpolate_series(sim_times, sim_temp_c, truth_times)
-    squared_errors = [(sim - truth) ** 2 for sim, truth in zip(aligned_temp_c, truth_temp_c)]
+    alignment = build_validation_alignment(result, dataset)
+    squared_errors = [
+        (sim - truth) ** 2
+        for sim, truth in zip(alignment.aligned_sim_temp_c, alignment.truth_temp_c)
+    ]
     return math.sqrt(sum(squared_errors) / max(len(squared_errors), 1))
 
 
 def compute_max_abs_voltage_error(result: SimulationResult, dataset: TruthDataset) -> float:
-    truth_times = [record.time_s for record in dataset.records]
-    truth_voltage_v = [record.voltage_v for record in dataset.records]
-    sim_times = [float(point.time_s) for point in result.time_series]
-    sim_voltage_v = [point.pack_voltage_v for point in result.time_series]
-    aligned_voltage_v = _interpolate_series(sim_times, sim_voltage_v, truth_times)
-    errors = [abs(sim - truth) for sim, truth in zip(aligned_voltage_v, truth_voltage_v)]
+    alignment = build_validation_alignment(result, dataset)
+    errors = [
+        abs(sim - truth)
+        for sim, truth in zip(alignment.aligned_sim_voltage_v, alignment.truth_voltage_v)
+    ]
     return max(errors, default=0.0)
 
 
@@ -1028,8 +1171,7 @@ def compute_final_soc_error(result: SimulationResult, dataset: TruthDataset) -> 
 def compute_final_voltage_error(result: SimulationResult, dataset: TruthDataset) -> float:
     if not dataset.records or not result.time_series:
         return 0.0
-    truth_time_s = dataset.records[-1].time_s
-    sim_times = [float(point.time_s) for point in result.time_series]
-    sim_voltage_v = [point.pack_voltage_v for point in result.time_series]
-    aligned_voltage_v = _interpolate_series(sim_times, sim_voltage_v, [truth_time_s])
-    return abs(aligned_voltage_v[0] - dataset.records[-1].voltage_v) if aligned_voltage_v else 0.0
+    alignment = build_validation_alignment(result, dataset)
+    if not alignment.aligned_sim_voltage_v:
+        return 0.0
+    return abs(alignment.aligned_sim_voltage_v[-1] - alignment.truth_voltage_v[-1])

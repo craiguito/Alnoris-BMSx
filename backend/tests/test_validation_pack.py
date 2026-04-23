@@ -38,6 +38,7 @@ class ValidationPackTests(unittest.TestCase):
             ("rmse_voltage", "final_voltage_error", "energy_error", "temp_rmse"),
         )
         self.assertIn("max_voltage_rmse_v", profile.thresholds)
+        self.assertIn("max_low_soc_voltage_rmse_v", profile.thresholds)
         self.assertIn("Validated at single-cell level only.", profile.validation_limits)
 
     def test_manifest_resolution_loads_curated_nasa_manifest(self) -> None:
@@ -104,6 +105,7 @@ class ValidationPackTests(unittest.TestCase):
         self.assertEqual(artifact.default_model.result_payload["validation_summary"]["dataset_count"], 2)
         self.assertIsNotNone(artifact.calibrated_model)
         self.assertIn("Validation Limits", artifact.comparison_markdown)
+        self.assertIn("segmented_metrics", artifact.default_model.result_payload["validation_scorecards"][0])
 
 
 if __name__ == "__main__":

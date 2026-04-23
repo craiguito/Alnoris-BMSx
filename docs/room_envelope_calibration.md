@@ -20,7 +20,7 @@ This is still a single-cell validation envelope for comparative trade-study supp
 Calibration profile:
 
 - defines what the optimizer cares about
-- examples: `electrical_first`, `balanced_electro_thermal`
+- examples: `electrical_first`, `balanced_electro_thermal`, `electrical_tail_guarded`
 
 Search plan:
 
@@ -80,6 +80,12 @@ Balanced default:
 python scripts/calibrate_room_envelope.py --calibration-profile balanced_electro_thermal --search-plan balanced_default
 ```
 
+Tail-guarded room-envelope run:
+
+```powershell
+python scripts/calibrate_room_envelope.py --calibration-profile electrical_tail_guarded
+```
+
 Exhaustive debug:
 
 ```powershell
@@ -101,7 +107,7 @@ What they mean:
 - calibration JSON: full run artifact, metadata, summary object, filtered candidates, diagnostics
 - diagnostics markdown: concise per-dataset baseline vs candidate comparison
 - parameters JSON: winning candidate metadata and calibrated parameter artifact
-- benchmark JSON / markdown: baseline + profile comparison rows for quick inspection
+- benchmark JSON / markdown: baseline + profile comparison rows for quick inspection, including low-SOC metrics and aging-stage pass/warn/fail counts
 
 ## Reading Pass/Warn/Fail Deltas
 
@@ -112,6 +118,9 @@ Per-dataset diagnostics show:
 - status transition such as `FAIL->WARN`
 - biggest metric improvement
 - biggest metric regression
+- low-SOC voltage RMSE before vs after
+- last-10% voltage RMSE before vs after
+- inferred aging stage (`early_life`, `mid_life`, `late_life`)
 
 Aggregate improvement summary shows:
 
@@ -127,3 +136,4 @@ Aggregate improvement summary shows:
 - The workflow is still built on heuristic per-dataset reduced-order fits plus candidate assembly.
 - Weighting now influences anchor ranking and candidate assembly, but it is not yet a full global solver.
 - Strong PASS results on the room canonical pack are still limited mainly by end-of-discharge electrical fidelity across aging states.
+- Segmented diagnostics identify where the tail fails, but they do not by themselves guarantee a globally optimal low-SOC parameterization.

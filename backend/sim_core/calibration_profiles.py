@@ -13,6 +13,10 @@ class CalibrationObjectiveWeights:
     energy_error_weight: float
     temp_rmse_weight: float
     time_to_cutoff_error_weight: float = 0.0
+    high_soc_voltage_rmse_weight: float = 0.0
+    mid_soc_voltage_rmse_weight: float = 0.0
+    low_soc_voltage_rmse_weight: float = 0.0
+    last_10_percent_voltage_rmse_weight: float = 0.0
 
     def as_metric_weights(self) -> dict[str, float]:
         return {
@@ -21,6 +25,10 @@ class CalibrationObjectiveWeights:
             "energy_error": self.energy_error_weight,
             "temp_rmse": self.temp_rmse_weight,
             "time_to_cutoff_error": self.time_to_cutoff_error_weight,
+            "high_soc_voltage_rmse": self.high_soc_voltage_rmse_weight,
+            "mid_soc_voltage_rmse": self.mid_soc_voltage_rmse_weight,
+            "low_soc_voltage_rmse": self.low_soc_voltage_rmse_weight,
+            "last_10_percent_voltage_rmse": self.last_10_percent_voltage_rmse_weight,
         }
 
 
@@ -48,6 +56,7 @@ class CalibrationObjectiveResult:
     total_score: float
     normalized_formula: str
     metric_terms: tuple[CalibrationObjectiveMetricTerm, ...]
+    metrics_used: tuple[str, ...]
 
 
 DEFAULT_CALIBRATION_PROFILE_ID = "electrical_first"
@@ -84,6 +93,23 @@ _PROFILES: dict[str, CalibrationProfile] = {
         ),
         default_search_plan_id=get_default_search_plan_id("balanced_electro_thermal"),
     ),
+    "electrical_tail_guarded": CalibrationProfile(
+        profile_id="electrical_tail_guarded",
+        display_name="Electrical Tail Guarded",
+        description=(
+            "Prioritize room-temperature low-SOC and end-of-discharge electrical fidelity "
+            "while still preserving overall voltage shape and usable energy tracking."
+        ),
+        objective_weights=CalibrationObjectiveWeights(
+            voltage_rmse_weight=0.22,
+            final_voltage_error_weight=0.22,
+            energy_error_weight=0.08,
+            temp_rmse_weight=0.02,
+            low_soc_voltage_rmse_weight=0.28,
+            last_10_percent_voltage_rmse_weight=0.18,
+        ),
+        default_search_plan_id=get_default_search_plan_id("electrical_first"),
+    ),
 }
 
 
@@ -109,6 +135,37 @@ def calibration_objective_result_to_dict(result: CalibrationObjectiveResult) -> 
     return asdict(result)
 
 
+def _scorecard_metric_observations(scorecard: dict[str, Any]) -> dict[str, list[tuple[float, float]]]:
+    observations: dict[str, list[tuple[float, float]]] = {}
+
+    for metric in scorecard.get("metric_results", []):
+        metric_id = str(metric.get("metric_id", "")).strip()
+        value = metric.get("value")
+        threshold = metric.get("threshold_value")
+        if not metric_id or value is None or threshold in (None, 0.0):
+            continue
+        observations.setdefault(metric_id, []).append((float(value), abs(float(threshold))))
+
+    for segment in scorecard.get("segmented_metrics", []):
+        segment_id = str(segment.get("segment_id", "")).strip()
+        rmse_value = segment.get("voltage_rmse_v")
+        rmse_threshold = segment.get("threshold_voltage_rmse_v")
+        if segment_id and rmse_value is not None and rmse_threshold not in (None, 0.0):
+            observations.setdefault(f"{segment_id}_voltage_rmse", []).append(
+                (float(rmse_value), abs(float(rmse_threshold)))
+            )
+
+    tail_metrics = scorecard.get("tail_metrics") or {}
+    last_10_value = tail_metrics.get("last_10_percent_voltage_rmse_v")
+    last_10_threshold = tail_metrics.get("last_10_percent_threshold_v")
+    if last_10_value is not None and last_10_threshold not in (None, 0.0):
+        observations.setdefault("last_10_percent_voltage_rmse", []).append(
+            (float(last_10_value), abs(float(last_10_threshold)))
+        )
+
+    return observations
+
+
 def evaluate_scorecard_objective(
     scorecard: dict[str, Any],
     *,
@@ -126,23 +183,20 @@ def evaluate_calibration_objective(
     terms: list[CalibrationObjectiveMetricTerm] = []
     weighted_sum = 0.0
     total_weight = 0.0
+    aggregated_observations: dict[str, list[tuple[float, float]]] = {}
+
+    for scorecard in scorecards:
+        for metric_id, items in _scorecard_metric_observations(scorecard).items():
+            aggregated_observations.setdefault(metric_id, []).extend(items)
 
     for metric_id, weight in metric_weights.items():
         if weight <= 0.0:
             continue
-        values: list[float] = []
-        thresholds: list[float] = []
-        for scorecard in scorecards:
-            for metric in scorecard.get("metric_results", []):
-                if str(metric.get("metric_id", "")) != metric_id:
-                    continue
-                if metric.get("value") is None or metric.get("threshold_value") in (None, 0.0):
-                    continue
-                values.append(float(metric["value"]))
-                thresholds.append(abs(float(metric["threshold_value"])))
-        if not values or not thresholds:
+        items = aggregated_observations.get(metric_id, [])
+        if not items:
             continue
-
+        values = [value for value, _ in items]
+        thresholds = [threshold for _, threshold in items]
         average_value = sum(values) / len(values)
         threshold_value = sum(thresholds) / len(thresholds)
         normalized_value = average_value / max(threshold_value, 1.0e-9)
@@ -167,4 +221,5 @@ def evaluate_calibration_objective(
             "objective = sum(weight_i * (avg_metric_i / threshold_i)) / sum(weight_i)"
         ),
         metric_terms=tuple(terms),
+        metrics_used=tuple(term.metric_id for term in terms),
     )
