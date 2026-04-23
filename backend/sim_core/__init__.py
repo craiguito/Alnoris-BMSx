@@ -7,7 +7,12 @@ from .calibration import (
     calibrate_parameters,
     load_truth_dataset,
 )
+from .calibration_profiles import (
+    get_calibration_profile,
+    list_calibration_profiles,
+)
 from .engine import run_simulation
+from .room_envelope_calibration import calibrate_room_envelope
 from .truth_data_manager import (
     get_truth_dataset,
     list_truth_datasets,
@@ -56,9 +61,12 @@ __all__ = [
     "TruthRecord",
     "apply_calibration_to_configs",
     "apply_calibration_to_simulation_config",
+    "calibrate_room_envelope",
     "calibrate_parameters",
+    "get_calibration_profile",
     "get_truth_dataset",
     "get_validation_threshold_profile",
+    "list_calibration_profiles",
     "list_truth_datasets",
     "list_validation_manifests",
     "list_validation_threshold_profiles",

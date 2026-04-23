@@ -223,6 +223,7 @@ def _run_manifest_case(
     base_config: SimulationConfig,
     anchor_dataset_id: str,
     truth_data_dir: str,
+    calibration_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     parameters: dict[str, Any] = {
         "dataset_ids": list(manifest.dataset_ids),
@@ -251,7 +252,34 @@ def _run_manifest_case(
         payload["validation_summary"]["threshold_profile_id"] = profile.profile_id
         payload["validation_summary"]["validation_manifest_id"] = manifest.manifest_id
         payload["validation_summary"]["calibration_anchor_dataset_id"] = anchor_dataset_id
+        if calibration_metadata:
+            payload["validation_summary"]["calibration_profile_id"] = calibration_metadata.get("calibration_profile_id")
+            payload["validation_summary"]["objective_weights"] = calibration_metadata.get("objective_weights")
+            payload["validation_summary"]["calibration_objective"] = calibration_metadata.get("calibration_objective")
+    if calibration_metadata:
+        payload["calibration_profile_id"] = calibration_metadata.get("calibration_profile_id")
+        payload["objective_weights"] = calibration_metadata.get("objective_weights")
+        payload["calibration_objective"] = calibration_metadata.get("calibration_objective")
     return payload
+
+
+def run_validation_manifest_case(
+    manifest: ValidationPackManifest,
+    threshold_profile: ValidationThresholdProfile,
+    *,
+    base_config: SimulationConfig,
+    truth_data_dir: str | Path,
+    anchor_dataset_id: str = "",
+    calibration_metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return _run_manifest_case(
+        manifest,
+        threshold_profile,
+        base_config=base_config,
+        anchor_dataset_id=anchor_dataset_id,
+        truth_data_dir=str(Path(truth_data_dir).expanduser().resolve()),
+        calibration_metadata=calibration_metadata,
+    )
 
 
 def _metric_map(scorecard: dict[str, Any]) -> dict[str, float]:
@@ -308,12 +336,22 @@ def _build_comparison_markdown(
         f"- Manifest: `{manifest.manifest_id}`",
         f"- Threshold profile: `{profile.profile_id}`",
         f"- Validation basis: {manifest.validation_basis_label or profile.validation_basis_label}",
+    ]
+    calibration_profile_id = default_payload.get("validation_summary", {}).get("calibration_profile_id")
+    objective_weights = default_payload.get("validation_summary", {}).get("objective_weights")
+    if calibration_profile_id:
+        lines.append(f"- Calibration profile: `{calibration_profile_id}`")
+    if objective_weights:
+        lines.append(f"- Objective weights: `{json.dumps(objective_weights, sort_keys=True)}`")
+    lines.extend(
+        [
         "",
         "## Default Model",
         "",
         f"- Overall status: {str(default_payload.get('validation_summary', {}).get('overall_status', 'n/a')).upper()}",
         f"- Datasets evaluated: {default_payload.get('validation_summary', {}).get('dataset_count', 0)}",
-    ]
+        ]
+    )
     if calibrated_payload is not None:
         lines.extend(
             [
@@ -388,6 +426,7 @@ def run_validation_pack(
         base_config=base_config,
         anchor_dataset_id=manifest.calibration_dataset_id,
         truth_data_dir=str(registry.truth_data_dir),
+        calibration_metadata=None,
     )
     default_case = _pack_case_result(
         case_id="default_model",
@@ -410,6 +449,11 @@ def run_validation_pack(
             base_config=calibrated_config,
             anchor_dataset_id=manifest.calibration_dataset_id,
             truth_data_dir=str(registry.truth_data_dir),
+            calibration_metadata={
+                "calibration_profile_id": "anchored_single_dataset",
+                "objective_weights": {},
+                "calibration_objective": None,
+            },
         )
         calibrated_case = _pack_case_result(
             case_id="calibrated_model",

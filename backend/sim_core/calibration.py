@@ -97,6 +97,11 @@ def _clamp(value: float, low: float, high: float) -> float:
     return max(low, min(value, high))
 
 
+def _blend_scalar(base_value: float, calibrated_value: float, blend: float) -> float:
+    alpha = _clamp(float(blend), 0.0, 1.0)
+    return float(base_value) + (float(calibrated_value) - float(base_value)) * alpha
+
+
 def _truth_dataset_error(message: str, *, source_path: str | None = None) -> ValueError:
     if source_path:
         return ValueError(f"{message} [dataset={source_path}]")
@@ -821,22 +826,49 @@ def apply_calibration_to_configs(
     base_electrical: ElectricalModelConfig,
     base_degradation: DegradationConfig,
     calibrated: CalibratedParameters,
+    *,
+    electro_blend: float = 1.0,
+    thermal_blend: float = 1.0,
 ) -> tuple[PhysicsConfig, ElectricalModelConfig, DegradationConfig]:
+    electro_alpha = _clamp(electro_blend, 0.0, 1.0)
+    thermal_alpha = _clamp(thermal_blend, 0.0, 1.0)
+    blended_r0 = _blend_scalar(
+        base_electrical.r0_ohm_per_cell if base_electrical.r0_ohm_per_cell is not None else calibrated.base_resistance_ohm_per_cell,
+        calibrated.base_resistance_ohm_per_cell,
+        electro_alpha,
+    )
+    blended_temp_alpha = _blend_scalar(
+        base_physics.resistance_temperature_alpha_per_c,
+        calibrated.resistance_temperature_alpha_per_c,
+        thermal_alpha,
+    )
     physics = replace(
         base_physics,
-        ocv_curve=calibrated.ocv_curve,
-        two_node_thermal_enabled=True,
-        resistance_vs_soc_enabled=True,
-        resistance_soc_curve=calibrated.resistance_soc_curve,
-        resistance_temperature_alpha_per_c=calibrated.resistance_temperature_alpha_per_c,
-        core_thermal_mass_j_per_k=calibrated.core_thermal_mass_j_per_k,
-        surface_thermal_mass_j_per_k=calibrated.surface_thermal_mass_j_per_k,
+        ocv_curve=calibrated.ocv_curve if electro_alpha >= 0.5 else base_physics.ocv_curve,
+        two_node_thermal_enabled=thermal_alpha > 0.0 or base_physics.two_node_thermal_enabled,
+        resistance_vs_soc_enabled=(electro_alpha >= 0.5) or base_physics.resistance_vs_soc_enabled,
+        resistance_soc_curve=calibrated.resistance_soc_curve if electro_alpha >= 0.5 else base_physics.resistance_soc_curve,
+        resistance_temperature_alpha_per_c=blended_temp_alpha,
+        core_thermal_mass_j_per_k=_blend_scalar(
+            base_physics.core_thermal_mass_j_per_k or calibrated.core_thermal_mass_j_per_k,
+            calibrated.core_thermal_mass_j_per_k,
+            thermal_alpha,
+        ),
+        surface_thermal_mass_j_per_k=_blend_scalar(
+            base_physics.surface_thermal_mass_j_per_k or calibrated.surface_thermal_mass_j_per_k,
+            calibrated.surface_thermal_mass_j_per_k,
+            thermal_alpha,
+        ),
     )
     electrical = replace(
         base_electrical,
-        model_type="rint" if not calibrated.rc_branches else f"{min(len(calibrated.rc_branches), 2)}rc",
-        r0_ohm_per_cell=calibrated.base_resistance_ohm_per_cell,
-        rc_branches=tuple(calibrated.rc_branches[:2]),
+        model_type=(
+            ("rint" if not calibrated.rc_branches else f"{min(len(calibrated.rc_branches), 2)}rc")
+            if electro_alpha >= 0.5
+            else base_electrical.model_type
+        ),
+        r0_ohm_per_cell=blended_r0,
+        rc_branches=tuple(calibrated.rc_branches[:2]) if electro_alpha >= 0.5 else base_electrical.rc_branches,
     )
     degradation = replace(
         base_degradation,
@@ -853,20 +885,29 @@ def apply_calibration_to_configs(
 def apply_calibration_to_simulation_config(
     base_config: SimulationConfig,
     calibrated: CalibratedParameters,
+    *,
+    electro_blend: float = 1.0,
+    thermal_blend: float = 1.0,
 ) -> SimulationConfig:
     physics, electrical, degradation = apply_calibration_to_configs(
         base_config.physics,
         base_config.electrical_model,
         base_config.degradation,
         calibrated,
+        electro_blend=electro_blend,
+        thermal_blend=thermal_blend,
     )
     return replace(
         base_config,
-        internal_resistance_ohm_per_cell=calibrated.base_resistance_ohm_per_cell,
+        internal_resistance_ohm_per_cell=electrical.r0_ohm_per_cell or calibrated.base_resistance_ohm_per_cell,
         physics=physics,
         electrical_model=electrical,
         degradation=degradation,
-        cooling_coeff_w_per_k=calibrated.cooling_coeff_w_per_k,
+        cooling_coeff_w_per_k=_blend_scalar(
+            base_config.cooling_coeff_w_per_k,
+            calibrated.cooling_coeff_w_per_k,
+            thermal_blend,
+        ),
     )
 
 
