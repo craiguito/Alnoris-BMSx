@@ -64,6 +64,10 @@ class CalibratedParameters:
     calendar_capacity_fade_per_hour: float
     calendar_resistance_growth_per_hour: float
     rc_low_soc_multiplier: float = 1.0
+    age_conditioned_tail_enabled: bool = False
+    age_conditioned_tail_resistance_gain: float = 0.0
+    age_conditioned_tail_ocv_drop_v: float = 0.0
+    age_conditioned_tail_rc_multiplier_gain: float = 0.0
     diagnostics: dict[str, Any] = field(default_factory=dict)
 
 
@@ -132,6 +136,7 @@ _LOW_SOC_FOCUSED_RESISTANCE_SOC_KNOTS: tuple[float, ...] = (
 _REFERENCE_RESISTANCE_SOC_MIN = 0.35
 _REFERENCE_RESISTANCE_SOC_MAX = 0.80
 _TAIL_RESISTANCE_SOC_MAX = 0.15
+_AGE_CONDITIONED_TAIL_SOC_MAX = 0.20
 
 
 def _clamp(value: float, low: float, high: float) -> float:
@@ -141,6 +146,19 @@ def _clamp(value: float, low: float, high: float) -> float:
 def _blend_scalar(base_value: float, calibrated_value: float, blend: float) -> float:
     alpha = _clamp(float(blend), 0.0, 1.0)
     return float(base_value) + (float(calibrated_value) - float(base_value)) * alpha
+
+
+def _infer_aging_stage_from_metadata(metadata: dict[str, Any]) -> str:
+    cycle_index = metadata.get("source_cycle_index")
+    try:
+        cycle_value = int(cycle_index)
+    except Exception:
+        return "unknown"
+    if cycle_value <= 200:
+        return "early_life"
+    if cycle_value <= 500:
+        return "mid_life"
+    return "late_life"
 
 
 def _truth_dataset_error(message: str, *, source_path: str | None = None) -> ValueError:
@@ -588,6 +606,44 @@ def _estimate_rc_low_soc_multiplier(
     )
 
 
+def _estimate_age_conditioned_tail_behavior(
+    dataset: TruthDataset,
+    *,
+    ocv_curve: Sequence[OcvLookupPoint],
+    resistance_estimates: Sequence[_ResistanceEstimate],
+    reference_resistance_ohm: float,
+    rc_low_soc_multiplier: float,
+    low_current_threshold_a: float,
+) -> tuple[bool, float, float, float]:
+    low_soc_estimates = [
+        item.resistance_ohm
+        for item in resistance_estimates
+        if item.soc <= _AGE_CONDITIONED_TAIL_SOC_MAX
+    ]
+    low_soc_ratio = (
+        _median_or(low_soc_estimates, reference_resistance_ohm) / max(reference_resistance_ohm, 1.0e-9)
+        if low_soc_estimates
+        else 1.0
+    )
+    resistance_gain = _clamp((low_soc_ratio - 1.0) * 0.45, 0.0, 0.65)
+
+    light_current_limit_a = max(low_current_threshold_a * 2.0, 0.25)
+    low_soc_residuals_v = [
+        max(_interpolate_curve(ocv_curve, record.soc) - record.voltage_v, 0.0)
+        for record in dataset.records
+        if record.soc <= _AGE_CONDITIONED_TAIL_SOC_MAX and abs(record.current_a) <= light_current_limit_a
+    ]
+    tail_ocv_drop_v = _clamp(_median_or(low_soc_residuals_v, 0.0), 0.0, 0.08)
+
+    rc_multiplier_gain = _clamp((rc_low_soc_multiplier - 1.0) * 0.75, 0.0, 1.20)
+    enabled = (
+        resistance_gain > 1.0e-3
+        or tail_ocv_drop_v > 1.0e-3
+        or rc_multiplier_gain > 1.0e-3
+    )
+    return enabled, resistance_gain, tail_ocv_drop_v, rc_multiplier_gain
+
+
 def _fit_ocv_curve(
     records: Sequence[TruthRecord],
     low_current_threshold_a: float,
@@ -899,6 +955,20 @@ def calibrate_parameters(dataset: TruthDataset, rc_branch_count: int = 1) -> Cal
         resistance_estimates,
         reference_resistance_ohm=base_resistance_ohm,
     )
+    (
+        age_conditioned_tail_enabled,
+        age_conditioned_tail_resistance_gain,
+        age_conditioned_tail_ocv_drop_v,
+        age_conditioned_tail_rc_multiplier_gain,
+    ) = _estimate_age_conditioned_tail_behavior(
+        dataset,
+        ocv_curve=ocv_curve,
+        resistance_estimates=resistance_estimates,
+        reference_resistance_ohm=base_resistance_ohm,
+        rc_low_soc_multiplier=rc_low_soc_multiplier,
+        low_current_threshold_a=low_current_threshold_a,
+    )
+    aging_stage = _infer_aging_stage_from_metadata(dataset.metadata)
 
     return CalibratedParameters(
         ocv_curve=ocv_curve,
@@ -914,6 +984,10 @@ def calibrate_parameters(dataset: TruthDataset, rc_branch_count: int = 1) -> Cal
         calendar_capacity_fade_per_hour=calendar_capacity_fade_per_hour,
         calendar_resistance_growth_per_hour=calendar_resistance_growth_per_hour,
         rc_low_soc_multiplier=rc_low_soc_multiplier,
+        age_conditioned_tail_enabled=age_conditioned_tail_enabled,
+        age_conditioned_tail_resistance_gain=age_conditioned_tail_resistance_gain,
+        age_conditioned_tail_ocv_drop_v=age_conditioned_tail_ocv_drop_v,
+        age_conditioned_tail_rc_multiplier_gain=age_conditioned_tail_rc_multiplier_gain,
         diagnostics={
             "record_count": len(dataset.records),
             "low_current_threshold_a": low_current_threshold_a,
@@ -921,6 +995,11 @@ def calibrate_parameters(dataset: TruthDataset, rc_branch_count: int = 1) -> Cal
             "resistance_estimate_count": len(resistance_estimates),
             "reference_resistance_ohm": base_resistance_ohm,
             "rc_low_soc_multiplier": rc_low_soc_multiplier,
+            "age_conditioned_tail_enabled": age_conditioned_tail_enabled,
+            "age_conditioned_tail_resistance_gain": age_conditioned_tail_resistance_gain,
+            "age_conditioned_tail_ocv_drop_v": age_conditioned_tail_ocv_drop_v,
+            "age_conditioned_tail_rc_multiplier_gain": age_conditioned_tail_rc_multiplier_gain,
+            "aging_stage": aging_stage,
             "ocv_soc_knot_count": len(ocv_curve),
             "resistance_soc_knot_count": len(resistance_soc_curve),
         },
@@ -953,6 +1032,21 @@ def apply_calibration_to_configs(
         calibrated.rc_low_soc_multiplier,
         electro_alpha,
     )
+    blended_age_conditioned_tail_resistance_gain = _blend_scalar(
+        base_physics.age_conditioned_tail_resistance_gain,
+        calibrated.age_conditioned_tail_resistance_gain,
+        electro_alpha,
+    )
+    blended_age_conditioned_tail_ocv_drop_v = _blend_scalar(
+        base_physics.age_conditioned_tail_ocv_drop_v,
+        calibrated.age_conditioned_tail_ocv_drop_v,
+        electro_alpha,
+    )
+    blended_age_conditioned_tail_rc_multiplier_gain = _blend_scalar(
+        base_physics.age_conditioned_tail_rc_multiplier_gain,
+        calibrated.age_conditioned_tail_rc_multiplier_gain,
+        electro_alpha,
+    )
     physics = replace(
         base_physics,
         ocv_curve=calibrated.ocv_curve if electro_alpha >= 0.5 else base_physics.ocv_curve,
@@ -960,6 +1054,21 @@ def apply_calibration_to_configs(
         resistance_vs_soc_enabled=(electro_alpha >= 0.5) or base_physics.resistance_vs_soc_enabled,
         resistance_soc_curve=calibrated.resistance_soc_curve if electro_alpha >= 0.5 else base_physics.resistance_soc_curve,
         resistance_temperature_alpha_per_c=blended_temp_alpha,
+        age_conditioned_tail_enabled=(
+            (
+                electro_alpha >= 0.5
+                and calibrated.age_conditioned_tail_enabled
+                and (
+                    calibrated.age_conditioned_tail_resistance_gain > 1.0e-6
+                    or calibrated.age_conditioned_tail_ocv_drop_v > 1.0e-6
+                    or calibrated.age_conditioned_tail_rc_multiplier_gain > 1.0e-6
+                )
+            )
+            or base_physics.age_conditioned_tail_enabled
+        ),
+        age_conditioned_tail_resistance_gain=blended_age_conditioned_tail_resistance_gain,
+        age_conditioned_tail_ocv_drop_v=blended_age_conditioned_tail_ocv_drop_v,
+        age_conditioned_tail_rc_multiplier_gain=blended_age_conditioned_tail_rc_multiplier_gain,
         rc_state_dependence_enabled=(
             (electro_alpha >= 0.5 and bool(calibrated.rc_branches) and calibrated.rc_low_soc_multiplier > 1.01)
             or base_physics.rc_state_dependence_enabled
@@ -1049,6 +1158,78 @@ def build_current_profile_from_truth(dataset: TruthDataset) -> CurrentProfile:
     return CurrentProfile(points=tuple(points))
 
 
+def _aging_stage_scale(physics: PhysicsConfig, aging_stage: str) -> float:
+    return {
+        "early_life": float(physics.age_conditioned_tail_early_life_scale),
+        "mid_life": float(physics.age_conditioned_tail_mid_life_scale),
+        "late_life": float(physics.age_conditioned_tail_late_life_scale),
+        "unknown": float(physics.age_conditioned_tail_unknown_scale),
+    }.get(str(aging_stage).strip().lower(), float(physics.age_conditioned_tail_unknown_scale))
+
+
+def _apply_age_conditioned_tail_physics(
+    physics: PhysicsConfig,
+    *,
+    aging_stage: str,
+) -> PhysicsConfig:
+    if not physics.age_conditioned_tail_enabled:
+        return physics
+
+    stage_scale = _aging_stage_scale(physics, aging_stage)
+    if stage_scale <= 1.0e-9:
+        return physics
+
+    soc_threshold = _clamp(float(physics.age_conditioned_tail_soc_threshold), 0.0, 1.0)
+
+    adjusted_resistance_curve = physics.resistance_soc_curve
+    if physics.resistance_soc_curve and physics.age_conditioned_tail_resistance_gain > 0.0:
+        adjusted_resistance_curve = tuple(
+            SocLookupPoint(
+                soc=point.soc,
+                multiplier=max(
+                    point.multiplier
+                    * (
+                        1.0
+                        + _clamp((soc_threshold - point.soc) / max(soc_threshold, 1.0e-9), 0.0, 1.0)
+                        * physics.age_conditioned_tail_resistance_gain
+                        * stage_scale
+                    ),
+                    0.05,
+                ),
+            )
+            for point in physics.resistance_soc_curve
+        )
+
+    adjusted_ocv_curve = physics.ocv_curve
+    if physics.ocv_curve and physics.age_conditioned_tail_ocv_drop_v > 0.0:
+        adjusted_ocv_curve = tuple(
+            OcvLookupPoint(
+                soc=point.soc,
+                voltage_v=point.voltage_v
+                - (
+                    _clamp((soc_threshold - point.soc) / max(soc_threshold, 1.0e-9), 0.0, 1.0)
+                    * physics.age_conditioned_tail_ocv_drop_v
+                    * stage_scale
+                ),
+            )
+            for point in physics.ocv_curve
+        )
+
+    adjusted_rc_low_soc_multiplier = physics.rc_low_soc_multiplier
+    if physics.age_conditioned_tail_rc_multiplier_gain > 0.0:
+        adjusted_rc_low_soc_multiplier = max(
+            physics.rc_low_soc_multiplier * (1.0 + physics.age_conditioned_tail_rc_multiplier_gain * stage_scale),
+            1.0,
+        )
+
+    return replace(
+        physics,
+        resistance_soc_curve=adjusted_resistance_curve,
+        ocv_curve=adjusted_ocv_curve,
+        rc_low_soc_multiplier=adjusted_rc_low_soc_multiplier,
+    )
+
+
 def build_validation_config(base_config: SimulationConfig, dataset: TruthDataset) -> SimulationConfig:
     deltas = _positive_time_deltas(dataset.records)
     rounded_deltas = [max(1, int(round(delta))) for delta in deltas if delta > 0.0]
@@ -1057,6 +1238,11 @@ def build_validation_config(base_config: SimulationConfig, dataset: TruthDataset
     initial_soc = float(dataset.metadata.get("initial_soc", dataset.records[0].soc))
     ambient_temp_c = float(dataset.metadata.get("ambient_temp_c", base_config.ambient_temp_c))
     fallback_current_a = dataset.records[0].current_a if dataset.records else base_config.discharge_current_a
+    aging_stage = _infer_aging_stage_from_metadata(dataset.metadata)
+    validation_physics = _apply_age_conditioned_tail_physics(
+        base_config.physics,
+        aging_stage=aging_stage,
+    )
 
     return replace(
         base_config,
@@ -1066,6 +1252,7 @@ def build_validation_config(base_config: SimulationConfig, dataset: TruthDataset
         ambient_temp_c=ambient_temp_c,
         discharge_current_a=fallback_current_a,
         current_profile=build_current_profile_from_truth(dataset),
+        physics=validation_physics,
     )
 
 

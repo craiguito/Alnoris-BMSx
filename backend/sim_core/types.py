@@ -151,6 +151,15 @@ class PhysicsConfig:
         SocLookupPoint(0.8, 1.03),
         SocLookupPoint(1.0, 1.08),
     )
+    age_conditioned_tail_enabled: bool = False
+    age_conditioned_tail_soc_threshold: float = 0.2
+    age_conditioned_tail_resistance_gain: float = 0.0
+    age_conditioned_tail_ocv_drop_v: float = 0.0
+    age_conditioned_tail_rc_multiplier_gain: float = 0.0
+    age_conditioned_tail_early_life_scale: float = 0.35
+    age_conditioned_tail_mid_life_scale: float = 0.70
+    age_conditioned_tail_late_life_scale: float = 1.0
+    age_conditioned_tail_unknown_scale: float = 0.60
     hysteresis_enabled: bool = False
     hysteresis_max_voltage_v: float = 0.0
     hysteresis_response_rate_per_s: float = 0.15

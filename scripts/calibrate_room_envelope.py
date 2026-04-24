@@ -25,7 +25,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--manifest", default="nasa_room_canonical", help="Manifest id or path.")
     parser.add_argument("--calibration-profile", default="electrical_first", help="Calibration profile id.")
     parser.add_argument("--search-plan", default=None, help="Optional search plan override.")
-    parser.add_argument("--benchmark-profiles", nargs="*", default=["electrical_first", "balanced_electro_thermal", "electrical_tail_guarded"], help="Calibration profiles to include in benchmark comparison.")
+    parser.add_argument("--benchmark-profiles", nargs="*", default=["electrical_first", "balanced_electro_thermal", "electrical_tail_guarded", "aged_tail_guarded"], help="Calibration profiles to include in benchmark comparison.")
     parser.add_argument("--threshold-profile", default=None, help="Optional threshold profile override.")
     parser.add_argument("--truth-data-dir", default=None, help="Optional truth-data directory override.")
     parser.add_argument("--manifest-dir", default=None, help="Optional validation-manifest directory override.")
@@ -71,6 +71,14 @@ def _write_text(path: str, content: str) -> str:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(content, encoding="utf-8")
     return str(output_path)
+
+
+def _stage_summary(payload: dict[str, object], stage_id: str) -> dict[str, object]:
+    validation_summary = dict(payload.get("validation_summary", {})) if isinstance(payload, dict) else {}
+    for item in validation_summary.get("aging_stage_summaries", []) or []:
+        if str(item.get("aging_stage", "")) == stage_id:
+            return dict(item)
+    return {}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -137,7 +145,14 @@ def main(argv: list[str] | None = None) -> int:
     selected_low_soc_objective = float(selected_artifact.summary.selected_low_soc_objective_score)
     baseline_overall_objective = float(selected_artifact.baseline_validation.get("validation_summary", {}).get("calibration_objective", {}).get("total_score", 0.0))
     selected_overall_objective = float(selected_artifact.selected_validation.get("validation_summary", {}).get("calibration_objective", {}).get("total_score", 0.0))
+    baseline_stage_aware_objective = float(selected_artifact.summary.baseline_stage_aware_objective_score)
+    selected_stage_aware_objective = float(selected_artifact.summary.selected_stage_aware_objective_score)
+    baseline_aged_tail_objective = float(selected_artifact.summary.baseline_aged_tail_objective_score)
+    selected_aged_tail_objective = float(selected_artifact.summary.selected_aged_tail_objective_score)
+    baseline_late_life = _stage_summary(selected_artifact.baseline_validation, "late_life")
+    selected_late_life = _stage_summary(selected_artifact.selected_validation, "late_life")
     tail_candidate_comparison = selected_artifact.summary.tail_candidate_comparison
+    improvement_summary = selected_artifact.summary.improvement_summary
     print(f"Room Envelope Calibration")
     print(f"Manifest: {selected_artifact.manifest.manifest_id}")
     print(f"Calibration profile: {selected_artifact.calibration_profile.profile_id}")
@@ -177,12 +192,58 @@ def main(argv: list[str] | None = None) -> int:
             after=selected_low_soc_objective,
         )
     )
+    print(
+        "Stage-aware objective: {before:.4f} -> {after:.4f}".format(
+            before=baseline_stage_aware_objective,
+            after=selected_stage_aware_objective,
+        )
+    )
+    print(
+        "Aged-tail objective: {before:.4f} -> {after:.4f}".format(
+            before=baseline_aged_tail_objective,
+            after=selected_aged_tail_objective,
+        )
+    )
+    if baseline_late_life or selected_late_life:
+        print(
+            "Late-life low-SOC RMSE: {before:.4f} -> {after:.4f}".format(
+                before=float(baseline_late_life.get("average_low_soc_voltage_rmse_v", 0.0) or 0.0),
+                after=float(selected_late_life.get("average_low_soc_voltage_rmse_v", 0.0) or 0.0),
+            )
+        )
+        print(
+            "Late-life status mix: {before_pass}/{before_warn}/{before_fail} -> {after_pass}/{after_warn}/{after_fail}".format(
+                before_pass=int(baseline_late_life.get("passed_count", 0)),
+                before_warn=int(baseline_late_life.get("warning_count", 0)),
+                before_fail=int(baseline_late_life.get("failed_count", 0)),
+                after_pass=int(selected_late_life.get("passed_count", 0)),
+                after_warn=int(selected_late_life.get("warning_count", 0)),
+                after_fail=int(selected_late_life.get("failed_count", 0)),
+            )
+        )
     if tail_candidate_comparison is not None:
         print(
-            "Aggregate-best vs tail-best: {aggregate} vs {tail} ({relation})".format(
+            "Aggregate-best vs tail-best vs aged-tail-best: {aggregate} vs {tail} vs {aged} ({relation})".format(
                 aggregate=tail_candidate_comparison.aggregate_best_candidate_id,
                 tail=tail_candidate_comparison.low_soc_best_candidate_id,
-                relation="same" if tail_candidate_comparison.same_candidate else "different",
+                aged=tail_candidate_comparison.aged_tail_best_candidate_id,
+                relation=(
+                    "same"
+                    if tail_candidate_comparison.same_candidate and tail_candidate_comparison.same_as_aged_tail
+                    else "different"
+                ),
+            )
+        )
+    if improvement_summary is not None:
+        print(
+            "Late-life improved/regressed: {improved}/{regressed}".format(
+                improved=improvement_summary.late_life_improved_count,
+                regressed=improvement_summary.late_life_regressed_count,
+            )
+        )
+        print(
+            "Early-life materially regressed: {count}".format(
+                count=improvement_summary.early_life_material_regression_count,
             )
         )
     print(_worst_tail_dataset_status(selected_artifact))

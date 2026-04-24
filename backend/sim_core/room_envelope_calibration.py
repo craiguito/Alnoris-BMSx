@@ -70,9 +70,13 @@ class CandidateEvaluationSummary:
     screening_dataset_ids: tuple[str, ...]
     screening_objective_score: float
     full_objective_score: float
+    stage_aware_objective_score: float
     low_soc_objective_score: float
+    aged_tail_objective_score: float
     average_low_soc_voltage_rmse_v: float = 0.0
     average_last_10_percent_voltage_rmse_v: float = 0.0
+    late_life_low_soc_voltage_rmse_v: float = 0.0
+    late_life_last_10_percent_voltage_rmse_v: float = 0.0
     validation_summary: dict[str, Any] = field(default_factory=dict)
 
 
@@ -98,17 +102,35 @@ class DatasetTransitionSummary:
 
 
 @dataclass(frozen=True)
+class StageDiagnosticLeaderboardEntry:
+    dataset_id: str
+    dataset_display_name: str
+    aging_stage: str
+    status_transition: str
+    objective_delta: float
+    low_soc_voltage_rmse_delta_v: float | None = None
+    last_10_percent_voltage_rmse_delta_v: float | None = None
+
+
+@dataclass(frozen=True)
 class RoomEnvelopeImprovementSummary:
     improved_dataset_count: int
     regressed_dataset_count: int
     unchanged_dataset_count: int
     status_upgrade_count: int
     status_downgrade_count: int
+    late_life_improved_count: int = 0
+    late_life_regressed_count: int = 0
+    early_life_material_regression_count: int = 0
     transition_counts: dict[str, int] = field(default_factory=dict)
+    status_upgrade_counts_by_stage: dict[str, int] = field(default_factory=dict)
     most_improved_dataset_id: str = ""
     most_improved_dataset_display_name: str = ""
     most_worsened_dataset_id: str = ""
     most_worsened_dataset_display_name: str = ""
+    late_life_improvement_leaderboard: tuple[StageDiagnosticLeaderboardEntry, ...] = ()
+    late_life_remaining_error_leaderboard: tuple[StageDiagnosticLeaderboardEntry, ...] = ()
+    early_life_regression_leaderboard: tuple[StageDiagnosticLeaderboardEntry, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -134,9 +156,26 @@ class RoomEnvelopeBenchmarkRow:
 
 
 @dataclass(frozen=True)
+class RoomEnvelopeStageBenchmarkRow:
+    stage_id: str
+    result_id: str
+    label: str
+    dataset_count: int
+    passed_count: int
+    warning_count: int
+    failed_count: int
+    average_voltage_rmse_v: float
+    average_low_soc_voltage_rmse_v: float
+    average_last_10_percent_voltage_rmse_v: float
+    average_final_voltage_error_v: float
+    average_energy_error_fraction: float
+
+
+@dataclass(frozen=True)
 class RoomEnvelopeBenchmarkComparison:
     rows: tuple[RoomEnvelopeBenchmarkRow, ...]
-    markdown: str
+    stage_rows: tuple[RoomEnvelopeStageBenchmarkRow, ...] = ()
+    markdown: str = ""
 
 
 @dataclass(frozen=True)
@@ -159,13 +198,23 @@ class CandidateSearchPreview:
 class TailCandidateComparison:
     aggregate_best_candidate_id: str
     aggregate_best_objective_score: float
+    aggregate_best_stage_aware_objective_score: float
     aggregate_best_low_soc_objective_score: float
     low_soc_best_candidate_id: str
     low_soc_best_objective_score: float
+    low_soc_best_stage_aware_objective_score: float
     low_soc_best_low_soc_objective_score: float
+    aged_tail_best_candidate_id: str
+    aged_tail_best_objective_score: float
+    aged_tail_best_stage_aware_objective_score: float
+    aged_tail_best_low_soc_objective_score: float
     same_candidate: bool
+    same_as_aged_tail: bool
+    tail_matches_aged_tail: bool
+    selected_winner_candidate_id: str = ""
     aggregate_best_candidate_summary: dict[str, Any] = field(default_factory=dict)
     low_soc_best_candidate_summary: dict[str, Any] = field(default_factory=dict)
+    aged_tail_best_candidate_summary: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -182,8 +231,12 @@ class RoomEnvelopeSummary:
     selected_status_counts: dict[str, int] = field(default_factory=dict)
     baseline_aging_stage_summaries: tuple[dict[str, Any], ...] = ()
     selected_aging_stage_summaries: tuple[dict[str, Any], ...] = ()
+    baseline_stage_aware_objective_score: float = 0.0
+    selected_stage_aware_objective_score: float = 0.0
     baseline_low_soc_objective_score: float = 0.0
     selected_low_soc_objective_score: float = 0.0
+    baseline_aged_tail_objective_score: float = 0.0
+    selected_aged_tail_objective_score: float = 0.0
     candidate_search_preview: CandidateSearchPreview | None = None
     tail_candidate_comparison: TailCandidateComparison | None = None
     improvement_summary: RoomEnvelopeImprovementSummary | None = None
@@ -222,6 +275,13 @@ def _infer_battery_family(metadata: dict[str, Any]) -> str:
         if token.startswith("b") and len(token) == 5:
             return token.upper()
     return dataset_id or "dataset"
+
+
+def _cycle_index(metadata: dict[str, Any]) -> int:
+    try:
+        return int(metadata.get("source_cycle_index", 0))
+    except Exception:
+        return 0
 
 
 def _status_rank(status: str) -> int:
@@ -301,6 +361,17 @@ def _aging_stage_status_counts(validation_payload: dict[str, Any]) -> dict[str, 
             "warning": int(summary.get("warning_count", 0)),
             "fail": int(summary.get("failed_count", 0)),
         }
+    return result
+
+
+def _aging_stage_summary_map(validation_payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    summaries = validation_payload.get("validation_summary", {}).get("aging_stage_summaries", [])
+    result: dict[str, dict[str, Any]] = {}
+    for summary in summaries:
+        stage = str(summary.get("aging_stage", "")).strip()
+        if not stage:
+            continue
+        result[stage] = dict(summary)
     return result
 
 
@@ -405,6 +476,19 @@ def combine_calibrated_parameters(
             weights,
         ),
         rc_low_soc_multiplier=_weighted_mean([item.rc_low_soc_multiplier for item in parameters], weights),
+        age_conditioned_tail_enabled=any(item.age_conditioned_tail_enabled for item in parameters),
+        age_conditioned_tail_resistance_gain=_weighted_mean(
+            [item.age_conditioned_tail_resistance_gain for item in parameters],
+            weights,
+        ),
+        age_conditioned_tail_ocv_drop_v=_weighted_mean(
+            [item.age_conditioned_tail_ocv_drop_v for item in parameters],
+            weights,
+        ),
+        age_conditioned_tail_rc_multiplier_gain=_weighted_mean(
+            [item.age_conditioned_tail_rc_multiplier_gain for item in parameters],
+            weights,
+        ),
         diagnostics={
             "source": "weighted_combination",
             "source_count": len(parameters),
@@ -421,16 +505,34 @@ def combine_calibrated_parameters(
 def _family_representative_anchor_ids(
     manifest: ValidationPackManifest,
     registry: TruthDatasetRegistry,
+    baseline_payload: dict[str, Any],
+    *,
+    calibration_profile: CalibrationProfile,
 ) -> tuple[str, ...]:
-    chosen_by_family: dict[str, tuple[int, str]] = {}
+    priorities = _anchor_priority_scores(
+        manifest,
+        baseline_payload,
+        calibration_profile=calibration_profile,
+    )
+    chosen_by_family: dict[str, tuple[float, int, str]] = {}
     for dataset_id in manifest.dataset_ids:
         resolved = registry.get_truth_dataset(dataset_id)
         family = _infer_battery_family(resolved.metadata)
-        cycle_index = int(resolved.metadata.get("source_cycle_index", 0))
+        cycle_index = _cycle_index(resolved.metadata)
+        priority_score = priorities.get(dataset_id, 0.0)
         existing = chosen_by_family.get(family)
-        if existing is None or cycle_index < existing[0]:
-            chosen_by_family[family] = (cycle_index, dataset_id)
-    ordered = [item[1] for item in sorted(chosen_by_family.values(), key=lambda entry: (entry[0], entry[1]))]
+        candidate = (priority_score, cycle_index, dataset_id)
+        if existing is None or candidate[0] > existing[0] or (candidate[0] == existing[0] and candidate[1] > existing[1]) or (
+            candidate[0] == existing[0] and candidate[1] == existing[1] and candidate[2] < existing[2]
+        ):
+            chosen_by_family[family] = candidate
+    ordered = [
+        item[2]
+        for item in sorted(
+            chosen_by_family.values(),
+            key=lambda entry: (-entry[0], -entry[1], entry[2]),
+        )
+    ]
     if manifest.calibration_dataset_id not in ordered:
         ordered.insert(0, manifest.calibration_dataset_id)
     return tuple(dict.fromkeys(ordered))
@@ -451,6 +553,7 @@ def _anchor_priority_scores(
         priorities[dataset_id] = evaluate_scorecard_objective(
             scorecard,
             weights=calibration_profile.objective_weights,
+            stage_weights=calibration_profile.aging_stage_weights,
         ).total_score
     return priorities
 
@@ -463,7 +566,12 @@ def _select_anchor_dataset_ids(
     calibration_profile: CalibrationProfile,
     search_plan: CalibrationSearchPlan,
 ) -> tuple[str, ...]:
-    family_representatives = _family_representative_anchor_ids(manifest, registry)
+    family_representatives = _family_representative_anchor_ids(
+        manifest,
+        registry,
+        baseline_payload,
+        calibration_profile=calibration_profile,
+    )
     priorities = _anchor_priority_scores(
         manifest,
         baseline_payload,
@@ -474,7 +582,7 @@ def _select_anchor_dataset_ids(
         key=lambda dataset_id: (-priorities.get(dataset_id, 0.0), dataset_id),
     )
     selected: list[str] = []
-    if manifest.calibration_dataset_id in ranked:
+    if manifest.calibration_dataset_id in ranked and calibration_profile.aging_stage_weights.is_uniform():
         selected.append(manifest.calibration_dataset_id)
     for dataset_id in ranked:
         if dataset_id in selected:
@@ -529,6 +637,10 @@ def _build_anchor_calibration_cache(
                 calendar_capacity_fade_per_hour=calibrated.calendar_capacity_fade_per_hour,
                 calendar_resistance_growth_per_hour=calibrated.calendar_resistance_growth_per_hour,
                 rc_low_soc_multiplier=calibrated.rc_low_soc_multiplier,
+                age_conditioned_tail_enabled=calibrated.age_conditioned_tail_enabled,
+                age_conditioned_tail_resistance_gain=calibrated.age_conditioned_tail_resistance_gain,
+                age_conditioned_tail_ocv_drop_v=calibrated.age_conditioned_tail_ocv_drop_v,
+                age_conditioned_tail_rc_multiplier_gain=calibrated.age_conditioned_tail_rc_multiplier_gain,
                 diagnostics={
                     **dict(calibrated.diagnostics),
                     "dataset_id": dataset_id,
@@ -654,8 +766,15 @@ def _candidate_sanity_issues(candidate: CalibrationCandidate) -> tuple[str, ...]
         "surface_thermal_mass_j_per_k": calibrated.surface_thermal_mass_j_per_k,
         "cooling_coeff_w_per_k": calibrated.cooling_coeff_w_per_k,
         "rc_low_soc_multiplier": calibrated.rc_low_soc_multiplier,
+        "age_conditioned_tail_resistance_gain": calibrated.age_conditioned_tail_resistance_gain,
+        "age_conditioned_tail_ocv_drop_v": calibrated.age_conditioned_tail_ocv_drop_v,
+        "age_conditioned_tail_rc_multiplier_gain": calibrated.age_conditioned_tail_rc_multiplier_gain,
     }
     for key, value in scalar_checks.items():
+        if key.startswith("age_conditioned_"):
+            if not math.isfinite(value) or value < 0.0:
+                issues.append(f"{key} must be finite and >= 0")
+            continue
         if not math.isfinite(value) or value <= 0.0:
             issues.append(f"{key} must be finite and > 0")
     if not calibrated.ocv_curve:
@@ -732,6 +851,7 @@ def _run_candidate_validation(
         calibration_metadata={
             "calibration_profile_id": calibration_profile.profile_id,
             "objective_weights": calibration_profile.objective_weights.as_metric_weights(),
+            "aging_stage_weights": calibration_profile.aging_stage_weights.as_dict(),
             "calibration_objective": None,
             "search_plan_id": search_plan.plan_id,
         },
@@ -749,7 +869,7 @@ def _benchmark_row_from_payload(
     candidate_count: int,
     validation_payload: dict[str, Any],
     improvement_summary: RoomEnvelopeImprovementSummary | None,
-) -> RoomEnvelopeBenchmarkRow:
+    ) -> RoomEnvelopeBenchmarkRow:
     scorecards = list(validation_payload.get("validation_scorecards", []))
     counts = _status_counts(scorecards)
     objective_score = float(
@@ -781,6 +901,42 @@ def _benchmark_row_from_payload(
             improvement_summary.most_worsened_dataset_display_name if improvement_summary is not None else ""
         ),
     )
+
+
+def _stage_benchmark_rows_from_payload(
+    *,
+    result_id: str,
+    label: str,
+    validation_payload: dict[str, Any],
+) -> tuple[RoomEnvelopeStageBenchmarkRow, ...]:
+    rows: list[RoomEnvelopeStageBenchmarkRow] = []
+    for stage_id, summary in sorted(_aging_stage_summary_map(validation_payload).items()):
+        rows.append(
+            RoomEnvelopeStageBenchmarkRow(
+                stage_id=stage_id,
+                result_id=result_id,
+                label=label,
+                dataset_count=int(summary.get("dataset_count", 0)),
+                passed_count=int(summary.get("passed_count", 0)),
+                warning_count=int(summary.get("warning_count", 0)),
+                failed_count=int(summary.get("failed_count", 0)),
+                average_voltage_rmse_v=float(summary.get("average_voltage_rmse_v", 0.0) or 0.0),
+                average_low_soc_voltage_rmse_v=float(summary.get("average_low_soc_voltage_rmse_v", 0.0) or 0.0),
+                average_last_10_percent_voltage_rmse_v=float(summary.get("average_last_10_percent_voltage_rmse_v", 0.0) or 0.0),
+                average_final_voltage_error_v=float(summary.get("average_final_voltage_error_v", 0.0) or 0.0),
+                average_energy_error_fraction=float(summary.get("average_energy_error_fraction", 0.0) or 0.0),
+            )
+        )
+    return tuple(rows)
+
+
+def _stage_display_name(stage_id: str) -> str:
+    return {
+        "early_life": "Early-Life",
+        "mid_life": "Mid-Life",
+        "late_life": "Late-Life",
+        "unknown": "Unknown Stage",
+    }.get(stage_id, stage_id.replace("_", " ").title())
 
 
 def build_room_envelope_benchmark_markdown(benchmark: RoomEnvelopeBenchmarkComparison) -> str:
@@ -822,6 +978,34 @@ def build_room_envelope_benchmark_markdown(benchmark: RoomEnvelopeBenchmarkCompa
                 worsened=row.most_worsened_dataset or "n/a",
             )
         )
+    for stage_id in ("early_life", "mid_life", "late_life", "unknown"):
+        stage_rows = [row for row in benchmark.stage_rows if row.stage_id == stage_id]
+        if not stage_rows:
+            continue
+        lines.extend(
+            [
+                "",
+                f"## {_stage_display_name(stage_id)}",
+                "",
+                "| Result Set | Datasets | Pass | Warn | Fail | Avg Voltage RMSE | Avg Low-SOC RMSE | Avg Last 10% RMSE | Avg Final Voltage Error | Avg Energy Error |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+            ]
+        )
+        for row in stage_rows:
+            lines.append(
+                "| {label} | {dataset_count} | {passed} | {warning} | {failed} | {rmse:.4f} | {low_soc_rmse:.4f} | {tail_rmse:.4f} | {final_v:.4f} | {energy:.4f} |".format(
+                    label=row.label,
+                    dataset_count=row.dataset_count,
+                    passed=row.passed_count,
+                    warning=row.warning_count,
+                    failed=row.failed_count,
+                    rmse=row.average_voltage_rmse_v,
+                    low_soc_rmse=row.average_low_soc_voltage_rmse_v,
+                    tail_rmse=row.average_last_10_percent_voltage_rmse_v,
+                    final_v=row.average_final_voltage_error_v,
+                    energy=row.average_energy_error_fraction,
+                )
+            )
     return "\n".join(lines)
 
 
@@ -842,11 +1026,20 @@ def build_room_envelope_benchmark(
         improvement_summary=None,
     )
     rows: list[RoomEnvelopeBenchmarkRow] = [baseline_row]
+    stage_rows: list[RoomEnvelopeStageBenchmarkRow] = list(
+        _stage_benchmark_rows_from_payload(
+            result_id="baseline_default_model",
+            label="Baseline / Default Model",
+            validation_payload=baseline_payload,
+        )
+    )
     for artifact in artifacts:
+        result_id = f"{artifact.calibration_profile.profile_id}_best_candidate"
+        label = f"{artifact.calibration_profile.display_name} Best Candidate"
         rows.append(
             _benchmark_row_from_payload(
-                result_id=f"{artifact.calibration_profile.profile_id}_best_candidate",
-                label=f"{artifact.calibration_profile.display_name} Best Candidate",
+                result_id=result_id,
+                label=label,
                 calibration_profile_id=artifact.calibration_profile.profile_id,
                 search_plan_id=artifact.search_plan.plan_id,
                 candidate_count=artifact.summary.generated_candidate_count,
@@ -854,7 +1047,14 @@ def build_room_envelope_benchmark(
                 improvement_summary=artifact.summary.improvement_summary,
             )
         )
-    benchmark = RoomEnvelopeBenchmarkComparison(rows=tuple(rows), markdown="")
+        stage_rows.extend(
+            _stage_benchmark_rows_from_payload(
+                result_id=result_id,
+                label=label,
+                validation_payload=artifact.selected_validation,
+            )
+        )
+    benchmark = RoomEnvelopeBenchmarkComparison(rows=tuple(rows), stage_rows=tuple(stage_rows), markdown="")
     return replace(benchmark, markdown=build_room_envelope_benchmark_markdown(benchmark))
 
 
@@ -866,6 +1066,11 @@ def _tail_objective_weights(calibration_profile: CalibrationProfile) -> Calibrat
         if base.last_10_percent_voltage_rmse_weight > 0.0
         else base.final_voltage_error_weight * 0.60
     )
+    derived_cutoff_weight = (
+        base.cutoff_neighborhood_voltage_rmse_weight
+        if base.cutoff_neighborhood_voltage_rmse_weight > 0.0
+        else base.final_voltage_error_weight * 0.50
+    )
     return CalibrationObjectiveWeights(
         voltage_rmse_weight=base.voltage_rmse_weight * 0.40,
         final_voltage_error_weight=base.final_voltage_error_weight,
@@ -873,13 +1078,18 @@ def _tail_objective_weights(calibration_profile: CalibrationProfile) -> Calibrat
         temp_rmse_weight=0.0,
         low_soc_voltage_rmse_weight=derived_low_soc_weight,
         last_10_percent_voltage_rmse_weight=derived_last_10_weight,
+        cutoff_neighborhood_voltage_rmse_weight=derived_cutoff_weight,
     )
 
 
 def _candidate_comparison_summary(
     evaluation: CandidateEvaluationSummary,
     candidate: CalibrationCandidate | None,
+    *,
+    selected_winner_candidate_id: str = "",
 ) -> dict[str, Any]:
+    validation_summary = dict(evaluation.validation_summary or {})
+    late_life_summary = _aging_stage_summary_map({"validation_summary": validation_summary}).get("late_life", {})
     return {
         "candidate_id": evaluation.candidate_id,
         "candidate_mode": evaluation.candidate_mode,
@@ -889,11 +1099,44 @@ def _candidate_comparison_summary(
         "electro_blend": evaluation.electro_blend,
         "thermal_blend": evaluation.thermal_blend,
         "full_objective_score": evaluation.full_objective_score,
+        "stage_aware_objective_score": evaluation.stage_aware_objective_score,
         "low_soc_objective_score": evaluation.low_soc_objective_score,
+        "aged_tail_objective_score": evaluation.aged_tail_objective_score,
         "average_low_soc_voltage_rmse_v": evaluation.average_low_soc_voltage_rmse_v,
         "average_last_10_percent_voltage_rmse_v": evaluation.average_last_10_percent_voltage_rmse_v,
+        "late_life_low_soc_voltage_rmse_v": evaluation.late_life_low_soc_voltage_rmse_v,
+        "late_life_last_10_percent_voltage_rmse_v": evaluation.late_life_last_10_percent_voltage_rmse_v,
+        "passed_count": int(validation_summary.get("passed_count", 0)),
+        "warning_count": int(validation_summary.get("warning_count", 0)),
+        "failed_count": int(validation_summary.get("failed_count", 0)),
+        "late_life_status_counts": {
+            "pass": int(late_life_summary.get("passed_count", 0)),
+            "warning": int(late_life_summary.get("warning_count", 0)),
+            "fail": int(late_life_summary.get("failed_count", 0)),
+        },
+        "selected_winner": evaluation.candidate_id == selected_winner_candidate_id,
         "rc_low_soc_multiplier": (
             float(candidate.calibrated_parameters.rc_low_soc_multiplier)
+            if candidate is not None
+            else 0.0
+        ),
+        "age_conditioned_tail_enabled": (
+            bool(candidate.calibrated_parameters.age_conditioned_tail_enabled)
+            if candidate is not None
+            else False
+        ),
+        "age_conditioned_tail_resistance_gain": (
+            float(candidate.calibrated_parameters.age_conditioned_tail_resistance_gain)
+            if candidate is not None
+            else 0.0
+        ),
+        "age_conditioned_tail_ocv_drop_v": (
+            float(candidate.calibrated_parameters.age_conditioned_tail_ocv_drop_v)
+            if candidate is not None
+            else 0.0
+        ),
+        "age_conditioned_tail_rc_multiplier_gain": (
+            float(candidate.calibrated_parameters.age_conditioned_tail_rc_multiplier_gain)
             if candidate is not None
             else 0.0
         ),
@@ -903,23 +1146,49 @@ def _candidate_comparison_summary(
 def _build_tail_candidate_comparison(
     candidate_evaluations: Sequence[CandidateEvaluationSummary],
     candidate_lookup: dict[str, CalibrationCandidate],
+    *,
+    selected_winner_candidate_id: str = "",
 ) -> TailCandidateComparison | None:
     if not candidate_evaluations:
         return None
     aggregate_best = min(candidate_evaluations, key=lambda item: (item.full_objective_score, item.candidate_id))
     low_soc_best = min(candidate_evaluations, key=lambda item: (item.low_soc_objective_score, item.candidate_id))
+    aged_tail_best = min(candidate_evaluations, key=lambda item: (item.aged_tail_objective_score, item.candidate_id))
     aggregate_candidate = candidate_lookup.get(aggregate_best.candidate_id)
     low_soc_candidate = candidate_lookup.get(low_soc_best.candidate_id)
+    aged_tail_candidate = candidate_lookup.get(aged_tail_best.candidate_id)
     return TailCandidateComparison(
         aggregate_best_candidate_id=aggregate_best.candidate_id,
         aggregate_best_objective_score=aggregate_best.full_objective_score,
+        aggregate_best_stage_aware_objective_score=aggregate_best.stage_aware_objective_score,
         aggregate_best_low_soc_objective_score=aggregate_best.low_soc_objective_score,
         low_soc_best_candidate_id=low_soc_best.candidate_id,
         low_soc_best_objective_score=low_soc_best.full_objective_score,
+        low_soc_best_stage_aware_objective_score=low_soc_best.stage_aware_objective_score,
         low_soc_best_low_soc_objective_score=low_soc_best.low_soc_objective_score,
+        aged_tail_best_candidate_id=aged_tail_best.candidate_id,
+        aged_tail_best_objective_score=aged_tail_best.full_objective_score,
+        aged_tail_best_stage_aware_objective_score=aged_tail_best.stage_aware_objective_score,
+        aged_tail_best_low_soc_objective_score=aged_tail_best.low_soc_objective_score,
         same_candidate=aggregate_best.candidate_id == low_soc_best.candidate_id,
-        aggregate_best_candidate_summary=_candidate_comparison_summary(aggregate_best, aggregate_candidate),
-        low_soc_best_candidate_summary=_candidate_comparison_summary(low_soc_best, low_soc_candidate),
+        same_as_aged_tail=aggregate_best.candidate_id == aged_tail_best.candidate_id,
+        tail_matches_aged_tail=low_soc_best.candidate_id == aged_tail_best.candidate_id,
+        selected_winner_candidate_id=selected_winner_candidate_id,
+        aggregate_best_candidate_summary=_candidate_comparison_summary(
+            aggregate_best,
+            aggregate_candidate,
+            selected_winner_candidate_id=selected_winner_candidate_id,
+        ),
+        low_soc_best_candidate_summary=_candidate_comparison_summary(
+            low_soc_best,
+            low_soc_candidate,
+            selected_winner_candidate_id=selected_winner_candidate_id,
+        ),
+        aged_tail_best_candidate_summary=_candidate_comparison_summary(
+            aged_tail_best,
+            aged_tail_candidate,
+            selected_winner_candidate_id=selected_winner_candidate_id,
+        ),
     )
 
 
@@ -966,6 +1235,7 @@ def _screen_and_select_candidates(
         screening_objective = evaluate_calibration_objective(
             payload.get("validation_scorecards", []),
             weights=calibration_profile.objective_weights,
+            stage_weights=calibration_profile.aging_stage_weights,
         ).total_score
         screen_evaluations.append((candidate, screening_objective))
 
@@ -999,15 +1269,29 @@ def _screen_and_select_candidates(
         full_objective = evaluate_calibration_objective(
             full_payload.get("validation_scorecards", []),
             weights=calibration_profile.objective_weights,
+            stage_weights=calibration_profile.aging_stage_weights,
+        )
+        stage_aware_objective = evaluate_calibration_objective(
+            full_payload.get("validation_scorecards", []),
+            weights=calibration_profile.objective_weights,
+            stage_weights=calibration_profile.aging_stage_weights,
         )
         low_soc_objective = evaluate_calibration_objective(
             full_payload.get("validation_scorecards", []),
             weights=tail_weights,
         )
+        aged_tail_objective = evaluate_calibration_objective(
+            full_payload.get("validation_scorecards", []),
+            weights=tail_weights,
+            stage_weights=calibration_profile.aging_stage_weights,
+        )
         full_payload.setdefault("validation_summary", {})
         full_payload["validation_summary"]["calibration_objective"] = calibration_objective_result_to_dict(full_objective)
+        full_payload["validation_summary"]["stage_aware_calibration_objective"] = calibration_objective_result_to_dict(stage_aware_objective)
         full_payload["validation_summary"]["low_soc_calibration_objective"] = calibration_objective_result_to_dict(low_soc_objective)
+        full_payload["validation_summary"]["aged_tail_calibration_objective"] = calibration_objective_result_to_dict(aged_tail_objective)
         full_payload["validation_summary"]["search_plan_id"] = search_plan.plan_id
+        full_payload["validation_summary"]["aging_stage_weights"] = calibration_profile.aging_stage_weights.as_dict()
         evaluations.append(
             CandidateEvaluationSummary(
                 candidate_id=candidate.candidate_id,
@@ -1021,7 +1305,9 @@ def _screen_and_select_candidates(
                 screening_dataset_ids=tuple(screening_dataset_ids),
                 screening_objective_score=screening_objective,
                 full_objective_score=full_objective.total_score,
+                stage_aware_objective_score=stage_aware_objective.total_score,
                 low_soc_objective_score=low_soc_objective.total_score,
+                aged_tail_objective_score=aged_tail_objective.total_score,
                 average_low_soc_voltage_rmse_v=_average_segment_metric(
                     full_payload.get("validation_scorecards", []),
                     "low_soc",
@@ -1030,6 +1316,12 @@ def _screen_and_select_candidates(
                 average_last_10_percent_voltage_rmse_v=_average_tail_metric(
                     full_payload.get("validation_scorecards", []),
                     "last_10_percent_voltage_rmse_v",
+                ),
+                late_life_low_soc_voltage_rmse_v=float(
+                    _aging_stage_summary_map(full_payload).get("late_life", {}).get("average_low_soc_voltage_rmse_v", 0.0) or 0.0
+                ),
+                late_life_last_10_percent_voltage_rmse_v=float(
+                    _aging_stage_summary_map(full_payload).get("late_life", {}).get("average_last_10_percent_voltage_rmse_v", 0.0) or 0.0
                 ),
                 validation_summary=dict(full_payload.get("validation_summary", {})),
             )
@@ -1176,6 +1468,56 @@ def _compare_dataset_diagnostics(
     return tuple(diagnostics)
 
 
+def _delta_or_none(after_value: Any, before_value: Any) -> float | None:
+    if after_value is None or before_value is None:
+        return None
+    return float(after_value) - float(before_value)
+
+
+def _leaderboard_entry(item: DatasetTransitionSummary) -> StageDiagnosticLeaderboardEntry:
+    return StageDiagnosticLeaderboardEntry(
+        dataset_id=item.dataset_id,
+        dataset_display_name=item.dataset_display_name,
+        aging_stage=item.aging_stage,
+        status_transition=item.status_transition,
+        objective_delta=float(item.objective_delta),
+        low_soc_voltage_rmse_delta_v=_delta_or_none(
+            item.candidate_segmented_metrics.get("low_soc", {}).get("voltage_rmse_v"),
+            item.baseline_segmented_metrics.get("low_soc", {}).get("voltage_rmse_v"),
+        ),
+        last_10_percent_voltage_rmse_delta_v=_delta_or_none(
+            item.candidate_tail_metrics.get("last_10_percent_voltage_rmse_v"),
+            item.baseline_tail_metrics.get("last_10_percent_voltage_rmse_v"),
+        ),
+    )
+
+
+def _candidate_tail_pain(item: DatasetTransitionSummary) -> float:
+    candidate_tail = item.candidate_tail_metrics.get("last_10_percent_voltage_rmse_v")
+    candidate_low_soc = item.candidate_segmented_metrics.get("low_soc", {}).get("voltage_rmse_v")
+    if candidate_tail is not None:
+        return float(candidate_tail)
+    if candidate_low_soc is not None:
+        return float(candidate_low_soc)
+    return -1.0
+
+
+def _is_material_early_life_regression(item: DatasetTransitionSummary) -> bool:
+    if item.aging_stage != "early_life":
+        return False
+    if item.status_change < 0 or item.objective_delta > 0.05:
+        return True
+    low_soc_delta = _delta_or_none(
+        item.candidate_segmented_metrics.get("low_soc", {}).get("voltage_rmse_v"),
+        item.baseline_segmented_metrics.get("low_soc", {}).get("voltage_rmse_v"),
+    )
+    tail_delta = _delta_or_none(
+        item.candidate_tail_metrics.get("last_10_percent_voltage_rmse_v"),
+        item.baseline_tail_metrics.get("last_10_percent_voltage_rmse_v"),
+    )
+    return (low_soc_delta is not None and low_soc_delta > 0.015) or (tail_delta is not None and tail_delta > 0.015)
+
+
 def _build_improvement_summary(
     diagnostics: Sequence[DatasetTransitionSummary],
 ) -> RoomEnvelopeImprovementSummary:
@@ -1184,9 +1526,15 @@ def _build_improvement_summary(
     unchanged = [item for item in diagnostics if abs(item.objective_delta) <= 1.0e-9]
     upgrades = [item for item in diagnostics if item.status_change > 0]
     downgrades = [item for item in diagnostics if item.status_change < 0]
+    late_life_improved = [item for item in diagnostics if item.aging_stage == "late_life" and item.objective_delta < -1.0e-9]
+    late_life_regressed = [item for item in diagnostics if item.aging_stage == "late_life" and item.objective_delta > 1.0e-9]
+    early_life_material_regressions = [item for item in diagnostics if _is_material_early_life_regression(item)]
     transition_counts: dict[str, int] = {}
+    status_upgrade_counts_by_stage: dict[str, int] = {}
     for item in diagnostics:
         transition_counts[item.status_transition] = transition_counts.get(item.status_transition, 0) + 1
+        if item.status_change > 0:
+            status_upgrade_counts_by_stage[item.aging_stage] = status_upgrade_counts_by_stage.get(item.aging_stage, 0) + 1
     most_improved = min(improved, key=lambda item: item.objective_delta, default=None)
     most_worsened = max(regressed, key=lambda item: item.objective_delta, default=None)
     return RoomEnvelopeImprovementSummary(
@@ -1195,11 +1543,30 @@ def _build_improvement_summary(
         unchanged_dataset_count=len(unchanged),
         status_upgrade_count=len(upgrades),
         status_downgrade_count=len(downgrades),
+        late_life_improved_count=len(late_life_improved),
+        late_life_regressed_count=len(late_life_regressed),
+        early_life_material_regression_count=len(early_life_material_regressions),
         transition_counts=transition_counts,
+        status_upgrade_counts_by_stage=status_upgrade_counts_by_stage,
         most_improved_dataset_id=most_improved.dataset_id if most_improved is not None else "",
         most_improved_dataset_display_name=most_improved.dataset_display_name if most_improved is not None else "",
         most_worsened_dataset_id=most_worsened.dataset_id if most_worsened is not None else "",
         most_worsened_dataset_display_name=most_worsened.dataset_display_name if most_worsened is not None else "",
+        late_life_improvement_leaderboard=tuple(
+            _leaderboard_entry(item)
+            for item in sorted(late_life_improved, key=lambda diagnostic: (diagnostic.objective_delta, diagnostic.dataset_id))[:3]
+        ),
+        late_life_remaining_error_leaderboard=tuple(
+            _leaderboard_entry(item)
+            for item in sorted(
+                [diagnostic for diagnostic in diagnostics if diagnostic.aging_stage == "late_life"],
+                key=lambda diagnostic: (-_candidate_tail_pain(diagnostic), diagnostic.dataset_id),
+            )[:3]
+        ),
+        early_life_regression_leaderboard=tuple(
+            _leaderboard_entry(item)
+            for item in sorted(early_life_material_regressions, key=lambda diagnostic: (-diagnostic.objective_delta, diagnostic.dataset_id))[:3]
+        ),
     )
 
 
@@ -1219,20 +1586,73 @@ def _build_diagnostics_markdown(
         f"- Threshold profile: `{threshold_profile.profile_id}`",
         f"- Calibration profile: `{calibration_profile.profile_id}`",
         f"- Search plan: `{search_plan.plan_id}`",
+        f"- Aging-stage weighting active: `{str(not calibration_profile.aging_stage_weights.is_uniform()).lower()}`",
         f"- Recommendation: {recommendation_text}",
         f"- Improved datasets: {improvement_summary.improved_dataset_count}",
         f"- Regressed datasets: {improvement_summary.regressed_dataset_count}",
         f"- Status upgrades: {improvement_summary.status_upgrade_count}",
         f"- Status downgrades: {improvement_summary.status_downgrade_count}",
+        f"- Late-life improved: {improvement_summary.late_life_improved_count}",
+        f"- Late-life regressed: {improvement_summary.late_life_regressed_count}",
+        f"- Early-life materially regressed: {improvement_summary.early_life_material_regression_count}",
     ]
     if tail_candidate_comparison is not None:
         lines.extend(
             [
                 f"- Aggregate-best candidate: `{tail_candidate_comparison.aggregate_best_candidate_id}`",
                 f"- Tail-best candidate: `{tail_candidate_comparison.low_soc_best_candidate_id}`",
+                f"- Aged-tail-best candidate: `{tail_candidate_comparison.aged_tail_best_candidate_id}`",
                 f"- Aggregate-best equals tail-best: `{str(tail_candidate_comparison.same_candidate).lower()}`",
+                f"- Aggregate-best equals aged-tail-best: `{str(tail_candidate_comparison.same_as_aged_tail).lower()}`",
+                f"- Tail-best equals aged-tail-best: `{str(tail_candidate_comparison.tail_matches_aged_tail).lower()}`",
             ]
         )
+    if improvement_summary.late_life_improvement_leaderboard:
+        lines.extend(["", "## Late-Life Improvements", ""])
+        for item in improvement_summary.late_life_improvement_leaderboard:
+            lines.append(
+                "- `{dataset}` {transition} objective {delta:+.4f} low_soc {low_soc} tail {tail}".format(
+                    dataset=item.dataset_id,
+                    transition=item.status_transition,
+                    delta=item.objective_delta,
+                    low_soc=(
+                        "n/a"
+                        if item.low_soc_voltage_rmse_delta_v is None
+                        else f"{item.low_soc_voltage_rmse_delta_v:+.4f}"
+                    ),
+                    tail=(
+                        "n/a"
+                        if item.last_10_percent_voltage_rmse_delta_v is None
+                        else f"{item.last_10_percent_voltage_rmse_delta_v:+.4f}"
+                    ),
+                )
+            )
+    if improvement_summary.late_life_remaining_error_leaderboard:
+        lines.extend(["", "## Late-Life Remaining Tail Error", ""])
+        for item in improvement_summary.late_life_remaining_error_leaderboard:
+            lines.append(
+                f"- `{item.dataset_id}` remains a dominant late-life tail dataset ({item.status_transition})"
+            )
+    if improvement_summary.early_life_regression_leaderboard:
+        lines.extend(["", "## Early-Life Regressions", ""])
+        for item in improvement_summary.early_life_regression_leaderboard:
+            lines.append(
+                "- `{dataset}` {transition} objective {delta:+.4f} low_soc {low_soc} tail {tail}".format(
+                    dataset=item.dataset_id,
+                    transition=item.status_transition,
+                    delta=item.objective_delta,
+                    low_soc=(
+                        "n/a"
+                        if item.low_soc_voltage_rmse_delta_v is None
+                        else f"{item.low_soc_voltage_rmse_delta_v:+.4f}"
+                    ),
+                    tail=(
+                        "n/a"
+                        if item.last_10_percent_voltage_rmse_delta_v is None
+                        else f"{item.last_10_percent_voltage_rmse_delta_v:+.4f}"
+                    ),
+                )
+            )
     lines.extend(
         [
             "",
@@ -1325,6 +1745,7 @@ def calibrate_room_envelope(
         calibration_metadata={
             "calibration_profile_id": calibration_profile.profile_id,
             "objective_weights": calibration_profile.objective_weights.as_metric_weights(),
+            "aging_stage_weights": calibration_profile.aging_stage_weights.as_dict(),
             "calibration_objective": None,
             "search_plan_id": search_plan.plan_id,
         },
@@ -1332,15 +1753,29 @@ def calibrate_room_envelope(
     baseline_objective = evaluate_calibration_objective(
         baseline_payload.get("validation_scorecards", []),
         weights=calibration_profile.objective_weights,
+        stage_weights=calibration_profile.aging_stage_weights,
+    )
+    baseline_stage_aware_objective = evaluate_calibration_objective(
+        baseline_payload.get("validation_scorecards", []),
+        weights=calibration_profile.objective_weights,
+        stage_weights=calibration_profile.aging_stage_weights,
     )
     baseline_low_soc_objective = evaluate_calibration_objective(
         baseline_payload.get("validation_scorecards", []),
         weights=tail_weights,
     )
+    baseline_aged_tail_objective = evaluate_calibration_objective(
+        baseline_payload.get("validation_scorecards", []),
+        weights=tail_weights,
+        stage_weights=calibration_profile.aging_stage_weights,
+    )
     baseline_payload.setdefault("validation_summary", {})
     baseline_payload["validation_summary"]["calibration_objective"] = calibration_objective_result_to_dict(baseline_objective)
+    baseline_payload["validation_summary"]["stage_aware_calibration_objective"] = calibration_objective_result_to_dict(baseline_stage_aware_objective)
     baseline_payload["validation_summary"]["low_soc_calibration_objective"] = calibration_objective_result_to_dict(baseline_low_soc_objective)
+    baseline_payload["validation_summary"]["aged_tail_calibration_objective"] = calibration_objective_result_to_dict(baseline_aged_tail_objective)
     baseline_payload["validation_summary"]["search_plan_id"] = search_plan.plan_id
+    baseline_payload["validation_summary"]["aging_stage_weights"] = calibration_profile.aging_stage_weights.as_dict()
 
     raw_candidate_count, candidates, prefiltered, preview = _generate_candidates(
         manifest,
@@ -1371,7 +1806,9 @@ def calibrate_room_envelope(
         "electro_blend": 0.0,
         "thermal_blend": 0.0,
         "objective": calibration_objective_result_to_dict(baseline_objective),
+        "stage_aware_objective": calibration_objective_result_to_dict(baseline_stage_aware_objective),
         "low_soc_objective": calibration_objective_result_to_dict(baseline_low_soc_objective),
+        "aged_tail_objective": calibration_objective_result_to_dict(baseline_aged_tail_objective),
         "base_config_summary": {
             "chemistry_name": base_config.chemistry_name,
             "cell_nominal_voltage_v": base_config.cell_nominal_voltage,
@@ -1382,10 +1819,12 @@ def calibrate_room_envelope(
         "calibrated_parameters": None,
     }
     selected_objective = baseline_objective
+    selected_stage_aware_objective = baseline_stage_aware_objective
     selected_low_soc_objective = baseline_low_soc_objective
+    selected_aged_tail_objective = baseline_aged_tail_objective
     selected_candidate = None
     candidate_lookup = {candidate.candidate_id: candidate for candidate in candidates}
-    tail_candidate_comparison = _build_tail_candidate_comparison(candidate_evaluations, candidate_lookup)
+    tail_candidate_comparison = None
 
     if candidate_evaluations:
         best_evaluation = min(candidate_evaluations, key=lambda item: (item.full_objective_score, item.candidate_id))
@@ -1406,15 +1845,29 @@ def calibrate_room_envelope(
                 selected_objective = evaluate_calibration_objective(
                     selected_payload.get("validation_scorecards", []),
                     weights=calibration_profile.objective_weights,
+                    stage_weights=calibration_profile.aging_stage_weights,
+                )
+                selected_stage_aware_objective = evaluate_calibration_objective(
+                    selected_payload.get("validation_scorecards", []),
+                    weights=calibration_profile.objective_weights,
+                    stage_weights=calibration_profile.aging_stage_weights,
                 )
                 selected_low_soc_objective = evaluate_calibration_objective(
                     selected_payload.get("validation_scorecards", []),
                     weights=tail_weights,
                 )
+                selected_aged_tail_objective = evaluate_calibration_objective(
+                    selected_payload.get("validation_scorecards", []),
+                    weights=tail_weights,
+                    stage_weights=calibration_profile.aging_stage_weights,
+                )
                 selected_payload.setdefault("validation_summary", {})
                 selected_payload["validation_summary"]["calibration_objective"] = calibration_objective_result_to_dict(selected_objective)
+                selected_payload["validation_summary"]["stage_aware_calibration_objective"] = calibration_objective_result_to_dict(selected_stage_aware_objective)
                 selected_payload["validation_summary"]["low_soc_calibration_objective"] = calibration_objective_result_to_dict(selected_low_soc_objective)
+                selected_payload["validation_summary"]["aged_tail_calibration_objective"] = calibration_objective_result_to_dict(selected_aged_tail_objective)
                 selected_payload["validation_summary"]["search_plan_id"] = search_plan.plan_id
+                selected_payload["validation_summary"]["aging_stage_weights"] = calibration_profile.aging_stage_weights.as_dict()
                 selected_candidate_payload = {
                     "candidate_id": selected_candidate.candidate_id,
                     "candidate_mode": selected_candidate.candidate_mode,
@@ -1424,7 +1877,9 @@ def calibrate_room_envelope(
                     "electro_blend": selected_candidate.electro_blend,
                     "thermal_blend": selected_candidate.thermal_blend,
                     "objective": calibration_objective_result_to_dict(selected_objective),
+                    "stage_aware_objective": calibration_objective_result_to_dict(selected_stage_aware_objective),
                     "low_soc_objective": calibration_objective_result_to_dict(selected_low_soc_objective),
+                    "aged_tail_objective": calibration_objective_result_to_dict(selected_aged_tail_objective),
                     "base_config_summary": {
                         "chemistry_name": base_config.chemistry_name,
                         "cell_nominal_voltage_v": base_config.cell_nominal_voltage,
@@ -1436,11 +1891,23 @@ def calibrate_room_envelope(
     selected_payload["validation_summary"]["calibration_profile_id"] = calibration_profile.profile_id
     selected_payload["validation_summary"]["objective_weights"] = calibration_profile.objective_weights.as_metric_weights()
     selected_payload["validation_summary"]["tail_objective_weights"] = tail_weights.as_metric_weights()
+    selected_payload["validation_summary"]["aging_stage_weights"] = calibration_profile.aging_stage_weights.as_dict()
     baseline_payload["validation_summary"]["calibration_profile_id"] = calibration_profile.profile_id
     baseline_payload["validation_summary"]["objective_weights"] = calibration_profile.objective_weights.as_metric_weights()
     baseline_payload["validation_summary"]["tail_objective_weights"] = tail_weights.as_metric_weights()
+    baseline_payload["validation_summary"]["aging_stage_weights"] = calibration_profile.aging_stage_weights.as_dict()
     if "low_soc_calibration_objective" not in selected_payload["validation_summary"]:
         selected_payload["validation_summary"]["low_soc_calibration_objective"] = calibration_objective_result_to_dict(selected_low_soc_objective)
+    if "stage_aware_calibration_objective" not in selected_payload["validation_summary"]:
+        selected_payload["validation_summary"]["stage_aware_calibration_objective"] = calibration_objective_result_to_dict(selected_stage_aware_objective)
+    if "aged_tail_calibration_objective" not in selected_payload["validation_summary"]:
+        selected_payload["validation_summary"]["aged_tail_calibration_objective"] = calibration_objective_result_to_dict(selected_aged_tail_objective)
+
+    tail_candidate_comparison = _build_tail_candidate_comparison(
+        candidate_evaluations,
+        candidate_lookup,
+        selected_winner_candidate_id=str(selected_candidate_payload["candidate_id"]),
+    )
 
     diagnostics = _compare_dataset_diagnostics(
         baseline_payload,
@@ -1485,8 +1952,12 @@ def calibrate_room_envelope(
         selected_aging_stage_summaries=tuple(
             dict(item) for item in selected_payload.get("validation_summary", {}).get("aging_stage_summaries", [])
         ),
+        baseline_stage_aware_objective_score=baseline_stage_aware_objective.total_score,
+        selected_stage_aware_objective_score=selected_stage_aware_objective.total_score,
         baseline_low_soc_objective_score=baseline_low_soc_objective.total_score,
         selected_low_soc_objective_score=selected_low_soc_objective.total_score,
+        baseline_aged_tail_objective_score=baseline_aged_tail_objective.total_score,
+        selected_aged_tail_objective_score=selected_aged_tail_objective.total_score,
         candidate_search_preview=preview,
         tail_candidate_comparison=tail_candidate_comparison,
         improvement_summary=improvement_summary,

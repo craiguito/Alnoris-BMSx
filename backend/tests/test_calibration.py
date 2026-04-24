@@ -6,6 +6,7 @@ from pathlib import Path
 
 from backend.sim_core.calibration import (
     apply_calibration_to_simulation_config,
+    build_validation_config,
     calibrate_parameters,
     load_truth_dataset,
 )
@@ -171,6 +172,69 @@ class CalibrationTests(unittest.TestCase):
         calibrated = calibrate_parameters(dataset, rc_branch_count=1)
 
         self.assertGreater(calibrated.rc_low_soc_multiplier, 1.0)
+
+    def test_age_conditioned_tail_adjustment_is_applied_more_strongly_for_late_life(self) -> None:
+        config = make_config(
+            "panasonic_ncr18650b",
+            cells_in_series=1,
+            group_count=1,
+            discharge_current_a=0.0,
+            duration_s=4200,
+            time_step_s=5,
+            current_profile=make_profile((0, 0.0), (10, 3.0), (3600, 3.0), (3900, 1.0), (4195, 0.0)),
+        )
+        result = run_simulation(config)
+
+        with temporary_workspace_dir() as temp_dir:
+            dataset_path = write_truth_dataset(
+                f"{temp_dir}/aged_tail_truth.json",
+                config,
+                result,
+                extra_metadata={
+                    "dataset_id": "aged_tail_truth",
+                    "display_name": "Aged Tail Truth",
+                    "description": "Synthetic aged tail truth dataset.",
+                    "chemistry": "generic_liion",
+                    "form_factor": "cylindrical",
+                    "nominal_voltage_v": 3.7,
+                    "nominal_capacity_ah": config.cell_capacity_ah,
+                    "temperature_range_c": [20.0, 35.0],
+                    "current_profile_type": "synthetic_pulse",
+                    "tags": ["synthetic", "aged-tail"],
+                    "source": "backend-tests",
+                    "status": "canonical",
+                    "created_at": "2026-04-23T00:00:00Z",
+                    "notes": "Synthetic aged-tail dataset.",
+                    "ambient_temp_c": 25.0,
+                    "source_battery_id": "B0006",
+                    "source_cycle_index": 650,
+                },
+            )
+            payload = json.loads(Path(dataset_path).read_text(encoding="utf-8"))
+            for row in payload["data"]:
+                if float(row.get("soc", 1.0)) <= 0.20:
+                    row["voltage_v"] = float(row["voltage_v"]) - 0.16
+            Path(dataset_path).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            dataset = load_truth_dataset(str(dataset_path), strict_metadata=True)
+
+        calibrated = calibrate_parameters(dataset, rc_branch_count=1)
+        calibrated_config = apply_calibration_to_simulation_config(config, calibrated)
+        early_dataset = dataset.__class__(metadata={**dataset.metadata, "source_cycle_index": 50}, records=dataset.records)
+        late_config = build_validation_config(calibrated_config, dataset)
+        early_config = build_validation_config(calibrated_config, early_dataset)
+
+        self.assertTrue(calibrated.age_conditioned_tail_enabled)
+        self.assertGreater(calibrated.age_conditioned_tail_resistance_gain, 0.0)
+        self.assertGreater(late_config.physics.rc_low_soc_multiplier, early_config.physics.rc_low_soc_multiplier)
+        self.assertGreater(
+            late_config.physics.resistance_soc_curve[0].multiplier,
+            early_config.physics.resistance_soc_curve[0].multiplier,
+        )
+        if calibrated.age_conditioned_tail_ocv_drop_v > 0.0:
+            self.assertLess(
+                late_config.physics.ocv_curve[0].voltage_v,
+                early_config.physics.ocv_curve[0].voltage_v,
+            )
 
 
 if __name__ == "__main__":

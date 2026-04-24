@@ -79,6 +79,11 @@ def _validation_thresholds(parameters: dict[str, Any]) -> dict[str, float]:
         "max_temp_rmse_c",
         "max_final_soc_error",
         "max_final_voltage_error_v",
+        "max_high_soc_voltage_rmse_v",
+        "max_mid_soc_voltage_rmse_v",
+        "max_low_soc_voltage_rmse_v",
+        "max_last_10_percent_voltage_rmse_v",
+        "max_cutoff_neighborhood_voltage_rmse_v",
     ):
         if parameters.get(key) is not None:
             thresholds[key] = float(parameters[key])

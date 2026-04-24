@@ -34,6 +34,10 @@ Segmented electrical metrics use the same normalized structure, but with tail-sp
 - `low_soc_voltage_rmse`
 - `last_10_percent_voltage_rmse`
 
+When aging-stage weighting is active, those metric averages become stage-weighted before normalization:
+
+`objective = sum(weight_i * (stage_weighted_avg_metric_i / stage_weighted_avg_threshold_i)) / sum(weight_i)`
+
 ## Profiles
 
 ### `electrical_first`
@@ -84,6 +88,31 @@ Intent:
 
 Default search plan: `fast_product_default`
 
+### `aged_tail_guarded`
+
+- Voltage RMSE weight: `0.14`
+- Final voltage error weight: `0.16`
+- Energy error weight: `0.08`
+- Temperature RMSE weight: `0.02`
+- Low-SOC voltage RMSE weight: `0.22`
+- Last 10% voltage RMSE weight: `0.18`
+- Cutoff-neighborhood voltage RMSE weight: `0.20`
+
+Aging-stage weights:
+
+- Early-life: `0.55`
+- Mid-life: `1.00`
+- Late-life: `1.85`
+- Unknown: `0.75`
+
+Intent:
+
+- prioritize the aged end-of-discharge blocker directly
+- keep room-envelope selection focused on late-life low-SOC fidelity
+- preserve some early-life accountability without letting it dominate the tail target
+
+Default search plan: `fast_product_default`
+
 ## Where Weighting Matters
 
 Weighting now affects more than final candidate selection.
@@ -92,6 +121,7 @@ Weighting now affects more than final candidate selection.
 - Weighted family blending: higher-priority anchors get more influence in combined parameter sets
 - Screening and final ranking: candidates are kept or dropped by the same weighted normalized objective
 - Segmented tail scoring: `low_soc_voltage_rmse` and `last_10_percent_voltage_rmse` can influence profile-aware ranking directly
+- Aging-stage weighting: `aged_tail_guarded` pushes anchor ranking, screening, and final selection toward late-life room-envelope pain
 
 What weighting does not do yet:
 

@@ -256,11 +256,13 @@ def _run_manifest_case(
             payload["validation_summary"]["calibration_profile_id"] = calibration_metadata.get("calibration_profile_id")
             payload["validation_summary"]["search_plan_id"] = calibration_metadata.get("search_plan_id")
             payload["validation_summary"]["objective_weights"] = calibration_metadata.get("objective_weights")
+            payload["validation_summary"]["aging_stage_weights"] = calibration_metadata.get("aging_stage_weights")
             payload["validation_summary"]["calibration_objective"] = calibration_metadata.get("calibration_objective")
     if calibration_metadata:
         payload["calibration_profile_id"] = calibration_metadata.get("calibration_profile_id")
         payload["search_plan_id"] = calibration_metadata.get("search_plan_id")
         payload["objective_weights"] = calibration_metadata.get("objective_weights")
+        payload["aging_stage_weights"] = calibration_metadata.get("aging_stage_weights")
         payload["calibration_objective"] = calibration_metadata.get("calibration_objective")
     return payload
 

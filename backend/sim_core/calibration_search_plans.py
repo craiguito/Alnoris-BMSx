@@ -202,6 +202,8 @@ _EXHAUSTIVE_DEBUG = CalibrationSearchPlan(
 DEFAULT_SEARCH_PLAN_ID_BY_PROFILE = {
     "electrical_first": _FAST_PRODUCT_DEFAULT.plan_id,
     "balanced_electro_thermal": _BALANCED_DEFAULT.plan_id,
+    "electrical_tail_guarded": _FAST_PRODUCT_DEFAULT.plan_id,
+    "aged_tail_guarded": _FAST_PRODUCT_DEFAULT.plan_id,
 }
 
 

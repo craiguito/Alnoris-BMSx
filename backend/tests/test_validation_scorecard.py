@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from backend.sim_core.calibration import truth_dataset_from_dict
-from backend.sim_core.calibration_profiles import evaluate_scorecard_objective, get_calibration_profile
+from backend.sim_core.calibration_profiles import evaluate_calibration_objective, evaluate_scorecard_objective, get_calibration_profile
 from backend.sim_core.engine import run_simulation
 from backend.sim_core.validation_scorecard import build_validation_scorecard, summarize_validation_scorecards
 from backend.tests.helpers import build_truth_dataset_payload, make_config, make_profile
@@ -199,6 +199,146 @@ class ValidationScorecardTests(unittest.TestCase):
 
         self.assertGreater(result.total_score, 0.0)
         self.assertNotIn("low_soc_voltage_rmse", result.metrics_used)
+
+    def test_aged_tail_guarded_profile_registers_stage_weights(self) -> None:
+        profile = get_calibration_profile("aged_tail_guarded")
+
+        self.assertEqual(profile.default_search_plan_id, "fast_product_default")
+        self.assertAlmostEqual(profile.objective_weights.low_soc_voltage_rmse_weight, 0.22, places=9)
+        self.assertAlmostEqual(profile.objective_weights.last_10_percent_voltage_rmse_weight, 0.18, places=9)
+        self.assertAlmostEqual(profile.objective_weights.cutoff_neighborhood_voltage_rmse_weight, 0.20, places=9)
+        self.assertAlmostEqual(profile.aging_stage_weights.early_life, 0.55, places=9)
+        self.assertAlmostEqual(profile.aging_stage_weights.mid_life, 1.00, places=9)
+        self.assertAlmostEqual(profile.aging_stage_weights.late_life, 1.85, places=9)
+        self.assertAlmostEqual(profile.aging_stage_weights.unknown, 0.75, places=9)
+
+    def test_stage_aware_weighting_prioritizes_late_life_tail_errors(self) -> None:
+        candidate_early_bad = [
+            {
+                "aging_stage": "early_life",
+                "metric_results": [
+                    {"metric_id": "rmse_voltage", "value": 0.045, "threshold_value": 0.05},
+                    {"metric_id": "final_voltage_error", "value": 0.070, "threshold_value": 0.08},
+                    {"metric_id": "energy_error", "value": 0.040, "threshold_value": 0.08},
+                ],
+                "segmented_metrics": [
+                    {"segment_id": "low_soc", "voltage_rmse_v": 0.115, "threshold_voltage_rmse_v": 0.06},
+                ],
+                "tail_metrics": {
+                    "last_10_percent_voltage_rmse_v": 0.135,
+                    "last_10_percent_threshold_v": 0.07,
+                    "cutoff_neighborhood_voltage_rmse_v": 0.150,
+                    "cutoff_neighborhood_threshold_v": 0.08,
+                },
+            },
+            {
+                "aging_stage": "late_life",
+                "metric_results": [
+                    {"metric_id": "rmse_voltage", "value": 0.040, "threshold_value": 0.05},
+                    {"metric_id": "final_voltage_error", "value": 0.060, "threshold_value": 0.08},
+                    {"metric_id": "energy_error", "value": 0.040, "threshold_value": 0.08},
+                ],
+                "segmented_metrics": [
+                    {"segment_id": "low_soc", "voltage_rmse_v": 0.050, "threshold_voltage_rmse_v": 0.06},
+                ],
+                "tail_metrics": {
+                    "last_10_percent_voltage_rmse_v": 0.060,
+                    "last_10_percent_threshold_v": 0.07,
+                    "cutoff_neighborhood_voltage_rmse_v": 0.070,
+                    "cutoff_neighborhood_threshold_v": 0.08,
+                },
+            },
+        ]
+        candidate_late_bad = [
+            {
+                "aging_stage": "early_life",
+                "metric_results": [
+                    {"metric_id": "rmse_voltage", "value": 0.040, "threshold_value": 0.05},
+                    {"metric_id": "final_voltage_error", "value": 0.060, "threshold_value": 0.08},
+                    {"metric_id": "energy_error", "value": 0.040, "threshold_value": 0.08},
+                ],
+                "segmented_metrics": [
+                    {"segment_id": "low_soc", "voltage_rmse_v": 0.050, "threshold_voltage_rmse_v": 0.06},
+                ],
+                "tail_metrics": {
+                    "last_10_percent_voltage_rmse_v": 0.060,
+                    "last_10_percent_threshold_v": 0.07,
+                    "cutoff_neighborhood_voltage_rmse_v": 0.070,
+                    "cutoff_neighborhood_threshold_v": 0.08,
+                },
+            },
+            {
+                "aging_stage": "late_life",
+                "metric_results": [
+                    {"metric_id": "rmse_voltage", "value": 0.045, "threshold_value": 0.05},
+                    {"metric_id": "final_voltage_error", "value": 0.070, "threshold_value": 0.08},
+                    {"metric_id": "energy_error", "value": 0.040, "threshold_value": 0.08},
+                ],
+                "segmented_metrics": [
+                    {"segment_id": "low_soc", "voltage_rmse_v": 0.115, "threshold_voltage_rmse_v": 0.06},
+                ],
+                "tail_metrics": {
+                    "last_10_percent_voltage_rmse_v": 0.135,
+                    "last_10_percent_threshold_v": 0.07,
+                    "cutoff_neighborhood_voltage_rmse_v": 0.150,
+                    "cutoff_neighborhood_threshold_v": 0.08,
+                },
+            },
+        ]
+
+        tail_profile = get_calibration_profile("electrical_tail_guarded")
+        aged_profile = get_calibration_profile("aged_tail_guarded")
+        uniform_a = evaluate_calibration_objective(
+            candidate_early_bad,
+            weights=tail_profile.objective_weights,
+        )
+        uniform_b = evaluate_calibration_objective(
+            candidate_late_bad,
+            weights=tail_profile.objective_weights,
+        )
+        staged_a = evaluate_calibration_objective(
+            candidate_early_bad,
+            weights=aged_profile.objective_weights,
+            stage_weights=aged_profile.aging_stage_weights,
+        )
+        staged_b = evaluate_calibration_objective(
+            candidate_late_bad,
+            weights=aged_profile.objective_weights,
+            stage_weights=aged_profile.aging_stage_weights,
+        )
+
+        self.assertAlmostEqual(uniform_a.total_score, uniform_b.total_score, places=6)
+        self.assertLess(staged_a.total_score, staged_b.total_score)
+        self.assertTrue(staged_a.stage_weighting_active)
+
+    def test_stage_weighting_falls_back_safely_for_unknown_stage(self) -> None:
+        profile = get_calibration_profile("aged_tail_guarded")
+        result = evaluate_calibration_objective(
+            [
+                {
+                    "aging_stage": "unknown",
+                    "metric_results": [
+                        {"metric_id": "rmse_voltage", "value": 0.045, "threshold_value": 0.05},
+                        {"metric_id": "final_voltage_error", "value": 0.060, "threshold_value": 0.08},
+                        {"metric_id": "energy_error", "value": 0.040, "threshold_value": 0.08},
+                    ],
+                    "segmented_metrics": [
+                        {"segment_id": "low_soc", "voltage_rmse_v": 0.070, "threshold_voltage_rmse_v": 0.06},
+                    ],
+                    "tail_metrics": {
+                        "last_10_percent_voltage_rmse_v": 0.075,
+                        "last_10_percent_threshold_v": 0.07,
+                    },
+                }
+            ],
+            weights=profile.objective_weights,
+            stage_weights=profile.aging_stage_weights,
+        )
+
+        self.assertGreater(result.total_score, 0.0)
+        self.assertTrue(result.stage_weighting_active)
+        self.assertEqual(result.stage_counts["unknown"], 1)
+        self.assertAlmostEqual(result.stage_weights["unknown"], 0.75, places=9)
 
 
 if __name__ == "__main__":

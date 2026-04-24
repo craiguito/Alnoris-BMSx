@@ -38,7 +38,7 @@ from backend.tests.helpers import make_config, make_profile, temporary_workspace
 from scripts.calibrate_room_envelope import _build_parser
 
 
-def _registry_metadata(dataset_id: str, display_name: str, source_battery_id: str) -> dict[str, object]:
+def _registry_metadata(dataset_id: str, display_name: str, source_battery_id: str, *, cycle_index: int = 1) -> dict[str, object]:
     return {
         "dataset_id": dataset_id,
         "display_name": display_name,
@@ -57,7 +57,7 @@ def _registry_metadata(dataset_id: str, display_name: str, source_battery_id: st
         "ambient_temp_c": 25.0,
         "initial_soc": 1.0,
         "source_battery_id": source_battery_id,
-        "source_cycle_index": 1,
+        "source_cycle_index": cycle_index,
     }
 
 
@@ -79,6 +79,7 @@ def _make_workspace(dataset_count: int = 2) -> tuple[str, Path, Path, object]:
     manifest_dir.mkdir(parents=True, exist_ok=True)
     dataset_ids: list[str] = []
     families = ["B0005", "B0006", "B0007", "B0018"]
+    cycle_indices = [12, 245, 612, 730]
     for index in range(dataset_count):
         dataset_id = f"synthetic_room_{index + 1}"
         dataset_ids.append(dataset_id)
@@ -86,7 +87,12 @@ def _make_workspace(dataset_count: int = 2) -> tuple[str, Path, Path, object]:
             truth_dir / f"{dataset_id}.json",
             config,
             result,
-            extra_metadata=_registry_metadata(dataset_id, f"Synthetic Room {index + 1}", families[index]),
+            extra_metadata=_registry_metadata(
+                dataset_id,
+                f"Synthetic Room {index + 1}",
+                families[index],
+                cycle_index=cycle_indices[index],
+            ),
         )
     (manifest_dir / "synthetic_room.json").write_text(
         json.dumps(
@@ -139,9 +145,12 @@ class RoomEnvelopeCalibrationTests(unittest.TestCase):
         fast = get_calibration_search_plan(None, calibration_profile_id="electrical_first")
         balanced = get_calibration_search_plan(None, calibration_profile_id="balanced_electro_thermal")
         tail_guarded = get_calibration_profile("electrical_tail_guarded")
+        aged_tail = get_calibration_profile("aged_tail_guarded")
         self.assertEqual(fast.plan_id, "fast_product_default")
         self.assertEqual(balanced.plan_id, "balanced_default")
         self.assertEqual(tail_guarded.default_search_plan_id, "fast_product_default")
+        self.assertEqual(aged_tail.default_search_plan_id, "fast_product_default")
+        self.assertAlmostEqual(aged_tail.aging_stage_weights.late_life, 1.85, places=9)
 
     def test_weighted_anchor_scoring_changes_by_profile(self) -> None:
         manifest = ValidationPackManifest(
@@ -387,13 +396,13 @@ class RoomEnvelopeCalibrationTests(unittest.TestCase):
     def test_cli_parser_accepts_profile_and_search_plan(self) -> None:
         parser = _build_parser()
         args = parser.parse_args([
-            "--calibration-profile", "electrical_tail_guarded",
+            "--calibration-profile", "aged_tail_guarded",
             "--search-plan", "balanced_default",
-            "--benchmark-profiles", "electrical_first", "balanced_electro_thermal", "electrical_tail_guarded",
+            "--benchmark-profiles", "electrical_first", "balanced_electro_thermal", "electrical_tail_guarded", "aged_tail_guarded",
         ])
-        self.assertEqual(args.calibration_profile, "electrical_tail_guarded")
+        self.assertEqual(args.calibration_profile, "aged_tail_guarded")
         self.assertEqual(args.search_plan, "balanced_default")
-        self.assertEqual(args.benchmark_profiles, ["electrical_first", "balanced_electro_thermal", "electrical_tail_guarded"])
+        self.assertEqual(args.benchmark_profiles, ["electrical_first", "balanced_electro_thermal", "electrical_tail_guarded", "aged_tail_guarded"])
 
     def test_artifact_persists_profile_and_search_metadata(self) -> None:
         workspace, truth_dir, manifest_dir, temp_dir = _make_workspace(dataset_count=2)
@@ -411,6 +420,7 @@ class RoomEnvelopeCalibrationTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["search_plan_id"], "fast_product_default")
         self.assertIn("benchmark_comparison", payload)
         self.assertIn("tail_objective_weights", payload["baseline_validation"]["validation_summary"])
+        self.assertIn("aging_stage_weights", payload["baseline_validation"]["validation_summary"])
         self.assertIn("baseline_low_soc_objective_score", payload["summary"])
         self.assertIn("tail_candidate_comparison", payload["summary"])
 
@@ -464,6 +474,105 @@ class RoomEnvelopeCalibrationTests(unittest.TestCase):
         self.assertGreaterEqual(artifact.summary.baseline_low_soc_objective_score, 0.0)
         self.assertGreaterEqual(artifact.summary.selected_low_soc_objective_score, 0.0)
         self.assertIsInstance(artifact.summary.selected_aging_stage_summaries, tuple)
+        self.assertGreaterEqual(artifact.summary.baseline_aged_tail_objective_score, 0.0)
+        self.assertGreaterEqual(artifact.summary.selected_aged_tail_objective_score, 0.0)
+        self.assertGreaterEqual(artifact.summary.baseline_stage_aware_objective_score, 0.0)
+        self.assertGreaterEqual(artifact.summary.selected_stage_aware_objective_score, 0.0)
+
+    def test_stage_aware_benchmark_rows_exist(self) -> None:
+        workspace, truth_dir, manifest_dir, temp_dir = _make_workspace(dataset_count=4)
+        try:
+            artifact = calibrate_room_envelope(
+                manifest_id_or_path="synthetic_room",
+                calibration_profile_id="aged_tail_guarded",
+                truth_data_dir=truth_dir,
+                manifest_dir=manifest_dir,
+            )
+            benchmark = build_room_envelope_benchmark([artifact])
+        finally:
+            temp_dir.__exit__(None, None, None)
+
+        late_rows = [row for row in benchmark.stage_rows if row.stage_id == "late_life"]
+        self.assertTrue(late_rows)
+        self.assertIn("## Late-Life", benchmark.markdown)
+        self.assertIn("## Early-Life", benchmark.markdown)
+
+    def test_improvement_summary_tracks_late_life_and_early_life_regressions(self) -> None:
+        diagnostics = (
+            DatasetTransitionSummary(
+                dataset_id="late_good",
+                dataset_display_name="Late Good",
+                baseline_status="fail",
+                candidate_status="warning",
+                status_transition="FAIL->WARNING",
+                status_change=1,
+                baseline_objective_score=2.0,
+                candidate_objective_score=1.3,
+                objective_delta=-0.7,
+                aging_stage="late_life",
+                baseline_segmented_metrics={"low_soc": {"voltage_rmse_v": 0.20}},
+                candidate_segmented_metrics={"low_soc": {"voltage_rmse_v": 0.11}},
+                baseline_tail_metrics={"last_10_percent_voltage_rmse_v": 0.22},
+                candidate_tail_metrics={"last_10_percent_voltage_rmse_v": 0.14},
+            ),
+            DatasetTransitionSummary(
+                dataset_id="early_bad",
+                dataset_display_name="Early Bad",
+                baseline_status="warning",
+                candidate_status="fail",
+                status_transition="WARNING->FAIL",
+                status_change=-1,
+                baseline_objective_score=1.0,
+                candidate_objective_score=1.2,
+                objective_delta=0.2,
+                aging_stage="early_life",
+                baseline_segmented_metrics={"low_soc": {"voltage_rmse_v": 0.05}},
+                candidate_segmented_metrics={"low_soc": {"voltage_rmse_v": 0.08}},
+                baseline_tail_metrics={"last_10_percent_voltage_rmse_v": 0.06},
+                candidate_tail_metrics={"last_10_percent_voltage_rmse_v": 0.09},
+            ),
+        )
+
+        summary = _build_improvement_summary(diagnostics)
+
+        self.assertEqual(summary.late_life_improved_count, 1)
+        self.assertEqual(summary.early_life_material_regression_count, 1)
+        self.assertEqual(len(summary.late_life_improvement_leaderboard), 1)
+        self.assertEqual(len(summary.early_life_regression_leaderboard), 1)
+        self.assertEqual(summary.status_upgrade_counts_by_stage["late_life"], 1)
+
+    def test_aged_tail_candidate_comparison_is_present(self) -> None:
+        workspace, truth_dir, manifest_dir, temp_dir = _make_workspace(dataset_count=4)
+        try:
+            artifact = calibrate_room_envelope(
+                manifest_id_or_path="synthetic_room",
+                calibration_profile_id="aged_tail_guarded",
+                truth_data_dir=truth_dir,
+                manifest_dir=manifest_dir,
+            )
+        finally:
+            temp_dir.__exit__(None, None, None)
+
+        comparison = artifact.summary.tail_candidate_comparison
+        self.assertIsNotNone(comparison)
+        self.assertTrue(comparison.aged_tail_best_candidate_id)
+        self.assertIn("selected_winner", comparison.aggregate_best_candidate_summary)
+        self.assertIn("late_life_low_soc_voltage_rmse_v", comparison.aged_tail_best_candidate_summary)
+
+    def test_aged_tail_guarded_runs_with_early_life_only_manifest(self) -> None:
+        workspace, truth_dir, manifest_dir, temp_dir = _make_workspace(dataset_count=1)
+        try:
+            artifact = calibrate_room_envelope(
+                manifest_id_or_path="synthetic_room",
+                calibration_profile_id="aged_tail_guarded",
+                truth_data_dir=truth_dir,
+                manifest_dir=manifest_dir,
+            )
+        finally:
+            temp_dir.__exit__(None, None, None)
+
+        self.assertTrue(artifact.selected_validation["validation_scorecards"])
+        self.assertIn("aging_stage_weights", artifact.selected_validation["validation_summary"])
 
 
 if __name__ == "__main__":
