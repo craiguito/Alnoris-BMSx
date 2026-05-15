@@ -105,6 +105,17 @@ class AssetGraphRepository:
             for edge in graph.edges:
                 self.connection.execute(
                     """
+                    DELETE FROM asset_edges
+                    WHERE project_id = ?
+                      AND source_asset_id = ?
+                      AND target_asset_id = ?
+                      AND edge_type = ?
+                      AND edge_id != ?
+                    """,
+                    (project_id, edge.source_id, edge.target_id, edge.relationship, edge.id),
+                )
+                self.connection.execute(
+                    """
                     INSERT OR REPLACE INTO asset_edges(
                         edge_id, project_id, source_asset_id, target_asset_id,
                         edge_type, created_at, raw_json
@@ -136,12 +147,47 @@ class AssetGraphRepository:
     def list_edges(self, project_id: str) -> list[dict[str, Any]]:
         return _fetch_all(self.connection, "SELECT * FROM asset_edges WHERE project_id = ? ORDER BY edge_id", (project_id,))
 
+    def find_assets_by_metadata(self, project_id: str, key: str, value: object) -> list[dict[str, Any]]:
+        matches: list[dict[str, Any]] = []
+        for asset in self.list_assets(project_id):
+            raw = asset.get("raw", {})
+            metadata = raw.get("metadata", {}) if isinstance(raw, dict) else {}
+            if isinstance(metadata, dict) and metadata.get(key) == value:
+                matches.append(asset)
+        return matches
+
+    def graph_exists_for_preset(self, project_id: str, preset_id: str) -> bool:
+        return any(
+            asset.get("node_type") == "battery_pack"
+            for asset in self.find_assets_by_metadata(project_id, "preset_id", preset_id)
+        )
+
+    def delete_edges_for_graph_scope(self, project_id: str, preset_id: str) -> None:
+        scoped_assets = self.find_assets_by_metadata(project_id, "preset_id", preset_id)
+        asset_ids = {str(asset["asset_id"]) for asset in scoped_assets}
+        if not asset_ids:
+            return
+        with transaction(self.connection):
+            for asset_id in asset_ids:
+                self.connection.execute(
+                    """
+                    DELETE FROM asset_edges
+                    WHERE project_id = ?
+                      AND (source_asset_id = ? OR target_asset_id = ?)
+                    """,
+                    (project_id, asset_id, asset_id),
+                )
+
 
 class ComponentRepository:
     def __init__(self, connection: sqlite3.Connection) -> None:
         self.connection = connection
 
     def save_component(self, component: ComponentTwin) -> None:
+        self._save_component_row(component)
+        self.connection.commit()
+
+    def _save_component_row(self, component: ComponentTwin) -> None:
         now = utc_now_iso()
         self.connection.execute(
             """
@@ -165,7 +211,11 @@ class ComponentRepository:
                 dataclass_to_json(component),
             ),
         )
-        self.connection.commit()
+
+    def save_components(self, components: tuple[ComponentTwin, ...] | list[ComponentTwin]) -> None:
+        with transaction(self.connection):
+            for component in components:
+                self._save_component_row(component)
 
     def get_component(self, component_id: str) -> dict[str, Any] | None:
         return _fetch_one(self.connection, "SELECT * FROM components WHERE component_id = ?", (component_id,))
@@ -190,6 +240,10 @@ class GeometryRepository:
         self.connection = connection
 
     def save_geometry_ref(self, geometry: GeometryRef, asset_id: str = "") -> None:
+        self._save_geometry_ref_row(geometry, asset_id)
+        self.connection.commit()
+
+    def _save_geometry_ref_row(self, geometry: GeometryRef, asset_id: str = "") -> None:
         now = utc_now_iso()
         self.connection.execute(
             """
@@ -200,7 +254,11 @@ class GeometryRepository:
             """,
             (geometry.id, asset_id, geometry.geometry_type, geometry.uri, geometry.id, now, now, dataclass_to_json(geometry)),
         )
-        self.connection.commit()
+
+    def save_geometry_refs(self, geometry_refs: tuple[GeometryRef, ...] | list[GeometryRef]) -> None:
+        with transaction(self.connection):
+            for geometry in geometry_refs:
+                self._save_geometry_ref_row(geometry, str(geometry.metadata.get("asset_id", "")))
 
     def list_geometry_refs(self, asset_id: str | None = None) -> list[dict[str, Any]]:
         if asset_id is None:

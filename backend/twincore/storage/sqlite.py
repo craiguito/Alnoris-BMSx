@@ -32,6 +32,9 @@ def initialize_database(db_path: str | Path | None = None) -> sqlite3.Connection
 
 @contextmanager
 def transaction(connection: sqlite3.Connection) -> Iterator[sqlite3.Connection]:
+    if connection.in_transaction:
+        yield connection
+        return
     try:
         connection.execute("BEGIN")
         yield connection

@@ -136,6 +136,14 @@ CREATE INDEX IF NOT EXISTS idx_assets_project_id ON assets(project_id);
 CREATE INDEX IF NOT EXISTS idx_asset_edges_project_id ON asset_edges(project_id);
 CREATE INDEX IF NOT EXISTS idx_asset_edges_source_asset_id ON asset_edges(source_asset_id);
 CREATE INDEX IF NOT EXISTS idx_asset_edges_target_asset_id ON asset_edges(target_asset_id);
+DELETE FROM asset_edges
+WHERE rowid NOT IN (
+    SELECT MIN(rowid)
+    FROM asset_edges
+    GROUP BY project_id, source_asset_id, target_asset_id, edge_type
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_asset_edges_semantic
+ON asset_edges(project_id, source_asset_id, target_asset_id, edge_type);
 CREATE INDEX IF NOT EXISTS idx_components_asset_id ON components(asset_id);
 CREATE INDEX IF NOT EXISTS idx_scenarios_project_id ON scenarios(project_id);
 CREATE INDEX IF NOT EXISTS idx_simulation_runs_project_id ON simulation_runs(project_id);

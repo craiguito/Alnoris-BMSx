@@ -59,12 +59,25 @@ class AssetGraph:
         self.nodes[node.id] = node
         return node
 
-    def add_edge(self, source_id: str, target_id: str, relationship: str = "contains", **metadata: Any) -> AssetEdge:
+    def add_edge(
+        self,
+        source_id: str,
+        target_id: str,
+        relationship: str = "contains",
+        identity: IdentityRef | None = None,
+        **metadata: Any,
+    ) -> AssetEdge:
         if source_id not in self.nodes:
             raise ValueError(f"AssetGraph does not contain source node id {source_id}.")
         if target_id not in self.nodes:
             raise ValueError(f"AssetGraph does not contain target node id {target_id}.")
-        edge = AssetEdge(source_id=source_id, target_id=target_id, relationship=relationship, metadata=dict(metadata))
+        edge = AssetEdge(
+            source_id=source_id,
+            target_id=target_id,
+            relationship=relationship,
+            identity=identity or IdentityRef(kind="asset_edge"),
+            metadata=dict(metadata),
+        )
         self.edges.append(edge)
         return edge
 

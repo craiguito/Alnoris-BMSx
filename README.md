@@ -18,6 +18,7 @@ Phase 2 adds the first local TwinCore persistence and BatteryTwin template path:
 - `backend/twincore/storage` initializes and writes a local SQLite database at `data/twincore/twincore.sqlite` by default.
 - Battery system presets can generate TwinCore asset graphs, component twins, geometry references, and runnable BatteryTwin scenarios.
 - `backend.batterytwin.cli` runs presets through the new TwinCore/BatteryTwin path and persists scenarios, runs, artifacts, provenance, validation records, and simple screening reports.
+- Preset-generated asset, component, edge, and geometry identifiers are project-scoped. Re-running graph generation for the same project and preset upserts the same semantic graph instead of duplicating it.
 
 Useful commands:
 
@@ -27,6 +28,7 @@ python -m backend.batterytwin.cli init-db
 python -m backend.batterytwin.cli create-project --name "BatteryTwin Demo"
 python -m backend.batterytwin.cli create-preset-graph --project-id PROJECT_ID --preset-id generic_cylindrical_pack
 python -m backend.batterytwin.cli run-preset --project-id PROJECT_ID --preset-id generic_cylindrical_pack
+python -m backend.batterytwin.cli run-preset --project-id PROJECT_ID --preset-id generic_cylindrical_pack --refresh-graph
 python -m backend.batterytwin.cli get-run --run-id RUN_ID
 python -m backend.batterytwin.cli list-runs --project-id PROJECT_ID
 ```

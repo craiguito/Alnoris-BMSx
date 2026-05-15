@@ -58,6 +58,8 @@ Battery system presets from `backend.sim_core.system_presets` can now generate:
 
 Representative cell-group nodes are used by default. The converter does not create thousands of individual cell assets.
 
+Generated IDs are scoped by project and preset, for example `batterytwin:{project_id}:{preset_id}:pack`. Asset edges use deterministic IDs derived from project, source asset, relationship, and target asset so graph upserts remain stable across repeated runs.
+
 ## BatteryTwin CLI
 
 The new CLI is separate from the legacy desktop path:
@@ -68,10 +70,12 @@ python -m backend.batterytwin.cli init-db
 python -m backend.batterytwin.cli create-project
 python -m backend.batterytwin.cli create-preset-graph
 python -m backend.batterytwin.cli run-preset
+python -m backend.batterytwin.cli run-preset --refresh-graph
 python -m backend.batterytwin.cli get-run
 python -m backend.batterytwin.cli list-runs
 ```
 
 `backend.sim_core.cli` remains preserved for the Qt desktop bridge. The BatteryTwin CLI is the new TwinCore path for local projects, asset graphs, scenarios, runs, provenance, validation records, and screening reports.
+`create-preset-graph` is idempotent for a project and preset. `run-preset` reuses an existing graph by default and only regenerates/upserts graph records when `--refresh-graph` is provided.
 
 Every `ResultPackage` includes provenance and a credibility card. The current model class is screening-level equivalent-circuit pack modeling with regression-test evidence only; it is not certification-grade and should not be presented as electrochemical cell design validation.

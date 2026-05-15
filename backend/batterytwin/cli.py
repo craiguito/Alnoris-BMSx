@@ -27,6 +27,7 @@ from backend.twincore.storage import (
     SimulationRunRepository,
     ValidationRepository,
     initialize_database,
+    transaction,
 )
 
 
@@ -53,6 +54,7 @@ def _parser() -> argparse.ArgumentParser:
     run_preset.add_argument("--db", required=False)
     run_preset.add_argument("--project-id", required=True)
     run_preset.add_argument("--preset-id", required=True)
+    run_preset.add_argument("--refresh-graph", action="store_true")
 
     get_run = subparsers.add_parser("get-run")
     get_run.add_argument("--db", required=False)
@@ -64,29 +66,50 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _preset_graph_counts(connection: Any, project_id: str, preset_id: str) -> dict[str, Any]:
+    asset_repository = AssetGraphRepository(connection)
+    assets = asset_repository.find_assets_by_metadata(project_id, "preset_id", preset_id)
+    asset_ids = {str(asset["asset_id"]) for asset in assets}
+    edges = [
+        edge
+        for edge in asset_repository.list_edges(project_id)
+        if edge.get("source_asset_id") in asset_ids and edge.get("target_asset_id") in asset_ids
+    ]
+    components = [
+        component
+        for component in ComponentRepository(connection).list_components(project_id)
+        if component.get("asset_id") in asset_ids
+    ]
+    geometry_refs = [
+        geometry
+        for geometry in GeometryRepository(connection).list_geometry_refs()
+        if geometry.get("asset_id") in asset_ids
+    ]
+    return {
+        "project_id": project_id,
+        "preset_id": preset_id,
+        "asset_graph_id": f"batterytwin:{project_id}:{preset_id}:asset_graph",
+        "asset_count": len(assets),
+        "edge_count": len(edges),
+        "component_count": len(components),
+        "geometry_count": len(geometry_refs),
+    }
+
+
 def _save_preset_graph(connection: Any, project_id: str, preset_id: str) -> dict[str, Any]:
     preset = get_system_preset(preset_id)
     graph = preset_to_asset_graph(preset, project_id)
     components = preset_to_component_twins(preset, graph)
     geometry_refs = preset_to_geometry_refs(preset, graph)
 
-    AssetGraphRepository(connection).save_asset_graph(project_id, graph)
-    component_repository = ComponentRepository(connection)
-    for component in components:
-        component_repository.save_component(component)
-    geometry_repository = GeometryRepository(connection)
-    for geometry in geometry_refs:
-        geometry_repository.save_geometry_ref(geometry, str(geometry.metadata.get("asset_id", "")))
+    with transaction(connection):
+        AssetGraphRepository(connection).save_asset_graph(project_id, graph)
+        ComponentRepository(connection).save_components(components)
+        GeometryRepository(connection).save_geometry_refs(geometry_refs)
 
-    return {
-        "project_id": project_id,
-        "preset_id": preset.preset_id,
-        "asset_graph_id": graph.id,
-        "asset_count": len(graph.nodes),
-        "edge_count": len(graph.edges),
-        "component_count": len(components),
-        "geometry_count": len(geometry_refs),
-    }
+    counts = _preset_graph_counts(connection, project_id, preset.preset_id)
+    counts["asset_graph_id"] = graph.id
+    return counts
 
 
 def _report_for_run(
@@ -123,11 +146,16 @@ def _report_for_run(
     )
 
 
-def _run_preset(connection: Any, project_id: str, preset_id: str) -> dict[str, Any]:
+def _run_preset(connection: Any, project_id: str, preset_id: str, *, refresh_graph: bool = False) -> dict[str, Any]:
     preset = get_system_preset(preset_id)
-    graph_result = _save_preset_graph(connection, project_id, preset_id)
+    graph_reused = AssetGraphRepository(connection).graph_exists_for_preset(project_id, preset.preset_id) and not refresh_graph
+    graph_result = (
+        _preset_graph_counts(connection, project_id, preset.preset_id)
+        if graph_reused
+        else _save_preset_graph(connection, project_id, preset_id)
+    )
     graph = preset_to_asset_graph(preset, project_id)
-    scenario = preset_to_battery_scenario(preset)
+    scenario = preset_to_battery_scenario(preset, project_id=project_id)
     scenario_id = ScenarioRepository(connection).save_scenario(project_id, scenario)
     solver = BatteryPackECMSolverPlugin()
     manifest = RunManifest(
@@ -175,6 +203,7 @@ def _run_preset(connection: Any, project_id: str, preset_id: str) -> dict[str, A
         "project_id": project_id,
         "preset_id": preset.preset_id,
         "asset_graph_id": graph_result["asset_graph_id"],
+        "graph_reused": graph_reused,
         "scenario_id": scenario_id,
         "run_id": manifest.run_id,
         "solver_id": result_package.solver_id,
@@ -204,7 +233,7 @@ def run_command(argv: list[str] | None = None) -> dict[str, Any]:
         if args.command == "create-preset-graph":
             return _save_preset_graph(connection, args.project_id, args.preset_id)
         if args.command == "run-preset":
-            return _run_preset(connection, args.project_id, args.preset_id)
+            return _run_preset(connection, args.project_id, args.preset_id, refresh_graph=args.refresh_graph)
         if args.command == "get-run":
             run = SimulationRunRepository(connection).get_run(args.run_id)
             if run is None:
@@ -212,6 +241,13 @@ def run_command(argv: list[str] | None = None) -> dict[str, Any]:
             run["provenance_records"] = ProvenanceRepository(connection).list_for_run(args.run_id)
             run["validation_records"] = ValidationRepository(connection).list_for_run(args.run_id)
             run["reports"] = ReportRepository(connection).list_for_run(args.run_id)
+            run["scenario"] = ScenarioRepository(connection).get_scenario(str(run["scenario_id"]))
+            raw = run.get("raw", {})
+            if isinstance(raw, dict):
+                if "credibility_card" in raw:
+                    run["credibility_card"] = raw["credibility_card"]
+                if "summary" in raw:
+                    run["result_summary"] = raw["summary"]
             return run
         if args.command == "list-runs":
             return {"runs": SimulationRunRepository(connection).list_runs(args.project_id)}

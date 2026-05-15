@@ -38,5 +38,7 @@ Phase 2 adds:
 - BatteryTwin preset-to-asset-graph and preset-to-scenario conversion
 - `python -m backend.batterytwin.cli` for the new TwinCore path
 - persisted credibility, provenance, validation, artifacts, and simple screening report records for `run-preset`
+- project-scoped preset asset/component/geometry IDs and deterministic semantic edge IDs
+- idempotent preset graph upserts, with `run-preset` reusing existing graphs unless `--refresh-graph` is passed
 
 The legacy `python -m backend.sim_core.cli` path remains unchanged and is still the desktop bridge path. BatteryTwin CLI runs are screening-level engineering studies, not certification-grade analyses.

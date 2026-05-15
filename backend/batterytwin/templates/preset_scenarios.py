@@ -7,11 +7,15 @@ from backend.sim_core.system_presets import BatterySystemPreset, build_simulatio
 from backend.twincore.schemas.identity import IdentityRef
 
 
-def _bt_id(preset: BatterySystemPreset, *segments: object) -> str:
-    return ":".join(["batterytwin", preset.preset_id, *(str(segment) for segment in segments)])
+def _bt_id(preset: BatterySystemPreset, *segments: object, project_id: str | None = None) -> str:
+    parts = ["batterytwin"]
+    if project_id:
+        parts.append(project_id)
+    parts.extend([preset.preset_id, *(str(segment) for segment in segments)])
+    return ":".join(parts)
 
 
-def preset_to_battery_scenario(preset: BatterySystemPreset) -> BatteryScenario:
+def preset_to_battery_scenario(preset: BatterySystemPreset, project_id: str | None = None) -> BatteryScenario:
     validate_system_preset(preset)
     legacy_config = build_simulation_config_for_preset(preset)
     cell_ref = REFERENCE_CELLS[preset.cell.key]
@@ -26,8 +30,10 @@ def preset_to_battery_scenario(preset: BatterySystemPreset) -> BatteryScenario:
         internal_resistance_ohm=cell_ref.internal_resistance_ohm_per_cell,
         mass_kg=cell_ref.pack_mass_kg,
         heat_capacity_j_per_kgk=cell_ref.pack_heat_capacity_j_per_kgk,
-        identity=IdentityRef(kind="battery_cell", name=cell_ref.name, id=_bt_id(preset, "cell", "representative")),
+        identity=IdentityRef(kind="battery_cell", name=cell_ref.name, id=_bt_id(preset, "cell", "representative", project_id=project_id)),
         metadata={
+            "project_id": project_id or "",
+            "preset_id": preset.preset_id,
             "cell_preset_key": preset.cell.key,
             "form_factor": preset.cell.form_factor,
         },
@@ -40,8 +46,8 @@ def preset_to_battery_scenario(preset: BatterySystemPreset) -> BatteryScenario:
             cells_in_parallel=preset.pack.parallel_count,
             thermal_zone_id=legacy_config.group_zone_assignments[index],
             cell=cell,
-            identity=IdentityRef(kind="cell_group", name=f"Group {index + 1}", id=_bt_id(preset, "group", index)),
-            metadata={"series_index": index, "preset_id": preset.preset_id},
+            identity=IdentityRef(kind="cell_group", name=f"Group {index + 1}", id=_bt_id(preset, "group", index, project_id=project_id)),
+            metadata={"project_id": project_id or "", "series_index": index, "preset_id": preset.preset_id},
         )
         for index in range(preset.pack.series_count)
     )
@@ -55,8 +61,9 @@ def preset_to_battery_scenario(preset: BatterySystemPreset) -> BatteryScenario:
         pack_heat_capacity_j_per_kgk=preset.pack_heat_capacity_j_per_kgk,
         cooling_coeff_w_per_k=preset.cooling_coeff_w_per_k,
         cell_groups=groups,
-        identity=IdentityRef(kind="battery_pack", name=preset.display_name, id=_bt_id(preset, "pack")),
+        identity=IdentityRef(kind="battery_pack", name=preset.display_name, id=_bt_id(preset, "pack", project_id=project_id)),
         metadata={
+            "project_id": project_id or "",
             "preset_id": preset.preset_id,
             "category": preset.category,
             "chemistry_display_name": preset.chemistry_display_name,
@@ -78,8 +85,9 @@ def preset_to_battery_scenario(preset: BatterySystemPreset) -> BatteryScenario:
             "group_entity_ids": legacy_config.group_entity_ids,
             "physics": legacy_config.physics,
         },
-        identity=IdentityRef(kind="battery_scenario", name=preset.display_name, id=_bt_id(preset, "scenario", "default")),
+        identity=IdentityRef(kind="battery_scenario", name=preset.display_name, id=_bt_id(preset, "scenario", "default", project_id=project_id)),
         metadata={
+            "project_id": project_id or "",
             "preset_id": preset.preset_id,
             "operating_limits": dict(preset.operating_limits),
             "recommended_virtual_tests": list(preset.recommended_virtual_tests),
