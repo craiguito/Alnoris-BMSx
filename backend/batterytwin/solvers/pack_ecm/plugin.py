@@ -25,7 +25,15 @@ class BatteryPackECMSolverPlugin:
         if not isinstance(scenario, BatteryScenario):
             raise TypeError("BatteryPackECMSolverPlugin requires a BatteryScenario in RunManifest.scenario.")
 
-        solver_manifest = replace(manifest, solver_id=self.solver_id)
+        solver_manifest = replace(
+            manifest,
+            solver_id=self.solver_id,
+            metadata={
+                **manifest.metadata,
+                "solver_version": self.solver_version,
+                "fidelity": self.fidelity,
+            },
+        )
         config = battery_scenario_to_legacy_simulation_config(scenario)
         legacy_result = run_simulation(config)
         return legacy_simulation_result_to_result_package(

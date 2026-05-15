@@ -13,9 +13,15 @@ def utc_now_iso() -> str:
 
 @dataclass(frozen=True)
 class ProvenanceRecord:
-    source: str
+    source: str = ""
     generated_by: str = ""
+    run_id: str = ""
+    activity_type: str = ""
     input_ids: tuple[str, ...] = ()
+    input_refs: dict[str, str] = field(default_factory=dict)
+    output_refs: dict[str, str] = field(default_factory=dict)
+    code_version: str = "unknown"
+    environment: dict[str, str] = field(default_factory=dict)
     created_at_iso: str = field(default_factory=utc_now_iso)
     metadata: dict[str, Any] = field(default_factory=dict)
     identity: IdentityRef = field(default_factory=lambda: IdentityRef(kind="provenance"))

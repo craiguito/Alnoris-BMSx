@@ -10,11 +10,11 @@
 
 3. Add persistence
 
-   Introduce storage for asset graphs, scenarios, manifests, result packages, validation records, provenance, and reports without changing the legacy CLI contract.
+   Introduce SQLite storage for projects, asset graphs, components, geometry references, scenarios, manifests, result packages, validation records, provenance, and reports without changing the legacy CLI contract.
 
 4. Convert presets to asset graph
 
-   Represent existing battery presets as BatteryTwin components inside TwinCore asset graphs while keeping legacy preset aliases available.
+   Represent existing battery presets as BatteryTwin components inside TwinCore asset graphs while keeping legacy preset aliases available. Use representative cell-group nodes by default to avoid graph explosion.
 
 5. Add component inspector
 
@@ -27,3 +27,16 @@
 7. Rename product layer from BMSx to BatteryTwin while keeping BMSx module
 
    Move product-facing naming toward BatteryTwin, but preserve BMSx compatibility modules and aliases until downstream users and the desktop bridge have migrated.
+
+## Phase 2 Status
+
+Phase 2 adds:
+
+- local SQLite persistence at `data/twincore/twincore.sqlite`
+- repositories for projects, asset graphs, components, scenarios, simulation runs, validation, provenance, and reports
+- JSON serialization and stable hashing helpers
+- BatteryTwin preset-to-asset-graph and preset-to-scenario conversion
+- `python -m backend.batterytwin.cli` for the new TwinCore path
+- persisted credibility, provenance, validation, artifacts, and simple screening report records for `run-preset`
+
+The legacy `python -m backend.sim_core.cli` path remains unchanged and is still the desktop bridge path. BatteryTwin CLI runs are screening-level engineering studies, not certification-grade analyses.

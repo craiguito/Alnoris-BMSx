@@ -4,7 +4,10 @@ import re
 from uuid import uuid4
 
 
-_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*:[0-9a-f]{32}$")
+# TwinCore supports generated opaque ids such as ``alnoris:run:<uuidhex>`` and
+# deterministic path ids used by template-generated assets such as
+# ``batterytwin:generic_cylindrical_pack:module:0``.
+_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*(?::[a-z0-9_]+){2,}$")
 _KIND_PATTERN = re.compile(r"[^a-z0-9_]+")
 
 
@@ -37,5 +40,5 @@ def is_valid_id(value: str) -> bool:
 
 def require_valid_id(value: str, field_name: str = "id") -> str:
     if not is_valid_id(value):
-        raise ValueError(f"{field_name} must be a TwinCore id of the form namespace:kind:uuidhex.")
+        raise ValueError(f"{field_name} must be a TwinCore id with colon-delimited lowercase segments.")
     return value

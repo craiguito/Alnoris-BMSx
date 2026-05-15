@@ -34,3 +34,44 @@ In Phase 1, `BatteryPackECMSolverPlugin` is a compatibility wrapper:
 5. Return a TwinCore `ResultPackage` with run id, solver identity, provenance, credibility card, and artifacts.
 
 This keeps the existing simulator and desktop CLI intact while establishing the target package boundaries.
+
+## Phase 2 Persistence
+
+Phase 2 adds local SQLite persistence under `backend/twincore/storage`. The default database path is:
+
+```text
+data/twincore/twincore.sqlite
+```
+
+The schema stores projects, assets, asset edges, components, materials, geometry references, scenarios, simulation runs, artifacts, validation records, provenance records, and reports. Each table keeps lookup columns for common queries and preserves the full dataclass payload in `raw_json`.
+
+## BatteryTwin Template Generation
+
+Battery system presets from `backend.sim_core.system_presets` can now generate:
+
+- a TwinCore `AssetGraph`
+- pack/module/cell-group hierarchy nodes
+- cooling, BMS, and enclosure assets
+- component twins tied to asset ids
+- generated parametric battery layout `GeometryRef` records
+- default `BatteryScenario` objects that can still be converted into legacy `SimulationConfig`
+
+Representative cell-group nodes are used by default. The converter does not create thousands of individual cell assets.
+
+## BatteryTwin CLI
+
+The new CLI is separate from the legacy desktop path:
+
+```text
+python -m backend.batterytwin.cli list-presets
+python -m backend.batterytwin.cli init-db
+python -m backend.batterytwin.cli create-project
+python -m backend.batterytwin.cli create-preset-graph
+python -m backend.batterytwin.cli run-preset
+python -m backend.batterytwin.cli get-run
+python -m backend.batterytwin.cli list-runs
+```
+
+`backend.sim_core.cli` remains preserved for the Qt desktop bridge. The BatteryTwin CLI is the new TwinCore path for local projects, asset graphs, scenarios, runs, provenance, validation records, and screening reports.
+
+Every `ResultPackage` includes provenance and a credibility card. The current model class is screening-level equivalent-circuit pack modeling with regression-test evidence only; it is not certification-grade and should not be presented as electrochemical cell design validation.

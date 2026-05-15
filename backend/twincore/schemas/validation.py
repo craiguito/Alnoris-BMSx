@@ -8,8 +8,15 @@ from .identity import IdentityRef
 
 @dataclass(frozen=True)
 class ValidationRecord:
-    validation_type: str
-    status: str
+    validation_type: str = "screening_regression"
+    status: str = "regression_tested"
+    run_id: str = ""
+    target_id: str = ""
+    validation_tier: str = "regression_tested"
+    uncertainty_class: str = "engineering_screening"
+    benchmark_refs: tuple[str, ...] = ()
+    metrics: dict[str, Any] = field(default_factory=dict)
+    approved_use_range: tuple[str, ...] = ()
     metric_results: dict[str, Any] = field(default_factory=dict)
     dataset_ids: tuple[str, ...] = ()
     notes: str = ""
@@ -24,6 +31,13 @@ class ValidationRecord:
 @dataclass(frozen=True)
 class CredibilityCard:
     credibility_level: str = "screening"
+    model_class: str = "screening"
+    model_family: str = ""
+    solver_id: str = ""
+    solver_version: str = ""
+    validation_tier: str = "unvalidated"
+    uncertainty_class: str = "engineering_screening"
+    approved_use_range: tuple[str, ...] = ()
     validation_records: tuple[ValidationRecord, ...] = ()
     assumptions: tuple[str, ...] = ()
     limitations: tuple[str, ...] = ()

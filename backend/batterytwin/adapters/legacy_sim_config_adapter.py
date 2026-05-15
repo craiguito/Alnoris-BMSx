@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import platform
+import sys
 from typing import Any
 
 from backend.batterytwin.schemas.results import BatterySimulationResult
@@ -21,7 +23,21 @@ from backend.sim_core.types import (
 from backend.sim_core.validation import validate_simulation_config
 from backend.twincore.schemas.provenance import ProvenanceRecord
 from backend.twincore.schemas.simulation import ResultPackage, RunManifest, SimulationArtifact
-from backend.twincore.schemas.validation import CredibilityCard
+from backend.twincore.schemas.validation import CredibilityCard, ValidationRecord
+from backend.twincore.serialization import stable_hash
+
+
+APPROVED_SCREENING_USE_RANGE = (
+    "early design trade studies",
+    "not certification-grade",
+    "not electrochemical cell design",
+)
+
+SCREENING_ASSUMPTIONS = (
+    "grouped series-segment ECM",
+    "reduced-order thermal model",
+    "pragmatic degradation approximation",
+)
 
 
 def _scenario_id(manifest: RunManifest) -> str:
@@ -148,21 +164,59 @@ def legacy_simulation_result_to_result_package(
     fidelity: str = "screening",
 ) -> ResultPackage:
     battery_result = legacy_simulation_result_to_battery_result(result, manifest)
+    manifest_hash = str(manifest.metadata.get("manifest_hash", stable_hash(manifest)))
+    preset_id = str(getattr(manifest.scenario, "metadata", {}).get("preset_id", "")) if hasattr(manifest.scenario, "metadata") else ""
+    artifact = SimulationArtifact(
+        artifact_type="battery_simulation_result",
+        name="Battery Simulation Result",
+        payload=battery_result,
+    )
+    validation_record = ValidationRecord(
+        run_id=manifest.run_id,
+        target_id=battery_result.scenario_id,
+        validation_tier="regression_tested",
+        uncertainty_class="engineering_screening",
+        benchmark_refs=(),
+        metrics={},
+        approved_use_range=APPROVED_SCREENING_USE_RANGE,
+        notes="Phase 2 wrapper run; regression tested but not certification validated.",
+    )
     provenance = ProvenanceRecord(
         source="backend.sim_core.engine.run_simulation",
         generated_by=solver_id,
+        run_id=manifest.run_id,
+        activity_type="battery_pack_ecm_simulation",
         input_ids=tuple(item for item in (battery_result.scenario_id, manifest.run_id) if item),
+        input_refs={
+            "scenario_id": battery_result.scenario_id,
+            "preset_id": preset_id,
+            "manifest_hash": manifest_hash,
+        },
+        output_refs={
+            "run_id": manifest.run_id,
+            "result_artifact_id": artifact.id,
+        },
+        code_version="unknown",
+        environment={
+            "python": sys.version.split()[0],
+            "platform": platform.platform(),
+        },
         metadata={"adapter": "legacy_sim_config_adapter", "solver_version": solver_version},
     )
     credibility_card = CredibilityCard(
         credibility_level=fidelity,
-        assumptions=(
-            "Wrapped legacy reduced-order pack ECM solver.",
-            "Phase 1 result package preserves sim_core native outputs.",
-        ),
+        model_class="screening",
+        model_family="equivalent_circuit_pack_model",
+        solver_id=solver_id,
+        solver_version=solver_version,
+        validation_tier="regression_tested",
+        uncertainty_class="engineering_screening",
+        approved_use_range=APPROVED_SCREENING_USE_RANGE,
+        validation_records=(validation_record,),
+        assumptions=SCREENING_ASSUMPTIONS,
         limitations=(
             "Screening fidelity only; not a certification model.",
-            "Persistence and full asset graph conversion are deferred.",
+            "Not suitable for electrochemical cell design.",
         ),
     )
     return ResultPackage(
@@ -171,15 +225,9 @@ def legacy_simulation_result_to_result_package(
         run_id=manifest.run_id,
         provenance_id=provenance.id,
         credibility_card=credibility_card,
-        artifacts=(
-            SimulationArtifact(
-                artifact_type="battery_simulation_result",
-                name="Battery Simulation Result",
-                payload=battery_result,
-            ),
-        ),
+        artifacts=(artifact,),
         summary=dict(battery_result.summary),
         manifest=manifest,
         provenance=provenance,
-        metadata={"fidelity": fidelity},
+        metadata={"fidelity": fidelity, "manifest_hash": manifest_hash, "preset_id": preset_id},
     )

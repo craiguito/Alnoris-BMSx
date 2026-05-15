@@ -48,6 +48,10 @@ class AssetGraph:
     metadata: dict[str, Any] = field(default_factory=dict)
     schema_version: str = field(default="twincore.asset_graph.v1", init=False)
 
+    @property
+    def id(self) -> str:
+        return self.identity.id
+
     def add_node(self, node: AssetNode) -> AssetNode:
         require_valid_id(node.id)
         if node.id in self.nodes:

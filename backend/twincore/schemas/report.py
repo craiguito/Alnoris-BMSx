@@ -10,6 +10,8 @@ from .identity import IdentityRef
 class ReportRecord:
     title: str
     report_type: str = "simulation"
+    project_id: str = ""
+    run_id: str = ""
     result_package_id: str = ""
     sections: tuple[dict[str, Any], ...] = ()
     identity: IdentityRef = field(default_factory=lambda: IdentityRef(kind="report"))

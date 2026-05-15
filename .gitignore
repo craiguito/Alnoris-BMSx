@@ -21,6 +21,8 @@ __pycache__/
 .coverage.*
 htmlcov/
 backend/tests/_tmp/
+data/twincore/
+Data/twincore/
 
 # Node / frontend caches
 node_modules/
