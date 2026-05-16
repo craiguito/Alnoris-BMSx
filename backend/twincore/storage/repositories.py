@@ -502,5 +502,8 @@ class ReportRepository:
             return _fetch_all(self.connection, "SELECT * FROM reports ORDER BY created_at DESC")
         return _fetch_all(self.connection, "SELECT * FROM reports WHERE project_id = ? ORDER BY created_at DESC", (project_id,))
 
+    def get_report(self, report_id: str) -> dict[str, Any] | None:
+        return _fetch_one(self.connection, "SELECT * FROM reports WHERE report_id = ?", (report_id,))
+
     def list_for_run(self, run_id: str) -> list[dict[str, Any]]:
         return _fetch_all(self.connection, "SELECT * FROM reports WHERE run_id = ? ORDER BY created_at DESC", (run_id,))

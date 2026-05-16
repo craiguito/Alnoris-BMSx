@@ -1,0 +1,7 @@
+{
+  "command": "run-preset",
+  "db": "data/twincore/twincore.sqlite",
+  "project_id": "PROJECT_ID",
+  "preset_id": "generic_cylindrical_pack",
+  "refresh_graph": false
+}

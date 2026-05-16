@@ -14,6 +14,7 @@ venv/
 __pycache__/
 *.py[cod]
 *.pyo
+*.pyd
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -21,8 +22,16 @@ __pycache__/
 .coverage.*
 htmlcov/
 backend/tests/_tmp/
+
+# Runtime DBs
 data/twincore/
+data/twincore/*.sqlite
+data/twincore/*.sqlite-wal
+data/twincore/*.sqlite-shm
 Data/twincore/
+Data/twincore/*.sqlite
+Data/twincore/*.sqlite-wal
+Data/twincore/*.sqlite-shm
 
 # Node / frontend caches
 node_modules/
@@ -34,7 +43,9 @@ node_modules/
 build/
 build-desktop/
 build-desktop-test-artifacts/
+cmake-build-*/
 dist/
+*.egg-info/
 out/
 bin/
 obj/
@@ -81,6 +92,7 @@ ui_*.h
 
 # Temporary / package artifacts
 *.tmp
+*.log
 *.temp
 *.bak
 *.cache

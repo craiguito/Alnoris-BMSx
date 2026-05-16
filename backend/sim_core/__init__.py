@@ -1,3 +1,5 @@
+"""Legacy simulation core retained for BatteryTwin.PackECM compatibility."""
+
 from .calibration import (
     CalibratedParameters,
     TruthDataset,

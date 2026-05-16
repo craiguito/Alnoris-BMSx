@@ -1,37 +1,73 @@
-# Alnoris BMSx
+# Alnoris BatteryTwin
 
-Alnoris BMSx is an early-stage battery simulation workspace with a Python simulation core and a Qt/C++ desktop shell.
+Alnoris BatteryTwin is the battery vertical built on the Alnoris TwinCore platform foundation.
 
-The current production path is intentionally preserved:
+BMSx is now treated as the BMS, control, SOC, and SOH module inside BatteryTwin. The older `backend/sim_core` simulator remains in the repository because `BatteryTwin.PackECM` currently wraps it as the first legacy solver backend.
 
-- `backend/sim_core` contains the working battery pack ECM simulator.
-- `desktop_cpp` launches the Python CLI with `python -m backend.sim_core.cli`.
-- The desktop bridge communicates through JSON over stdin/stdout.
+## Current Architecture
 
-Phase 1 of the TwinCore refactor adds an additive architecture layer:
+- `backend/twincore`: shared platform schemas, IDs, serialization, SQLite persistence, solver interfaces, validation, provenance, reporting, and UI-ready service projections.
+- `backend/batterytwin`: battery-domain schemas, preset templates, scenario adapters, solver plugin, project summary services, and CLI workflow.
+- `backend/sim_core`: legacy battery simulation core retained for compatibility with `BatteryTwin.PackECM` and `python -m backend.sim_core.cli`.
+- `archive/desktop_cpp_legacy`: archived Qt/C++ desktop shell from the former BMSx desktop path. It is not part of the active backend architecture.
 
-- `backend/twincore` provides identity, asset graph, scenario, validation, provenance, report, and solver package primitives.
-- `backend/batterytwin` provides battery-domain twin schemas plus an adapter and solver plugin that wrap the existing `sim_core` engine.
+## Quickstart
 
-Phase 2 adds the first local TwinCore persistence and BatteryTwin template path:
+Run the backend tests:
 
-- `backend/twincore/storage` initializes and writes a local SQLite database at `data/twincore/twincore.sqlite` by default.
-- Battery system presets can generate TwinCore asset graphs, component twins, geometry references, and runnable BatteryTwin scenarios.
-- `backend.batterytwin.cli` runs presets through the new TwinCore/BatteryTwin path and persists scenarios, runs, artifacts, provenance, validation records, and simple screening reports.
-- Preset-generated asset, component, edge, and geometry identifiers are project-scoped. Re-running graph generation for the same project and preset upserts the same semantic graph instead of duplicating it.
+```text
+python -m pytest backend/tests -q
+```
 
-Useful commands:
+Check the legacy simulator CLI:
+
+```text
+python -m backend.sim_core.cli list-presets
+```
+
+Check the BatteryTwin CLI:
 
 ```text
 python -m backend.batterytwin.cli list-presets
-python -m backend.batterytwin.cli init-db
-python -m backend.batterytwin.cli create-project --name "BatteryTwin Demo"
-python -m backend.batterytwin.cli create-preset-graph --project-id PROJECT_ID --preset-id generic_cylindrical_pack
-python -m backend.batterytwin.cli run-preset --project-id PROJECT_ID --preset-id generic_cylindrical_pack
-python -m backend.batterytwin.cli run-preset --project-id PROJECT_ID --preset-id generic_cylindrical_pack --refresh-graph
-python -m backend.batterytwin.cli get-run --run-id RUN_ID
-python -m backend.batterytwin.cli list-runs --project-id PROJECT_ID
 ```
 
-The legacy simulator and CLI remain the compatibility baseline while BatteryTwin grows around them.
-The BatteryTwin solver wrapper is screening-level engineering software, not certification-grade validation or electrochemical cell design software.
+Create and run a BatteryTwin project:
+
+```text
+python -m backend.batterytwin.cli init-db --db data/twincore/twincore.sqlite
+python -m backend.batterytwin.cli create-project --db data/twincore/twincore.sqlite --name "BatteryTwin Demo"
+python -m backend.batterytwin.cli create-preset-graph --db data/twincore/twincore.sqlite --project-id PROJECT_ID --preset-id generic_cylindrical_pack
+python -m backend.batterytwin.cli run-preset --db data/twincore/twincore.sqlite --project-id PROJECT_ID --preset-id generic_cylindrical_pack
+python -m backend.batterytwin.cli get-run --db data/twincore/twincore.sqlite --run-id RUN_ID
+```
+
+UI-ready projection commands:
+
+```text
+python -m backend.batterytwin.cli project-summary --db data/twincore/twincore.sqlite --project-id PROJECT_ID
+python -m backend.batterytwin.cli graph --db data/twincore/twincore.sqlite --project-id PROJECT_ID
+python -m backend.batterytwin.cli asset-tree --db data/twincore/twincore.sqlite --project-id PROJECT_ID
+python -m backend.batterytwin.cli inspect-asset --db data/twincore/twincore.sqlite --asset-id ASSET_ID
+python -m backend.batterytwin.cli reports --db data/twincore/twincore.sqlite --project-id PROJECT_ID
+python -m backend.batterytwin.cli run-detail --db data/twincore/twincore.sqlite --run-id RUN_ID
+```
+
+## Architecture Docs
+
+- [Current Architecture](docs/architecture/ARCHITECTURE_CURRENT.md)
+- [Target TwinCore Architecture](docs/architecture/ARCHITECTURE_TARGET_TWINCORE.md)
+- [Migration Plan](docs/migration/MIGRATION_PLAN.md)
+- [Codebase Cleanup Audit](docs/architecture/CODEBASE_CLEANUP_AUDIT.md)
+- [BatteryTwin CLI Workflow](examples/batterytwin/cli_workflow.md)
+
+## Legacy Status
+
+`backend/sim_core` is legacy but still required. It contains the working ECM, thermal, degradation, balancing, faults, validation, calibration, truth dataset, preset, and virtual test machinery used by `BatteryTwin.PackECM`.
+
+The old Qt desktop shell has been archived under `archive/desktop_cpp_legacy`. New work should target `backend/twincore` and `backend/batterytwin`.
+
+## Validation Posture
+
+`BatteryTwin.PackECM` is screening-level engineering software. It is not certification-grade and is not electrochemical cell design software.
+
+BatteryTwin result packages include provenance, validation records, reports, and credibility cards so downstream tools can show assumptions, limitations, and approved-use boundaries clearly.

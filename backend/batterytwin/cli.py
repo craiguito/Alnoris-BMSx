@@ -5,6 +5,7 @@ import json
 import sys
 from typing import Any
 
+from backend.batterytwin.services import BatteryTwinProjectSummaryService, battery_component_display
 from backend.batterytwin.solvers.pack_ecm import BatteryPackECMSolverPlugin
 from backend.batterytwin.templates import (
     preset_to_asset_graph,
@@ -28,6 +29,13 @@ from backend.twincore.storage import (
     ValidationRepository,
     initialize_database,
     transaction,
+)
+from backend.twincore.services import (
+    AssetGraphService,
+    ComponentInspectorService,
+    ReportSummaryService,
+    RunHistoryService,
+    ScenarioService,
 )
 
 
@@ -63,6 +71,42 @@ def _parser() -> argparse.ArgumentParser:
     list_runs = subparsers.add_parser("list-runs")
     list_runs.add_argument("--db", required=False)
     list_runs.add_argument("--project-id", required=False)
+
+    project_summary = subparsers.add_parser("project-summary")
+    project_summary.add_argument("--db", required=False)
+    project_summary.add_argument("--project-id", required=True)
+
+    graph = subparsers.add_parser("graph")
+    graph.add_argument("--db", required=False)
+    graph.add_argument("--project-id", required=True)
+
+    asset_tree = subparsers.add_parser("asset-tree")
+    asset_tree.add_argument("--db", required=False)
+    asset_tree.add_argument("--project-id", required=True)
+
+    inspect_asset = subparsers.add_parser("inspect-asset")
+    inspect_asset.add_argument("--db", required=False)
+    inspect_asset.add_argument("--asset-id", required=True)
+
+    inspect_component = subparsers.add_parser("inspect-component")
+    inspect_component.add_argument("--db", required=False)
+    inspect_component.add_argument("--component-id", required=True)
+
+    scenario = subparsers.add_parser("scenario")
+    scenario.add_argument("--db", required=False)
+    scenario.add_argument("--scenario-id", required=True)
+
+    reports = subparsers.add_parser("reports")
+    reports.add_argument("--db", required=False)
+    reports.add_argument("--project-id", required=True)
+
+    report = subparsers.add_parser("report")
+    report.add_argument("--db", required=False)
+    report.add_argument("--report-id", required=True)
+
+    run_detail = subparsers.add_parser("run-detail")
+    run_detail.add_argument("--db", required=False)
+    run_detail.add_argument("--run-id", required=True)
     return parser
 
 
@@ -251,6 +295,27 @@ def run_command(argv: list[str] | None = None) -> dict[str, Any]:
             return run
         if args.command == "list-runs":
             return {"runs": SimulationRunRepository(connection).list_runs(args.project_id)}
+        if args.command == "project-summary":
+            return BatteryTwinProjectSummaryService(connection).get_project_summary(args.project_id)
+        if args.command == "graph":
+            return AssetGraphService(connection).get_project_graph(args.project_id)
+        if args.command == "asset-tree":
+            return AssetGraphService(connection).get_asset_tree(args.project_id)
+        if args.command == "inspect-asset":
+            return battery_component_display(ComponentInspectorService(connection).inspect_asset(args.asset_id))
+        if args.command == "inspect-component":
+            return battery_component_display(ComponentInspectorService(connection).inspect_component(args.component_id))
+        if args.command == "scenario":
+            return ScenarioService(connection).get_scenario_summary(args.scenario_id)
+        if args.command == "reports":
+            return {"reports": ReportSummaryService(connection).list_project_reports(args.project_id)}
+        if args.command == "report":
+            report = ReportSummaryService(connection).get_report_detail(args.report_id)
+            if report is None:
+                raise ValueError(f"Unknown report_id: {args.report_id}")
+            return report
+        if args.command == "run-detail":
+            return RunHistoryService(connection).get_run_detail(args.run_id)
     finally:
         connection.close()
 
