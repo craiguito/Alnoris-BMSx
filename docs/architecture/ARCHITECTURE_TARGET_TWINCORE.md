@@ -27,6 +27,9 @@ TwinCore should be reusable by future verticals such as:
 - GridTwin
 - AeroTwin
 
+The reusable vertical pattern is formalized through `backend/twincore/verticals`.
+BatteryTwin is registered as the active reference vertical; FusionTwin, FissionTwin, GridTwin, and AeroTwin are planned definitions only.
+
 ## BatteryTwin Vertical
 
 `backend/batterytwin` owns the battery-specific layer:
@@ -40,6 +43,18 @@ TwinCore should be reusable by future verticals such as:
 - BatteryTwin CLI and project summary services
 
 BMSx is now treated as the BMS/control/SOC/SOH module inside BatteryTwin rather than the top-level product architecture.
+
+## Vertical Registry
+
+TwinCore exposes a lightweight registry for vertical definitions and capabilities:
+
+```text
+python -m backend.twincore.cli list-verticals
+python -m backend.twincore.cli vertical --vertical-id batterytwin
+python -m backend.twincore.cli capabilities
+```
+
+The registry is descriptive. It records active, planned, stub, and legacy capabilities without importing future vertical packages or claiming implementation status.
 
 ## Solver Architecture
 

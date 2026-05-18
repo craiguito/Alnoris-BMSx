@@ -11,6 +11,20 @@ BMSx is now treated as the BMS, control, SOC, and SOH module inside BatteryTwin.
 - `backend/sim_core`: legacy battery simulation core retained for compatibility with `BatteryTwin.PackECM` and `python -m backend.sim_core.cli`.
 - `archive/desktop_cpp_legacy`: archived Qt/C++ desktop shell from the former BMSx desktop path. It is not part of the active backend architecture.
 
+## Multi-Vertical TwinCore Roadmap
+
+BatteryTwin is the active reference vertical for the TwinCore pattern. Future vertical definitions are registered for FusionTwin, FissionTwin, GridTwin, and AeroTwin so the architecture can be discussed and tested without creating placeholder physics packages.
+
+View the registry:
+
+```text
+python -m backend.twincore.cli list-verticals
+python -m backend.twincore.cli vertical --vertical-id batterytwin
+python -m backend.twincore.cli capabilities
+```
+
+Do not build future vertical implementations until BatteryTwin service contracts and solver migration are stable.
+
 ## Quickstart
 
 Run the backend tests:
@@ -56,9 +70,12 @@ python -m backend.batterytwin.cli run-detail --db data/twincore/twincore.sqlite 
 
 - [Current Architecture](docs/architecture/ARCHITECTURE_CURRENT.md)
 - [Target TwinCore Architecture](docs/architecture/ARCHITECTURE_TARGET_TWINCORE.md)
+- [Vertical Architecture Pattern](docs/architecture/VERTICAL_ARCHITECTURE_PATTERN.md)
+- [Future Verticals](docs/architecture/FUTURE_VERTICALS.md)
 - [Migration Plan](docs/migration/MIGRATION_PLAN.md)
 - [Codebase Cleanup Audit](docs/architecture/CODEBASE_CLEANUP_AUDIT.md)
 - [BatteryTwin CLI Workflow](examples/batterytwin/cli_workflow.md)
+- [Vertical Scaffold Example](examples/vertical_scaffold/README.md)
 
 ## Legacy Status
 

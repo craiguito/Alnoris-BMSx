@@ -46,6 +46,18 @@ Added:
 - BatteryTwin project summary service
 - CLI commands exposing UI-ready JSON projections
 
+## Phase 3.5: Multi-Vertical Registry And Future Definitions Complete
+
+Added:
+
+- lightweight TwinCore vertical definition and capability registry
+- BatteryTwin registration as the active reference vertical
+- planned/stub definitions for FusionTwin, FissionTwin, GridTwin, and AeroTwin
+- `python -m backend.twincore.cli` commands for listing verticals and capabilities
+- architecture docs for the reusable vertical pattern
+
+This phase is architectural scaffolding only. It does not implement future vertical physics or create runtime packages for FusionTwin, FissionTwin, GridTwin, or AeroTwin.
+
 ## Phase 4: Web Or Desktop UI Integration
 
 Next UI phase:
@@ -56,6 +68,8 @@ Next UI phase:
 - add graph and asset tree views
 - add run history and report views
 - keep backend CLI contracts stable
+
+The next implementation phase should remain BatteryTwin UI/service integration or BatteryTwin solver migration. Full future vertical builds should wait until BatteryTwin contracts and solver boundaries are stable.
 
 ## Phase 5: Migrate sim_core Internals Into BatteryTwin
 
